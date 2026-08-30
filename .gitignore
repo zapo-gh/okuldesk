@@ -1,0 +1,27 @@
+.env
+node_modules/
+dist/
+uploads/
+nginx/ssl/
+*.log
+*.traineddata
+*.pdf
+.vscode/
+dist-electron/
+
+# Database and Excel files
+*.db
+*.sqlite
+*.sqlite3
+*.xls
+*.xlsx
+
+# Temporary Database Files
+*.db-wal
+*.db-shm
+
+# Tauri binaries
+src-tauri/binaries/*.exe
+
+# Test dosyaları
+frontend/test*.css

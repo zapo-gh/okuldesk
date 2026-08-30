@@ -1,0 +1,612 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite enum desteklemediği için String kullanılır (değerler: ADMIN, PARENT)
+// (değerler: ACTIVE, INACTIVE)
+
+model User {
+  id                 String   @id @default(uuid())
+  username           String   @unique
+  password           String
+  role               String   @default("PARENT")
+  mustChangePassword Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  parent Parent?
+  auditLogs AuditLog[]
+}
+
+model Student {
+  id           String   @id @default(uuid())
+  schoolNumber String   @unique
+  fullName     String
+  className    String
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+
+  parents              Parent[]             @relation("StudentParents")
+  absenteeisms         Absenteeism[]
+  writtenWarnings      WrittenWarning[]
+  dailyViolations      DailyViolation[]
+  gradeReportStudents  GradeReportStudent[]
+  clubMembers          StudentClubMember[]
+}
+
+model Parent {
+  id       String @id @default(uuid())
+  userId   String @unique
+  fullName String
+  
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students Student[] @relation("StudentParents")
+  contacts ParentContact[]
+}
+
+model ParentContact {
+  id              String    @id @default(uuid())
+  parentId        String
+  name            String    // Örn: Anne, Baba, Vasi
+  phone           String
+  isPrimary       Boolean   @default(false)
+  waConsentStatus String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  waConsentDate   DateTime?
+  
+  parent          Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+}
+
+model Absenteeism {
+  id             String    @id @default(uuid())
+  studentId      String
+  warningNumber  Int       @default(1)
+  isBep          Boolean   @default(false)
+  pdfPath        String
+  previewPath    String?
+  excusedDays    Float?
+  unexcusedDays  Float?
+  createdAt      DateTime  @default(now())
+  viewedByParent Boolean   @default(false)
+  waSentAt       DateTime?
+  deletedAt      DateTime?
+
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+
+model WrittenWarning {
+  id                  String    @id @default(uuid())
+  studentId           String
+  warningNumber       Int       @default(1)
+  behaviorCode        String
+  behaviorText        String
+  description         String?
+  guidanceNote        String?
+  classTeacherName    String?
+  schoolCounselorName String?
+  pdfPath             String
+  issuedBy            String    @default("Okul Yönetimi")
+  issuedAt            DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  waSentAt            DateTime?
+  deletedAt           DateTime?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ── Günlük İhlal Takip Sistemi ──────────────────────
+// ViolationType değerleri: KIYAFET, TOREN_GEC, DIGER
+
+model ViolationUpload {
+  id          String  @id @default(uuid())
+  type        String
+  description String?
+  imagePath   String
+  ocrRawText  String?
+  uploadedBy  String        @default("Okul Yönetimi")
+  violationDate DateTime    @default(now())
+  createdAt   DateTime      @default(now())
+
+  records DailyViolation[]
+}
+
+model DailyViolation {
+  id              String   @id @default(uuid())
+  studentId       String
+  uploadId        String
+  type            String
+  violationDate   DateTime      @default(now())
+  matchedBy       String        @default("OCR")   // OCR, MANUAL
+  isConfirmed     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  deletedAt       DateTime?
+
+  student Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  upload  ViolationUpload  @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, uploadId])
+  @@index([studentId])
+  @@index([uploadId])
+  @@index([type])
+  @@index([violationDate])
+}
+
+// ── Okul Ayarları ──────────────────────────────────
+
+model SchoolSettings {
+  id               String   @id @default("singleton")
+  schoolName       String   @default("")
+  principalName    String   @default("")
+  academicYear     String   @default("2025-2026")
+  waTemplate1      String?  @default("")
+  waTemplate2      String?  @default("")
+  waTemplate3      String?  @default("")
+  dutyRotationFreq String   @default("weekly") // none, weekly, biweekly, monthly
+  lastRotationDate String?  
+  updatedAt        DateTime @updatedAt
+}
+
+// ── Personel ───────────────────────────────────────
+// role değerleri: MUDUR_YARDIMCISI | REHBER_OGRETMEN | SINIF_REHBER_OGRETMEN
+
+model Staff {
+  id        String   @id @default(uuid())
+  name      String
+  role          String
+  className     String?  // Sadece SINIF_REHBER_OGRETMEN için (örn: "10-A")
+  tcKimlikNo    String?
+  brans         String?
+  kurumSicilNo  String?
+  emekliSicilNo String?
+  unvan         String?
+  gorev         String?
+  isActive      Boolean  @default(true)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+  extraData String?
+
+  commissionAssignments CommissionAssignment[]
+
+  @@index([role])
+}
+
+// ── Karne / Akademik Başarısızlık Bildirimi ────────
+
+model GradeReport {
+  id          String   @id @default(uuid())
+  className   String
+  schoolYear  String
+  meetingDate DateTime @default(now())
+  karneText   String?  // ham çıkarılan metin (debug)
+  uploadedAt  DateTime @default(now())
+  archived    Boolean  @default(false)
+
+  students GradeReportStudent[]
+}
+
+model GradeReportStudent {
+  id             String   @id @default(uuid())
+  reportId       String
+  studentId      String?  // DB'de eşleşen öğrenci (null = eşleşme yok)
+  fullName       String   // karneden okunan isim
+  className      String
+  tcKimlikNo     String?
+  schoolNumber   String?
+  pdfPath        String?  // üretilen PDF yolu
+  createdAt      DateTime @default(now())
+
+  report  GradeReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  student Student?    @relation(fields: [studentId], references: [id])
+  failedSubjectsList GradeReportStudentSubject[]
+
+  @@index([reportId])
+  @@index([studentId])
+}
+
+model GradeReportStudentSubject {
+  id                   String @id @default(uuid())
+  gradeReportStudentId String
+  subject              String
+  grade                Float
+  
+  gradeReportStudent   GradeReportStudent @relation(fields: [gradeReportStudentId], references: [id], onDelete: Cascade)
+  
+  @@index([gradeReportStudentId])
+}
+
+// ----------------------------------------------------
+// İDARE YARDIMCISI 16 MODÜL VERİTABANI ALTYAPISI
+// ----------------------------------------------------
+
+model DutyStation {
+  id        String   @id @default(uuid())
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Int      @default(1)
+  shift     String   @default("tum") // sabah | oglen | tum | okuloncesi
+  capacity  Int      @default(1) // Kaç nöbetçi olacağı
+  assignments DutyAssignment[]
+}
+
+model DutyAssignment {
+  id           String @id @default(uuid())
+  staffId      String
+  stationId    String
+  dayOfWeek    Int
+  weekNumber   Int    @default(0)
+  academicYear String
+  month        Int    @default(0) // 0=haftalık mod, 1-12=Ocak-Aralık
+  year         Int    @default(0)
+
+  station DutyStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+}
+
+model DutyStaffConfig {
+  id              String  @id @default(uuid())
+  staffId         String
+  academicYear    String
+  availableDays   String  @default("1,2,3,4,5") // virgülle ayrılmış gün no (1-5)
+  maxPerMonth     Int     @default(0)             // 0 = sınırsız
+  maxPerWeek      Int     @default(0)             // 0 = sınırsız
+  isAdmin         Boolean @default(false)         // İdareci mi?
+  isFixedDay      Boolean @default(false)         // Nöbet günü sabit mi?
+  fixedDayOfWeek  Int?                            // Sabit gün ise hangisi (1: Pzt, ..., 5: Cuma)
+  isFixedStation  Boolean @default(false)
+  isExempt        Boolean @default(false)         // Nöbet muaf mı?         // Nöbet yeri sabit mi?
+  fixedStationId  String?                         // Sabit nöbet yeri ID'si
+
+  @@unique([staffId, academicYear])
+  @@index([academicYear])
+}
+
+model Supplier {
+  id            String @id @default(uuid())
+  name          String
+  taxNumber     String?
+  taxOffice     String?
+  address       String?
+  phone         String?
+  email         String?
+  iban          String?
+  contactPerson String?
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+
+  offers ProcurementOffer[]
+}
+
+model OrderLetter {
+  id            String   @id @default(uuid())
+  subject       String
+  supplierName  String
+  supplierAddress String?
+  date          String
+  deliveryDate  String
+  academicYear  String
+  notes         String?
+  extraData     String?
+  createdAt     DateTime @default(now())
+
+  orderItems    OrderLetterItem[]
+}
+
+model OrderLetterItem {
+  id          String      @id @default(uuid())
+  orderId     String
+  name        String
+  quantity    Int
+  unit        String
+  unitPrice   Float
+  total       Float
+  
+  order       OrderLetter @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+}
+
+model Procurement {
+  id            String @id @default(uuid())
+  title         String
+  date          String
+  procedureType String @default("22/d")
+  estimatedCost Float  @default(0)
+  status        String @default("ONAY_BEKLIYOR")
+  academicYear  String
+  itemCount     Int    @default(0)
+  supplierCount Int    @default(0)
+  createdAt     DateTime @default(now())
+
+  items  ProcurementItem[]
+  offers ProcurementOffer[]
+  commissionMembersList ProcurementCommissionMember[]
+  extraData String?
+}
+
+model ProcurementCommissionMember {
+  id            String @id @default(uuid())
+  procurementId String
+  fullName      String
+  role          String?
+  
+  procurement   Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  
+  @@index([procurementId])
+}
+
+model ProcurementItem {
+  id                 String @id @default(uuid())
+  procurementId      String
+  name               String
+  quantity           Int
+  unit               String
+  estimatedUnitPrice Float
+
+  procurement Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  offers      ProcurementOffer[]
+}
+
+model ProcurementOffer {
+  id            String @id @default(uuid())
+  procurementId String
+  itemId        String
+  supplierId    String
+  offeredPrice  Float
+  isWinner      Boolean @default(false)
+
+  procurement Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  item        ProcurementItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model StudentClub {
+  id               String @id @default(uuid())
+  name             String
+  description      String?
+  assignedStaffId  String?
+  assignedStaffName String?
+  meetingDay       String?
+  meetingTime      String?
+  maxMembers       Int     @default(30)
+  academicYear     String
+  isActive         Int     @default(1)
+  memberCount      Int     @default(0)
+
+  members StudentClubMember[]
+  extraData String?
+}
+
+model StudentClubMember {
+  id        String @id @default(uuid())
+  clubId    String
+  studentId String
+  role      String @default("Üye")
+
+  club StudentClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Extracurricular {
+  id               String @id @default(uuid())
+  branch           String
+  assignedStaffId  String?
+  assignedStaffName String?
+  schedule         String?
+  academicYear     String
+  notes            String?
+  status           String @default("ONAY_BEKLIYOR")
+  extraData        String?
+}
+
+model SocialActivity {
+  id               String @id @default(uuid())
+  name             String
+  type             String
+  description      String?
+  plannedDate      String?
+  academicYear     String
+  assignedStaffId  String?
+  assignedStaffName String?
+  status           String @default("PLAN_ASAMASINDA")
+  notes            String?
+  extraData        String?
+}
+
+model FieldTrip {
+  id                 String @id @default(uuid())
+  title              String
+  destination        String
+  date               String
+  returnDate         String?
+  purpose            String?
+  transportation     String?
+  assignedStaffId    String?
+  assignedStaffName  String?
+  participantClasses String?
+  academicYear       String
+  notes              String?
+  status             String @default("PLAN_ASAMASINDA")
+  extraData          String?
+}
+
+model BoardMeeting {
+  id               String @id @default(uuid())
+  title            String
+  date             String
+  time             String?
+  location         String?
+  academicYear     String
+  agenda           String?
+  decisions        String?
+  status           String @default("PLANLANDI")
+  extraData        String?
+
+  agendaItems      BoardAgendaItem[]
+}
+
+model Commission {
+  id               String @id @default(uuid())
+  name             String
+  description      String?
+  academicYear     String
+  members          String? 
+  status           String @default("AKTIF")
+  extraData        String?
+
+  roles            CommissionRole[]
+}
+
+model CommemorativeDay {
+  id               String @id @default(uuid())
+  name             String
+  startDate        String
+  endDate          String
+  assignedStaffId  String?
+  assignedStaffName String?
+  description      String?
+  academicYear     String
+  status           String @default("BEKLIYOR")
+  extraData        String?
+}
+
+model Holiday {
+  id        String @id @default(uuid())
+  name      String
+  startDate String
+  endDate   String?
+  type      String @default("RESMI_TATIL")
+  academicYear String
+  extraData    String?
+}
+
+model AnnualPlanItem {
+  id           String @id @default(uuid())
+  academicYear String
+  month        Int
+  title        String
+  description  String?
+  category     String?
+  sortOrder    Int     @default(0)
+  extraData    String?
+}
+
+model ParentAssociationMeeting {
+  id               String @id @default(uuid())
+  date             String
+  type             String @default("OLAGAN")
+  meetingNumber    Int    @default(1)
+  academicYear     String
+  notes            String?
+  decisions        String?
+  status           String @default("PLANLANDI")
+  extraData        String?
+}
+
+model ParentAssociationMember {
+  id           String @id @default(uuid())
+  fullName     String
+  role         String @default("UYE")
+  phone        String?
+  academicYear String
+  extraData    String?
+}
+
+model TravelAllowance {
+  id                String @id @default(uuid())
+  staffId           String?
+  staffName         String?
+  title             String?
+  purpose           String?
+  departurePlace    String?
+  arrivalPlace      String?
+  departureDate     String?
+  returnDate        String?
+  transportType     String?
+  transportCost     Float?
+  dailyAllowance    Float?
+  accommodationCost Float?
+  totalCost         Float?
+  academicYear      String
+  notes             String?
+  extraData         String?
+}
+
+model StaffTransfer {
+  id             String @id @default(uuid())
+  staffName      String
+  staffTitle     String?
+  tcKimlikNo     String?
+  sicilNo        String?
+  currentSchool  String?
+  newSchool      String?
+  transferDate   String
+  transferReason String?
+  academicYear   String
+  notes          String?
+  extraData      String?
+}
+
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model BoardAgendaItem {
+  id          String   @id @default(uuid())
+  meetingId   String
+  orderNumber Int      @default(1)
+  topic       String
+  decision    String?
+  explanation String?
+  createdAt   DateTime @default(now())
+
+  meeting     BoardMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+}
+
+model CommissionRole {
+  id           String   @id @default(uuid())
+  commissionId String
+  roleName     String
+  sortOrder    Int      @default(0)
+
+  commission   Commission @relation(fields: [commissionId], references: [id], onDelete: Cascade)
+  assignments  CommissionAssignment[]
+
+  @@index([commissionId])
+}
+
+model CommissionAssignment {
+  id      String @id @default(uuid())
+  roleId  String
+  staffId String
+
+  role    CommissionRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  staff   Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([roleId])
+  @@index([staffId])
+}
+

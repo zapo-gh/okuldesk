@@ -1,0 +1,26 @@
+{
+  "name": "okuldesk",
+  "version": "1.0.0",
+  "description": "OkulDesk - Masaüstü Uygulaması",
+  "scripts": {
+    "install:backend": "npm --prefix backend install",
+    "install:frontend": "npm --prefix frontend install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "build:backend": "npm --prefix backend run prisma:generate && npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:all": "npm run build:backend && npm run build:frontend",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "tauri": "tauri",
+    "tauri:dev": "npm run build:backend && concurrently \"npm --prefix backend run dev\" \"npx tauri dev\"",
+    "tauri:start": "npm run tauri:dev",
+    "tauri:build": "npm run build:all && npx tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "concurrently": "^10.0.5",
+    "cross-env": "^7.0.3"
+  },
+  "overrides": {
+    "lru-cache": "10.4.3"
+  }
+}
