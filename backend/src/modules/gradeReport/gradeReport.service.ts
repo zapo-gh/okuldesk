@@ -177,13 +177,13 @@ class GradeReportService {
 
     // Müdür yardımcısı ve rehber öğretmen tek seferde getir
     const [vicePrincipal, counselor] = await Promise.all([
-      prisma.staff.findFirst({ where: { role: 'MUDUR_YARDIMCISI', isActive: true } }),
-      prisma.staff.findFirst({ where: { role: 'REHBER_OGRETMEN',   isActive: true } }),
+      prisma.staff.findFirst({ where: { title: 'MUDUR_YARDIMCISI', isActive: true } }),
+      prisma.staff.findFirst({ where: { title: 'REHBER_OGRETMEN',   isActive: true } }),
     ]);
 
     // Sınıf rehber öğretmenlerini önbelleğe al (formatı normalleştirerek eşleştir)
     const allClassTeachers = await prisma.staff.findMany({
-      where: { role: 'SINIF_REHBER_OGRETMEN', isActive: true },
+      where: { title: 'SINIF_REHBER_OGRETMEN', isActive: true },
     });
 
     /**

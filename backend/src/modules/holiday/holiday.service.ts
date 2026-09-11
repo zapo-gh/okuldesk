@@ -3,39 +3,57 @@ import { v4 as uuid } from 'uuid';
 
 class HolidayService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "Holiday" WHERE "academicYear"=? ORDER BY "startDate" ASC`, academicYear
-    );
+    return prisma.holiday.findMany({
+      where: {
+        academicYear,
+        deletedAt: null
+      },
+      orderBy: {
+        startDate: 'asc'
+      }
+    });
   }
 
   async create(data: { name: string; startDate: string; endDate: string; academicYear: string; isRecurring?: boolean }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "Holiday" ("id","name","startDate","endDate","academicYear") VALUES (?,?,?,?,?)`,
-      id, data.name.trim(), data.startDate, data.endDate, data.academicYear
-    );
-    return { id, ...data };
+    const extraData = JSON.stringify({ isRecurring: !!data.isRecurring });
+    return prisma.holiday.create({
+      data: {
+        name: data.name.trim(),
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        academicYear: data.academicYear,
+        extraData
+      }
+    });
   }
 
   async update(id: string, data: Partial<{ name: string; startDate: string; endDate: string; isRecurring: boolean }>) {
-    const sets: string[] = []; const vals: any[] = [];
-    if (data.name !== undefined) { sets.push(`"name"=?`); vals.push(data.name.trim()); }
-    if (data.startDate !== undefined) { sets.push(`"startDate"=?`); vals.push(data.startDate); }
-    if (data.endDate !== undefined) { sets.push(`"endDate"=?`); vals.push(data.endDate); }
-    if (!sets.length) return;
-    vals.push(id);
-    await prisma.$executeRawUnsafe(`UPDATE "Holiday" SET ${sets.join(',')} WHERE "id"=?`, ...vals);
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name.trim();
+    if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
+    if (data.endDate !== undefined) updateData.endDate = new Date(data.endDate);
+    if (data.isRecurring !== undefined) updateData.extraData = JSON.stringify({ isRecurring: !!data.isRecurring });
+
+    if (Object.keys(updateData).length === 0) return;
+
+    await prisma.holiday.update({
+      where: { id },
+      data: updateData
+    });
   }
 
   async delete(id: string) {
-    await prisma.$executeRawUnsafe(`DELETE FROM "Holiday" WHERE "id"=?`, id);
+    await prisma.holiday.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
   }
 
   async seedDefaults(academicYear: string) {
-    const existing = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT COUNT(*) as c FROM "Holiday" WHERE "academicYear"=?`, academicYear
-    );
-    if ((existing[0]?.c || 0) > 0) return;
+    const count = await prisma.holiday.count({
+      where: { academicYear, deletedAt: null }
+    });
+    if (count > 0) return;
 
     const defaults = [
       { name: '29 Ekim Cumhuriyet Bayramı', start: '10-29', end: '10-29' },
@@ -50,15 +68,21 @@ class HolidayService {
     ];
 
     const [startYear, endYear] = academicYear.split('-').map(Number);
-    for (const d of defaults) {
+    const createManyData = defaults.map(d => {
       const [mm] = d.start.split('-').map(Number);
       const year = mm >= 9 ? startYear : endYear;
-      const id = uuid();
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "Holiday" ("id","name","startDate","endDate","academicYear") VALUES (?,?,?,?,?)`,
-        id, d.name, `${year}-${d.start}`, `${year}-${d.end}`, academicYear
-      );
-    }
+      return {
+        name: d.name,
+        startDate: new Date(`${year}-${d.start}T00:00:00.000Z`),
+        endDate: new Date(`${year}-${d.end}T00:00:00.000Z`),
+        academicYear,
+        extraData: JSON.stringify({ isRecurring: true })
+      };
+    });
+
+    await prisma.holiday.createMany({
+      data: createManyData
+    });
   }
 }
 

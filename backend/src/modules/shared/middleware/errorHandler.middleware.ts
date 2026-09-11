@@ -12,9 +12,11 @@ export class AppError extends Error {
   }
 }
 
+import { logger } from '../utils/logger';
+
 export const errorHandler = (
   err: Error | AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
@@ -25,7 +27,7 @@ export const errorHandler = (
     });
   }
 
-  console.error('Unexpected error:', err);
+  logger.error(`Unexpected error on ${req.method} ${req.originalUrl}:`, err.stack || err);
 
   return res.status(500).json({
     success: false,

@@ -22,11 +22,24 @@ class SettingsService {
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
-      lastRotationDate: settings.lastRotationDate ?? '',
+      dutyRotationDates: settings.dutyRotationDates ?? '[]',
+      dutyStartDate: settings.dutyStartDate ?? null,
+      lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
     };
   }
 
-  async update(data: { schoolName?: string; principalName?: string; academicYear?: string; waTemplate1?: string; waTemplate2?: string; waTemplate3?: string; dutyRotationFreq?: string; lastRotationDate?: string }) {
+  async update(data: {
+    schoolName?: string;
+    principalName?: string;
+    academicYear?: string;
+    waTemplate1?: string;
+    waTemplate2?: string;
+    waTemplate3?: string;
+    dutyRotationFreq?: string;
+    dutyRotationDates?: string;
+    dutyStartDate?: string | null;
+    lastRotationDate?: string | null;
+  }) {
     const settings = await prisma.schoolSettings.upsert({
       where: { id: SINGLETON_ID },
       create: {
@@ -38,7 +51,8 @@ class SettingsService {
         waTemplate2: data.waTemplate2 ?? '',
         waTemplate3: data.waTemplate3 ?? '',
         dutyRotationFreq: data.dutyRotationFreq ?? 'weekly',
-        lastRotationDate: data.lastRotationDate ?? '',
+        dutyRotationDates: data.dutyRotationDates ?? '[]',
+        dutyStartDate: data.dutyStartDate ?? null,
       },
       update: {
         ...(data.schoolName !== undefined && { schoolName: data.schoolName }),
@@ -48,7 +62,11 @@ class SettingsService {
         ...(data.waTemplate2 !== undefined && { waTemplate2: data.waTemplate2 }),
         ...(data.waTemplate3 !== undefined && { waTemplate3: data.waTemplate3 }),
         ...(data.dutyRotationFreq !== undefined && { dutyRotationFreq: data.dutyRotationFreq }),
-        ...(data.lastRotationDate !== undefined && { lastRotationDate: data.lastRotationDate }),
+        ...(data.dutyRotationDates !== undefined && { dutyRotationDates: data.dutyRotationDates }),
+        ...(data.dutyStartDate !== undefined && { dutyStartDate: data.dutyStartDate }),
+        ...(data.lastRotationDate !== undefined && {
+          lastRotationDate: data.lastRotationDate ? new Date(data.lastRotationDate) : null,
+        }),
       },
     });
 
@@ -60,9 +78,12 @@ class SettingsService {
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
-      lastRotationDate: settings.lastRotationDate ?? '',
+      dutyRotationDates: settings.dutyRotationDates ?? '[]',
+      dutyStartDate: settings.dutyStartDate ?? null,
+      lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
     };
   }
 }
 
 export const settingsService = new SettingsService();
+

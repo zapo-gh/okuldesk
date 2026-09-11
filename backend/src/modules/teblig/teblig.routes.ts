@@ -6,5 +6,7 @@ const router = Router();
 
 router.use(authMiddleware, adminOnly);
 router.post('/generate-pdf', tebligController.generatePdf);
+router.get('/', tebligController.getAll);
+router.delete('/:id', tebligController.delete);
 
 export default router;

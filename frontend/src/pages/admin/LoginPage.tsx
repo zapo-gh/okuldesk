@@ -62,16 +62,16 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-5" >
-      <div className="bg-white rounded-2xl py-9 px-10 w-full max-w-[410px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35)] animate-[fade-in_0.3s_ease-out]" >
+      <div className="py-9 px-10 w-full max-w-[410px] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" >
         
         <div className="text-center mb-7" >
           <div className="w-[52px] h-[52px] bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-3.5 shadow-[0_4px_12px_rgba(59,130,246,0.3)]" >
             <GraduationCap className="text-white"  size={28}  />
           </div>
-          <h1 className="text-[22px] font-bold text-slate-900 m-0 tracking-tight" >
+          <h1 className="text-xl font-bold text-slate-900 m-0 tracking-tight" >
             OkulDesk
           </h1>
-          <p className="text-[13px] text-slate-500 mt-1" >
+          <p className="text-sm text-slate-500 mt-1" >
             Yönetim Sistemine Giriş Yapın
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4" >
-            <label className="block text-[13px] font-semibold text-slate-900 mb-1.5" >
+            <label className="block text-sm font-semibold text-slate-900 mb-1.5" >
               Kullanıcı Adı
             </label>
             <div className="relative" >
@@ -100,13 +100,13 @@ export default function LoginPage() {
                 placeholder="Kullanıcı adınızı giriniz"
                 required
                 ref={usernameRef}
-                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-[13px] outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
 
           <div className="mb-6" >
-            <label className="block text-[13px] font-semibold text-slate-900 mb-1.5" >
+            <label className="block text-sm font-semibold text-slate-900 mb-1.5" >
               Şifre
             </label>
             <div className="relative" >
@@ -120,7 +120,7 @@ export default function LoginPage() {
                 placeholder="Şifrenizi giriniz"
                 required
                 ref={passwordRef}
-                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-[13px] outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
           </div>
@@ -134,20 +134,20 @@ export default function LoginPage() {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 cursor-pointer accent-blue-600"
               />
-              <label className="text-[13px] text-slate-900 cursor-pointer select-none"
+              <label className="text-sm text-slate-900 cursor-pointer select-none"
                 htmlFor="rememberMe"
                 
               >
                 Beni hatırla
               </label>
             </div>
-            <div className="flex items-center gap-1 text-slate-500 text-[11px]" >
+            <div className="flex items-center gap-1 text-slate-500 text-xs" >
               <ShieldCheck size={14} />
               <span>Güvenli Oturum</span>
             </div>
           </div>
 
-          <Button className="w-full py-2.5 px-4 text-[14px] rounded-lg flex items-center justify-center gap-2 bg-blue-600 text-white font-medium transition-colors hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 disabled:opacity-70 disabled:cursor-not-allowed"
+          <Button className="w-full py-2.5 px-4 text-sm rounded-lg flex items-center justify-center gap-2 bg-blue-600 text-white font-medium transition-colors hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 disabled:opacity-70 disabled:cursor-not-allowed"
             type="submit"
             disabled={loading}
             

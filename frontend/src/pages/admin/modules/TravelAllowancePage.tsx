@@ -253,7 +253,7 @@ export default function TravelAllowancePage() {
               
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Personel Adı Soyadı</label>
@@ -337,7 +337,7 @@ export default function TravelAllowancePage() {
 
               {activeTab === 'costs' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
                        <h3 className="font-semibold text-slate-800 flex items-center space-x-2">
                           <Calculator className="w-5 h-5 text-indigo-500" />
@@ -384,7 +384,7 @@ export default function TravelAllowancePage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Yolluk Bildirimi</h3>

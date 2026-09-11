@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 const createSchema = z.object({
   name: z.string().min(2, 'Ad en az 2 karakter olmalıdır.').max(100),
-  role: z.enum(['KURUM_PERSONELI', 'MUDUR_YARDIMCISI', 'REHBER_OGRETMEN', 'SINIF_REHBER_OGRETMEN']),
+  title: z.enum(['KURUM_PERSONELI', 'MUDUR_YARDIMCISI', 'REHBER_OGRETMEN', 'SINIF_REHBER_OGRETMEN']),
   className: z.string().max(50).optional(),
   tcKimlikNo: z.string().optional(),
   brans: z.string().optional(),
@@ -18,6 +18,7 @@ const createSchema = z.object({
 
 const updateSchema = z.object({
   name: z.string().min(2).max(100).optional(),
+  title: z.enum(['KURUM_PERSONELI', 'MUDUR_YARDIMCISI', 'REHBER_OGRETMEN', 'SINIF_REHBER_OGRETMEN']).optional(),
   className: z.string().max(50).optional(),
   isActive: z.boolean().optional(),
   tcKimlikNo: z.string().optional(),
@@ -38,6 +39,14 @@ export class StaffController {
     } catch (e) { next(e); }
   }
 
+  async getDeleted(req: Request, res: Response, next: NextFunction) {
+    try {
+      const role = req.query.role as string | undefined;
+      const list = await staffService.getDeleted(role);
+      res.json({ success: true, data: { staff: list, roleLabels: ROLE_LABELS } });
+    } catch (e) { next(e); }
+  }
+
   async getByClass(req: Request, res: Response, next: NextFunction) {
     try {
       const className = decodeURIComponent(req.params.className);
@@ -50,7 +59,7 @@ export class StaffController {
     try {
       const parsed = createSchema.safeParse(req.body);
       if (!parsed.success) throw new AppError(parsed.error.errors[0].message, 400);
-      const record = await staffService.create(parsed.data as { name: string; role: StaffRole; className?: string });
+      const record = await staffService.create(parsed.data as { name: string; title: StaffRole; className?: string });
       res.status(201).json({ success: true, data: record });
     } catch (e) { next(e); }
   }
@@ -88,6 +97,24 @@ export class StaffController {
         throw new AppError('Geçersiz veri formatı. Dizi bekleniyor.', 400);
       }
       const result = await staffService.bulkDelete(ids);
+      res.json({ success: true, count: result.count });
+    } catch (e) { next(e); }
+  }
+
+  async restore(req: Request, res: Response, next: NextFunction) {
+    try {
+      await staffService.restore(req.params.id);
+      res.json({ success: true });
+    } catch (e) { next(e); }
+  }
+
+  async bulkRestore(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids)) {
+        throw new AppError('Geçersiz veri formatı. Dizi bekleniyor.', 400);
+      }
+      const result = await staffService.bulkRestore(ids);
       res.json({ success: true, count: result.count });
     } catch (e) { next(e); }
   }

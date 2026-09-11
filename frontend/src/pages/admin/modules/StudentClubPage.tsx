@@ -372,7 +372,7 @@ export default function StudentClubPage() {
               
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Kulüp Adı</label>
                       <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" />
@@ -423,7 +423,7 @@ export default function StudentClubPage() {
                      </Button>
                   </div>
                   {formData.activities.map((item: any, idx: number) => (
-                    <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4 relative group">
+                    <div key={item.id} className="p-4 flex items-center space-x-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="w-1/4">
                         <label className="block text-xs font-medium text-slate-500 mb-1">Aylar / Dönem</label>
                         <input type="text" value={item.month} onChange={(e) => updateActivity(item.id, 'month', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Örn: Ekim Ayı" />
@@ -448,12 +448,12 @@ export default function StudentClubPage() {
               {activeTab === 'members' && (
                 <div className="space-y-6">
                   {!editingId ? (
-                     <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">
+                     <div className="text-center py-12 text-slate-500 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         Öğrenci ekleyebilmek için önce kulübü kaydetmelisiniz. (Aşağıdan Kaydet butonuna basınız)
                      </div>
                   ) : (
                     <>
-                      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex space-x-4 items-end">
+                      <div className="p-6 flex space-x-4 items-end bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="flex-1 relative">
                           <label className="block text-sm font-medium text-slate-700 mb-1">Öğrenci Seç / Ara</label>
                           <div className="relative">
@@ -475,7 +475,7 @@ export default function StudentClubPage() {
                                   className="fixed inset-0 z-10" 
                                   onClick={() => setIsStudentDropdownOpen(false)} 
                                 ></div>
-                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                <div className="w-full mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                   {allStudents
                                     .filter(s => 
                                       s.fullName.toLowerCase().includes(studentSearch.toLowerCase()) || 
@@ -513,15 +513,15 @@ export default function StudentClubPage() {
                         </Button>
                       </div>
 
-                      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto shadow-sm">
+                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <table className="w-full text-left text-sm border-collapse">
                           <thead className="bg-slate-50 text-slate-600">
                             <tr>
-                              <th className="px-4 py-3 border-b border-slate-200">Öğrenci No</th>
-                              <th className="px-4 py-3 border-b border-slate-200">Adı Soyadı</th>
-                              <th className="px-4 py-3 border-b border-slate-200">Sınıfı</th>
-                              <th className="px-4 py-3 border-b border-slate-200">Görevi</th>
-                              <th className="px-4 py-3 border-b border-slate-200 w-24"></th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci No</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıfı</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görevi</th>
+                              <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -553,7 +553,7 @@ export default function StudentClubPage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Kulüp Faaliyet Raporu</h3>

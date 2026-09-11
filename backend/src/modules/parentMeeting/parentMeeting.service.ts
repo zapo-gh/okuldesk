@@ -32,11 +32,13 @@ class ParentMeetingService {
     const items: ParentMeetingPdfData[] = [];
 
     for (const cn of params.classNames) {
-      const students = await prisma.student.findMany({
+      let students = await prisma.student.findMany({
         where: { className: cn, status: 'ACTIVE' },
         include: { parents: true },
-        orderBy: { fullName: 'asc' },
       });
+
+      // SQLite Türkçe karakterleri (Ç, Ş, Ö, vb.) ASCII sonuna attığı için memory'de sıralıyoruz
+      students.sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
 
       items.push({
         schoolName,

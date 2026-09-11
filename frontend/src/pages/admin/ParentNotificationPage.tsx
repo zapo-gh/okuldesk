@@ -20,6 +20,12 @@ interface Parent {
   phone: string;
 }
 
+interface StaffMember {
+  id: string;
+  name: string;
+  title: string;
+}
+
 export default function ParentNotificationPage() {
   const [students,        setStudents]        = useState<Student[]>([]);
   const [searchQuery,     setSearchQuery]     = useState('');
@@ -32,12 +38,19 @@ export default function ParentNotificationPage() {
   const [selectedParentId,setSelectedParentId]= useState('');
   const [customParentName,setCustomParentName]= useState('');
   const [studentParents,  setStudentParents]  = useState<Parent[]>([]);
+
+  const [counselors,      setCounselors]      = useState<StaffMember[]>([]);
+  const [viceDirectors,   setViceDirectors]   = useState<StaffMember[]>([]);
+  const [selectedCounselorName, setSelectedCounselorName] = useState('');
+  const [selectedViceDirectorName, setSelectedViceDirectorName] = useState('');
+
   const [loading,         setLoading]         = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(true);
   
   const [success,         setSuccess]         = useState('');
 
   useEffect(() => {
+    // Öğrencileri yükle
     api.get<{ success: boolean; data: { students: Student[] } }>('/students?limit=1000&status=ACTIVE')
       .then(res => {
         const list = res.data.data?.students || [];
@@ -45,6 +58,23 @@ export default function ParentNotificationPage() {
       })
       .catch(() => toast.error('Öğrenci listesi alınamadı.'))
       .finally(() => setLoadingStudents(false));
+
+    // Personelleri yükle
+    api.get<{ success: boolean; data: { staff: StaffMember[] } }>('/staff?role=REHBER_OGRETMEN')
+      .then(res => {
+        const list = res.data.data?.staff || [];
+        setCounselors(list);
+        if (list.length > 0) setSelectedCounselorName(list[0].name);
+      })
+      .catch(console.error);
+
+    api.get<{ success: boolean; data: { staff: StaffMember[] } }>('/staff?role=MUDUR_YARDIMCISI')
+      .then(res => {
+        const list = res.data.data?.staff || [];
+        setViceDirectors(list);
+        if (list.length > 0) setSelectedViceDirectorName(list[0].name);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -108,6 +138,8 @@ export default function ParentNotificationPage() {
         absenceDay,
         meetingDate,
         parentName,
+        counselorName: selectedCounselorName || undefined,
+        viceDirectorName: selectedViceDirectorName || undefined,
         absenceData: { excusedDays, unexcusedDays, totalDays: String(totalDays) },
       }, { responseType: 'blob' });
 
@@ -133,7 +165,7 @@ export default function ParentNotificationPage() {
       <PageHeader
         title="ÖMYK Veli Devamsızlık Bildirimi"
         description="Öğrenci arayın, devamsızlık bilgilerini girin ve veli bildirim tutanağını PDF olarak oluşturun."
-        icon={<FileText size={28} className="text-indigo-600" />}
+        icon={<FileText size={28} />}
       />
 
       
@@ -143,7 +175,7 @@ export default function ParentNotificationPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
         {/* Adım 1: Öğrenci Seçimi */}
         <div className="p-6 border-b border-gray-100 bg-gray-50/50">
@@ -169,7 +201,7 @@ export default function ParentNotificationPage() {
 
                 {/* Dropdown Arama Sonuçları */}
                 {searchQuery.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-200 shadow-xl max-h-80 overflow-y-auto z-50">
+                  <div className="mt-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     {filteredStudents.length === 0 ? (
                       <div className="p-4 text-center text-sm text-gray-500">Sonuç bulunamadı.</div>
                     ) : (
@@ -371,6 +403,36 @@ export default function ParentNotificationPage() {
                 )}
               </div>
 
+              {/* İdareci & Rehber Öğretmen Seçimi */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Rehber Öğretmen</label>
+                  <select
+                    value={selectedCounselorName}
+                    onChange={e => setSelectedCounselorName(e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
+                  >
+                    <option value="">(Otomatik / Boş Bırak)</option>
+                    {counselors.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Müdür Yardımcısı</label>
+                  <select
+                    value={selectedViceDirectorName}
+                    onChange={e => setSelectedViceDirectorName(e.target.value)}
+                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
+                  >
+                    <option value="">(Otomatik / Boş Bırak)</option>
+                    {viceDirectors.map(v => (
+                      <option key={v.id} value={v.name}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <Button 
                 variant="primary"
                 onClick={handleGenerate}
@@ -386,7 +448,7 @@ export default function ParentNotificationPage() {
             
             {/* Alt Bilgi */}
             <div className="mt-6 flex items-center justify-between text-xs text-gray-500 font-medium">
-              <div className="flex items-center gap-1.5"><Info size={14}/> Sınıf ve Okul Rehber Öğretmeni bilgileri otomatik dolar.</div>
+              <div className="flex items-center gap-1.5"><Info size={14}/> Sınıf Rehber Öğretmeni öğrencinin sınıfından otomatik olarak bulunur.</div>
               <div>Gizlilik & KVKK Uyumlu</div>
             </div>
           </div>

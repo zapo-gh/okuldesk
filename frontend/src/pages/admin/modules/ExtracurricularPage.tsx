@@ -194,7 +194,7 @@ export default function ExtracurricularPage() {
         <DataTable data={items} columns={columns} loading={loading} emptyMessage="Egzersiz planı bulunmuyor." />
       </div>
 
-      <ActionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? 'Egzersiz Düzenle' : 'Yeni Egzersiz Planı Ekle'} width="full">
+      <ActionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? 'Egzersiz Düzenle' : 'Yeni Egzersiz Planı Ekle'} width="full" hideFooter={true}>
         <form onSubmit={handleSave} className="space-y-6">
           <div className="flex border-b border-gray-200 gap-4 mb-4">
             {['Genel Bilgiler', 'Program & Onay', 'Öğrenci Listesi'].map((tab, idx) => (
@@ -328,8 +328,8 @@ export default function ExtracurricularPage() {
               </div>
             )}
           </div>
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <Button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm text-gray-700 bg-white border rounded-md">İptal</Button>
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>İptal</Button>
             <Button type="submit" variant="primary">Kaydet</Button>
           </div>
         </form>

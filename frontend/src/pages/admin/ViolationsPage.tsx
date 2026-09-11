@@ -221,6 +221,27 @@ export default function ViolationsPage() {
     } finally { setDeletingUploadId(null); }
   };
 
+  const handleHistoryRemoveViolation = async (uploadId: string, violationId: string, studentName: string) => {
+    if (!await confirm(`${studentName} isimli öğrencinin bu ihlal kaydı silinecek. Emin misiniz?`)) return;
+    try {
+      await api.delete(`/violations/record/${violationId}`);
+      setExpandedDetails(prev => {
+        const detail = prev[uploadId];
+        if (!detail?.records) return prev;
+        const newRecords = detail.records.filter(r => r.id !== violationId);
+        return { ...prev, [uploadId]: { ...detail, records: newRecords } };
+      });
+      setHistory(prev => prev.map(h => {
+        if (h.id !== uploadId || !h.records) return h;
+        return { ...h, records: h.records.filter(r => r.id !== violationId), studentCount: Math.max(0, h.studentCount - 1) };
+      }));
+      toast(`${studentName} kaydı başarıyla silindi.`);
+      loadStats();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Silme işlemi başarısız.');
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); setResult(null); setConfirmed(false); void 0; }
@@ -364,11 +385,11 @@ export default function ViolationsPage() {
       <PageHeader
         title="İhlal Takip Sistemi"
         description="Öğrenci ihlallerini OCR ile otomatik veya numara listesiyle manuel kaydedin, takip edin ve gerektiğinde tutanak oluşturun."
-        icon={<ClipboardList size={28} className="text-indigo-600" />}
+        icon={<ClipboardList size={28} />}
         actions={<ViolationStatsHeader stats={stats} />}
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <ViolationTabBar
           activeTab={tab}
           onTabChange={(newTab) => {
@@ -386,7 +407,7 @@ export default function ViolationsPage() {
             <div className="space-y-6">
               {!result && (
                 <>
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                       <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">1</span> 
                       İhlal Bilgileri
@@ -416,7 +437,7 @@ export default function ViolationsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                       <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">2</span> 
                       Öğrenci Listesi Giriş Yöntemi
@@ -448,7 +469,7 @@ export default function ViolationsPage() {
                           onClick={() => fileInputRef.current?.click()}
                           className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${selectedFile ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'}`}
                         >
-                          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} className="hidden" />
+                          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} className="hidden w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white" />
                           {selectedFile ? (
                             <div className="flex items-center gap-6 justify-center">
                               {previewUrl && <img src={previewUrl} alt="Önizleme" className="h-24 object-contain rounded-lg shadow-sm" />}
@@ -507,7 +528,7 @@ export default function ViolationsPage() {
               {result && (
                 <div className="space-y-6 animate-in fade-in duration-500">
                   {/* Özet Kartı */}
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">Sonuçlar — {result.typeLabel}</h3>
@@ -580,7 +601,7 @@ export default function ViolationsPage() {
                   )}
 
                   {result.matched.length > 0 && (
-                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                         <h3 className="font-bold text-gray-800">✅ Eşleşen Öğrenciler ({result.matched.length})</h3>
                         <div className="flex gap-2">
@@ -598,12 +619,12 @@ export default function ViolationsPage() {
                         <table className="min-w-full divide-y divide-gray-100">
                           <thead className="bg-gray-50/50">
                             <tr>
-                              {!confirmed && <th className="px-4 py-3"><input type="checkbox" checked={selectedIds.size === result.matched.length} onChange={() => selectedIds.size === result.matched.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(result.matched.map(m => m.id)))} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>}
-                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Öğrenci</th>
-                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Sınıf/No</th>
-                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Eşleşme</th>
-                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Geçmiş</th>
-                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">İşlem</th>
+                              {!confirmed && <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={selectedIds.size === result.matched.length} onChange={() => selectedIds.size === result.matched.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(result.matched.map(m => m.id)))} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>}
+                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf/No</th>
+                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eşleşme</th>
+                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Geçmiş</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -643,7 +664,7 @@ export default function ViolationsPage() {
                   )}
 
                   {result.unmatched.length > 0 && (
-                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="p-4 border-b border-gray-100 bg-gray-50">
                         <h3 className="font-bold text-gray-800">⚠️ Eşleşemeyen Satırlar ({result.unmatched.length})</h3>
                       </div>
@@ -685,7 +706,7 @@ export default function ViolationsPage() {
 
               {historyView === 'uploads' && (
                 <>
-                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-end gap-4">
+                  <div className="p-4 flex flex-wrap items-end bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">İhlal Tipi</label>
                       <select value={hFilterType} onChange={e => setHFilterType(e.target.value)} className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500">
@@ -716,7 +737,7 @@ export default function ViolationsPage() {
                         const isExpanded = expandedUploadId === h.id;
                         
                         return (
-                          <div key={h.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow">
+                          <div key={h.id} className="hover:shadow bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div 
                               onClick={() => handleToggleExpand(h.id)} 
                               className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isExpanded ? 'bg-indigo-50/30' : 'hover:bg-gray-50'}`}
@@ -736,11 +757,14 @@ export default function ViolationsPage() {
                                 </div>
                               </div>
                               <Button 
+                                variant="ghost"
                                 onClick={e => { e.stopPropagation(); handleDeleteUpload(h.id); }}
                                 disabled={deletingUploadId === h.id}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                className="text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
+                                title="Tüm Yüklemeyi ve Kayıtları Sil"
                               >
-                                <Trash2 size={18} />
+                                <Trash2 size={16} />
+                                Tümünü Sil
                               </Button>
                             </div>
 
@@ -771,10 +795,10 @@ export default function ViolationsPage() {
                                     <table className="min-w-full divide-y divide-gray-100">
                                       <thead className="bg-gray-50">
                                         <tr>
-                                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Öğrenci</th>
-                                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Sınıf/No</th>
-                                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Durum</th>
-                                          <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">İşlem</th>
+                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf/No</th>
+                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Durum</th>
+                                          <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-100">
@@ -786,11 +810,22 @@ export default function ViolationsPage() {
                                               {r.isConfirmed ? <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">Onaylı</span> : <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Beklemede</span>}
                                             </td>
                                             <td className="px-4 py-2 text-right">
-                                              {r.requiresDiscipline && r.isConfirmed ? (
-                                                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">🔴 Disiplin</span>
-                                              ) : r.suggestWarning && r.isConfirmed ? (
-                                                r.hasWarning ? <span className="text-xs font-bold text-green-600">✓ Uyarıldı</span> : <Button onClick={() => handleHistoryCreateWarning(h.id, h.type, r.studentId, r.student.fullName, r.student.className, r.previousViolations ?? 0)} className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition">⚠️ Uyarı</Button>
-                                              ) : null}
+                                              <div className="flex items-center justify-end gap-2">
+                                                {r.requiresDiscipline && r.isConfirmed ? (
+                                                  <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">🔴 Disiplin</span>
+                                                ) : r.suggestWarning && r.isConfirmed ? (
+                                                  r.hasWarning ? <span className="text-xs font-bold text-green-600">✓ Uyarıldı</span> : <Button onClick={() => handleHistoryCreateWarning(h.id, h.type, r.studentId, r.student.fullName, r.student.className, r.previousViolations ?? 0)} className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition">⚠️ Uyarı</Button>
+                                                ) : null}
+                                                <Button 
+                                                  variant="ghost" 
+                                                  size="icon" 
+                                                  onClick={() => handleHistoryRemoveViolation(h.id, r.id, r.student.fullName)} 
+                                                  className="text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                  title="Öğrencinin İhlal Kaydını Sil"
+                                                >
+                                                  <Trash2 size={16} />
+                                                </Button>
+                                              </div>
                                             </td>
                                           </tr>
                                         ))}
@@ -810,7 +845,7 @@ export default function ViolationsPage() {
 
               {historyView === 'student' && (
                 <div className="space-y-6">
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><FileSearch className="text-indigo-600"/> Öğrenci İhlal Sorgula</h3>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -822,7 +857,7 @@ export default function ViolationsPage() {
                         className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 text-sm"
                       />
                       {stuSearch && !stuSelected && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-10">
+                        <div className="mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                           {allStudents.filter(s => s.fullName.toLowerCase().includes(stuSearch.toLowerCase()) || s.schoolNumber.includes(stuSearch)).slice(0, 15).map(s => (
                             <div key={s.id} onClick={() => { setStuSearch(s.fullName); handleStudentSearch(s); }} className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-50 transition">
                               <div className="font-bold text-gray-900">{s.fullName}</div>
@@ -838,7 +873,7 @@ export default function ViolationsPage() {
 
                   {stuHistory && stuSelected && (
                     <div className="space-y-4 animate-in fade-in duration-300">
-                      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-wrap justify-between items-center gap-6">
+                      <div className="p-6 flex flex-wrap justify-between items-center bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div>
                           <h2 className="text-2xl font-bold text-gray-900">{stuHistory.student.fullName}</h2>
                           <p className="text-gray-500 mt-1">{stuHistory.student.className} • Okul No: {stuHistory.student.schoolNumber}</p>
@@ -878,7 +913,7 @@ export default function ViolationsPage() {
                         </div>
                       )}
 
-                      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 font-bold text-gray-800">İhlal Kayıtları</div>
                         {stuHistory.violations.length === 0 ? (
                           <div className="p-8 text-center text-gray-500">İhlal kaydı bulunmuyor.</div>

@@ -29,16 +29,61 @@ export default function HolidayPage() {
   const [isPrinting, setIsPrinting] = useState(false);
 
   const { settings } = useSettings();
-  const academicYear = settings?.academicYear || '2024-2025';
+  const academicYear = settings?.academicYear || '2025-2026';
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const res = await api.get(`/holiday?academicYear=${academicYear}`);
       
-      // Tarihe göre sırala
-      const sorted = (res.data.data || []).sort((a: Holiday, b: Holiday) => {
-        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Backend'den gelen extraData alanından isRecurring bilgisini çıkar
+      const processedHolidays = (res.data.data || []).map((h: Holiday & { extraData?: string }) => {
+        let isRecurring = false;
+        try {
+          if (h.extraData) {
+            isRecurring = JSON.parse(h.extraData).isRecurring;
+          }
+        } catch (e) {}
+
+        h.isRecurring = isRecurring ? 1 : 0;
+        
+        if (h.isRecurring) {
+          const start = new Date(h.startDate);
+          const end = new Date(h.endDate);
+          const duration = end.getTime() - start.getTime();
+          
+          // Önce bu yıla ayarla
+          start.setFullYear(today.getFullYear());
+          end.setTime(start.getTime() + duration);
+
+          // Eğer bu yılki tarihi geçmişse, bir sonraki yıla at
+          if (end < today) {
+            start.setFullYear(today.getFullYear() + 1);
+            end.setTime(start.getTime() + duration);
+          }
+          
+          return { ...h, startDate: start.toISOString(), endDate: end.toISOString() };
+        }
+        return h;
+      });
+
+      // Tarihe göre sırala (Önce gelecek/mevcut tatiller, sonra geçmiş tatiller)
+      const sorted = processedHolidays.sort((a: Holiday, b: Holiday) => {
+        const aDate = new Date(a.startDate);
+        const bDate = new Date(b.startDate);
+        
+        // Bitiş tarihi bugünden küçükse geçmiş tatildir
+        const aIsPast = new Date(a.endDate) < today;
+        const bIsPast = new Date(b.endDate) < today;
+
+        if (aIsPast && !bIsPast) return 1; // a geçmiş, b gelecek -> b önce
+        if (!aIsPast && bIsPast) return -1; // a gelecek, b geçmiş -> a önce
+
+        // İkisi de gelecek veya ikisi de geçmişse, tarihe göre artan sırala
+        return aDate.getTime() - bDate.getTime();
       });
 
       setHolidays(sorted);

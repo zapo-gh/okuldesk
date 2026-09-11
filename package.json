@@ -22,5 +22,9 @@
   },
   "overrides": {
     "lru-cache": "10.4.3"
+  },
+  "dependencies": {
+    "@tauri-apps/plugin-updater": "^2.11.0",
+    "all": "^0.0.0"
   }
 }

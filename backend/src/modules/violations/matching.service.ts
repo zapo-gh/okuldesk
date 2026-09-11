@@ -252,7 +252,7 @@ export async function getPreviousViolationCount(
   return prisma.dailyViolation.count({
     where: {
       studentId,
-      type: type as any,
+      upload: { type: type as any },
       isConfirmed: true,
     },
   });
@@ -270,7 +270,7 @@ export async function getBulkViolationCounts(
     by: ['studentId'],
     where: {
       studentId: { in: studentIds },
-      type: type as any,
+      upload: { type: type as any },
       isConfirmed: true,
       ...(excludeUploadId ? { uploadId: { not: excludeUploadId } } : {}),
     },
@@ -279,7 +279,7 @@ export async function getBulkViolationCounts(
 
   const counts = new Map<string, number>();
   for (const r of results) {
-    counts.set(r.studentId, r._count.id);
+    counts.set(r.studentId, (r._count as any).id || 0);
   }
   return counts;
 }

@@ -11,7 +11,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
     const letters = await prisma.orderLetter.findMany({
       where: academicYear ? { academicYear: String(academicYear) } : undefined,
       orderBy: { createdAt: 'desc' },
-      include: { orderItems: true }
+      include: { orderItems: true, supplier: true, procurement: true }
     });
     
     // items alanını frontend'in beklediği formata (diziye) eşle
@@ -29,15 +29,17 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
 // Yeni sipariş mektubu ekle
 router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response) => {
   try {
-    const { subject, supplierName, supplierAddress, date, deliveryDate, academicYear, items, notes, extraData } = req.body;
+    const { subject, supplierName, supplierId, supplierAddress, date, deliveryDate, academicYear, procurementId, items, notes, extraData } = req.body;
     const letter = await prisma.orderLetter.create({
       data: {
         subject,
         supplierName,
+        supplierId: supplierId || null,
         supplierAddress,
         date,
         deliveryDate,
         academicYear,
+        procurementId: procurementId || null,
         notes,
         extraData,
         orderItems: {
@@ -61,16 +63,18 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response) 
 router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { subject, supplierName, supplierAddress, date, deliveryDate, academicYear, items, notes, extraData } = req.body;
+    const { subject, supplierName, supplierId, supplierAddress, date, deliveryDate, academicYear, procurementId, items, notes, extraData } = req.body;
     const letter = await prisma.orderLetter.update({
       where: { id },
       data: {
         subject,
         supplierName,
+        supplierId: supplierId || null,
         supplierAddress,
         date,
         deliveryDate,
         academicYear,
+        procurementId: procurementId || null,
         notes,
         extraData,
         orderItems: {

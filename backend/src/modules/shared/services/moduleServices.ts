@@ -1,275 +1,404 @@
 import prisma from '../utils/prisma';
 import { v4 as uuid } from 'uuid';
 
-/** Generic CRUD: raw SQL + dynamic column building. */
-function buildUpdate(table: string, id: string, data: Record<string, any>) {
-  const sets: string[] = []; const vals: any[] = [];
-  for (const [k, v] of Object.entries(data)) {
-    if (v !== undefined) { sets.push(`"${k}"=?`); vals.push(v); }
-  }
-  if (!sets.length) return null;
-  vals.push(id);
-  return { sql: `UPDATE "${table}" SET ${sets.join(',')} WHERE "id"=?`, vals };
-}
-
 // ── Yıllık Çalışma Planı ──
 class AnnualPlanService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "AnnualPlanItem" WHERE "academicYear"=? ORDER BY "month" ASC, "sortOrder" ASC`, academicYear
-    );
+    return prisma.annualPlanItem.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: [{ month: 'asc' }, { sortOrder: 'asc' }]
+    });
   }
-  async create(d: { academicYear: string; month: number; title: string; description?: string; category?: string; sortOrder?: number }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "AnnualPlanItem" ("id","academicYear","month","title","description","category","sortOrder") VALUES (?,?,?,?,?,?,?)`,
-      id, d.academicYear, d.month, d.title.trim(), d.description || null, d.category || 'IDARI', d.sortOrder ?? 0
-    );
-    return { id, ...d };
+  async create(d: { academicYear: string; month: number; title: string; description?: string; category?: string; sortOrder?: number; extraData?: string }) {
+    return prisma.annualPlanItem.create({
+      data: {
+        id: uuid(),
+        academicYear: d.academicYear,
+        month: d.month,
+        title: d.title.trim(),
+        description: d.description || null,
+        category: d.category || 'IDARI',
+        sortOrder: d.sortOrder ?? 0,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('AnnualPlanItem', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.annualPlanItem.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "AnnualPlanItem" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.annualPlanItem.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Belirli Gün ve Haftalar ──
 class CommemorativeDaysService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT cd.*, s."name" as "assignedStaffName"
-       FROM "CommemorativeDay" cd LEFT JOIN "Staff" s ON s."id"=cd."assignedStaffId"
-       WHERE cd."academicYear"=? ORDER BY cd."startDate" ASC`, academicYear
-    );
+    const records = await prisma.commemorativeDay.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { startDate: 'asc' },
+      include: {
+        assignedStaff: { select: { name: true } },
+        assignedClub: { select: { name: true } }
+      }
+    });
+    return records.map((r: any) => ({
+      ...r,
+      assignedStaffName: r.assignedStaff?.name || null,
+      assignedClubName: r.assignedClub?.name || null
+    }));
   }
-  async create(d: { name: string; startDate: string; endDate: string; academicYear: string; description?: string; assignedStaffId?: string; status?: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "CommemorativeDay" ("id","name","startDate","endDate","academicYear","description","assignedStaffId","status") VALUES (?,?,?,?,?,?,?,?)`,
-      id, d.name.trim(), d.startDate, d.endDate, d.academicYear, d.description || null, d.assignedStaffId || null, d.status || 'PLANLI'
-    );
-    return { id, ...d };
+  async create(data: { name: string; startDate: string; endDate: string; academicYear: string; description?: string; assignedStaffId?: string; assignedClubId?: string; status?: string; extraData?: string }) {
+    return prisma.commemorativeDay.create({
+      data: {
+        id: uuid(),
+        name: data.name.trim(),
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        academicYear: data.academicYear,
+        description: data.description || null,
+        assignedStaffId: data.assignedStaffId || null,
+        assignedClubId: data.assignedClubId || null,
+        status: data.status || 'PLANLI',
+        extraData: data.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('CommemorativeDay', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.commemorativeDay.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "CommemorativeDay" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.commemorativeDay.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Sosyal Etkinlik ──
 class SocialActivityService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT sa.*, s."name" as "assignedStaffName"
-       FROM "SocialActivity" sa LEFT JOIN "Staff" s ON s."id"=sa."assignedStaffId"
-       WHERE sa."academicYear"=? ORDER BY sa."plannedDate" ASC`, academicYear
-    );
+    const records = await prisma.socialActivity.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { plannedDate: 'asc' },
+      include: {
+        assignedStaff: { select: { name: true } }
+      }
+    });
+    return records.map((r: any) => ({
+      ...r,
+      assignedStaffName: r.assignedStaff?.name || null
+    }));
   }
-  async create(d: { name: string; type?: string; description?: string; plannedDate?: string; academicYear: string; assignedStaffId?: string; status?: string; notes?: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "SocialActivity" ("id","name","type","description","plannedDate","academicYear","assignedStaffId","status","notes") VALUES (?,?,?,?,?,?,?,?,?)`,
-      id, d.name.trim(), d.type || 'KULTUREL', d.description || null, d.plannedDate || null, d.academicYear, d.assignedStaffId || null, d.status || 'PLANLI', d.notes || null
-    );
-    return { id, ...d };
+  async create(d: { name: string; type?: string; description?: string; plannedDate?: string; academicYear: string; assignedStaffId?: string; status?: string; notes?: string; extraData?: string }) {
+    return prisma.socialActivity.create({
+      data: {
+        id: uuid(),
+        name: d.name.trim(),
+        type: d.type || 'KULTUREL',
+        description: d.description || null,
+        plannedDate: d.plannedDate ? new Date(d.plannedDate) : null,
+        academicYear: d.academicYear,
+        assignedStaffId: d.assignedStaffId || null,
+        status: d.status || 'PLANLI',
+        notes: d.notes || null,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('SocialActivity', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.socialActivity.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "SocialActivity" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.socialActivity.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Okul Aile Birliği ──
 class ParentAssociationService {
   async getMeetings(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "ParentAssociationMeeting" WHERE "academicYear"=? ORDER BY "date" DESC`, academicYear
-    );
+    return prisma.parentAssociationMeeting.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { date: 'desc' }
+    });
   }
-  async createMeeting(d: { date: string; type?: string; meetingNumber?: number; academicYear: string; notes?: string; decisions?: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "ParentAssociationMeeting" ("id","date","type","meetingNumber","academicYear","notes","decisions") VALUES (?,?,?,?,?,?,?)`,
-      id, d.date, d.type || 'OLAGAN', d.meetingNumber ?? 1, d.academicYear, d.notes || null, d.decisions || null
-    );
-    return { id, ...d };
+  async createMeeting(d: { date: string; type?: string; meetingNumber?: number; academicYear: string; notes?: string; decisions?: string; extraData?: string }) {
+    return prisma.parentAssociationMeeting.create({
+      data: {
+        id: uuid(),
+        date: d.date ? new Date(d.date) : null,
+        type: d.type || 'OLAGAN',
+        meetingNumber: d.meetingNumber ?? 1,
+        academicYear: d.academicYear,
+        notes: d.notes || null,
+        decisions: d.decisions || null,
+        extraData: d.extraData || null
+      }
+    });
   }
   async updateMeeting(id: string, data: Record<string, any>) {
-    const u = buildUpdate('ParentAssociationMeeting', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.parentAssociationMeeting.update({ where: { id }, data });
   }
-  async deleteMeeting(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "ParentAssociationMeeting" WHERE "id"=?`, id); }
+  async deleteMeeting(id: string) {
+    return prisma.parentAssociationMeeting.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 
   async getMembers(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "ParentAssociationMember" WHERE "academicYear"=? ORDER BY "role" ASC, "fullName" ASC`, academicYear
-    );
+    return prisma.parentAssociationMember.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: [{ role: 'asc' }, { fullName: 'asc' }]
+    });
   }
-  async createMember(d: { fullName: string; role?: string; phone?: string; academicYear: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "ParentAssociationMember" ("id","fullName","role","phone","academicYear") VALUES (?,?,?,?,?)`,
-      id, d.fullName.trim(), d.role || 'UYE', d.phone || null, d.academicYear
-    );
-    return { id, ...d };
+  async createMember(d: { fullName: string; role?: string; phone?: string; academicYear: string; extraData?: string }) {
+    return prisma.parentAssociationMember.create({
+      data: {
+        id: uuid(),
+        fullName: d.fullName.trim(),
+        role: d.role || 'UYE',
+        phone: d.phone || null,
+        academicYear: d.academicYear,
+        extraData: d.extraData || null
+      }
+    });
   }
   async updateMember(id: string, data: Record<string, any>) {
-    const u = buildUpdate('ParentAssociationMember', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.parentAssociationMember.update({ where: { id }, data });
   }
-  async deleteMember(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "ParentAssociationMember" WHERE "id"=?`, id); }
+  async deleteMember(id: string) {
+    return prisma.parentAssociationMember.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Gezi Planı ──
 class FieldTripService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT ft.*, s."name" as "assignedStaffName"
-       FROM "FieldTrip" ft LEFT JOIN "Staff" s ON s."id"=ft."assignedStaffId"
-       WHERE ft."academicYear"=? ORDER BY ft."date" ASC`, academicYear
-    );
+    const records = await prisma.fieldTrip.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { date: 'asc' },
+      include: {
+        assignedStaff: { select: { name: true } }
+      }
+    });
+    return records.map((r: any) => ({
+      ...r,
+      assignedStaffName: r.assignedStaff?.name || null
+    }));
   }
   async create(d: Record<string, any>) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "FieldTrip" ("id","title","destination","date","returnDate","purpose","transportation","assignedStaffId","academicYear","participantClasses","notes","status") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      id, d.title, d.destination, d.date, d.returnDate || null, d.purpose || null, d.transportation || null,
-      d.assignedStaffId || null, d.academicYear, d.participantClasses || null, d.notes || null, d.status || 'PLANLI'
-    );
-    return { id, ...d };
+    return prisma.fieldTrip.create({
+      data: {
+        id: uuid(),
+        title: d.title,
+        destination: d.destination,
+        date: d.date ? new Date(d.date) : null,
+        returnDate: d.returnDate ? new Date(d.returnDate) : null,
+        purpose: d.purpose || null,
+        transportation: d.transportation || null,
+        assignedStaffId: d.assignedStaffId || null,
+        academicYear: d.academicYear,
+        participantClasses: d.participantClasses || null,
+        notes: d.notes || null,
+        status: d.status || 'PLANLI',
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('FieldTrip', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.fieldTrip.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "FieldTrip" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.fieldTrip.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Ders Dışı Egzersiz ──
 class ExtracurricularService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT e.*, s."name" as "assignedStaffName"
-       FROM "Extracurricular" e LEFT JOIN "Staff" s ON s."id"=e."assignedStaffId"
-       WHERE e."academicYear"=? ORDER BY e."branch" ASC`, academicYear
-    );
+    const records = await prisma.extracurricular.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { branch: 'asc' },
+      include: {
+        assignedStaff: { select: { name: true } }
+      }
+    });
+    return records.map((r: any) => ({
+      ...r,
+      assignedStaffName: r.assignedStaff?.name || null
+    }));
   }
-  async create(d: { branch: string; assignedStaffId?: string; schedule?: string; academicYear: string; notes?: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "Extracurricular" ("id","branch","assignedStaffId","schedule","academicYear","notes") VALUES (?,?,?,?,?,?)`,
-      id, d.branch.trim(), d.assignedStaffId || null, d.schedule || null, d.academicYear, d.notes || null
-    );
-    return { id, ...d };
+  async create(d: { branch: string; assignedStaffId?: string; schedule?: string; academicYear: string; notes?: string; extraData?: string }) {
+    return prisma.extracurricular.create({
+      data: {
+        id: uuid(),
+        branch: d.branch.trim(),
+        assignedStaffId: d.assignedStaffId || null,
+        schedule: d.schedule || null,
+        academicYear: d.academicYear,
+        notes: d.notes || null,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('Extracurricular', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.extracurricular.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "Extracurricular" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.extracurricular.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Yolluk Hesaplama ──
 class TravelAllowanceService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "TravelAllowance" WHERE "academicYear"=? ORDER BY "departureDate" DESC`, academicYear
-    );
+    const records = await prisma.travelAllowance.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { departureDate: 'desc' },
+      include: {
+        staff: { select: { name: true } }
+      }
+    });
+    return records.map((r: any) => ({
+      ...r,
+      staffName: r.staff?.name || null
+    }));
   }
   async create(d: Record<string, any>) {
-    const id = uuid();
     const total = (Number(d.transportCost) || 0) + (Number(d.dailyAllowance) || 0) + (Number(d.accommodationCost) || 0);
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "TravelAllowance" ("id","staffId","staffName","title","purpose","departurePlace","arrivalPlace","departureDate","returnDate","transportType","transportCost","dailyAllowance","accommodationCost","totalCost","academicYear","notes") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      id, d.staffId || null, d.staffName, d.title || null, d.purpose, d.departurePlace, d.arrivalPlace,
-      d.departureDate, d.returnDate, d.transportType || 'OTOBÜS', d.transportCost || 0, d.dailyAllowance || 0,
-      d.accommodationCost || 0, total, d.academicYear, d.notes || null
-    );
-    return { id, totalCost: total, ...d };
+    return prisma.travelAllowance.create({
+      data: {
+        id: uuid(),
+        staffId: d.staffId || null,
+        title: d.title || null,
+        purpose: d.purpose,
+        departurePlace: d.departurePlace,
+        arrivalPlace: d.arrivalPlace,
+        departureDate: d.departureDate,
+        returnDate: d.returnDate,
+        transportType: d.transportType || 'OTOBÜS',
+        transportCost: d.transportCost || 0,
+        dailyAllowance: d.dailyAllowance || 0,
+        accommodationCost: d.accommodationCost || 0,
+        totalCost: total,
+        academicYear: d.academicYear,
+        notes: d.notes || null,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
     if (data.transportCost !== undefined || data.dailyAllowance !== undefined || data.accommodationCost !== undefined) {
       data.totalCost = (Number(data.transportCost) || 0) + (Number(data.dailyAllowance) || 0) + (Number(data.accommodationCost) || 0);
     }
-    const u = buildUpdate('TravelAllowance', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.travelAllowance.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "TravelAllowance" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.travelAllowance.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Personel Nakil Bildirimi ──
 class StaffTransferService {
   async getAll(academicYear: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM "StaffTransfer" WHERE "academicYear"=? ORDER BY "transferDate" DESC`, academicYear
-    );
+    return prisma.staffTransfer.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { transferDate: 'desc' }
+    });
   }
   async create(d: Record<string, any>) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "StaffTransfer" ("id","staffName","staffTitle","tcKimlikNo","sicilNo","currentSchool","newSchool","transferDate","transferReason","academicYear","notes") VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      id, d.staffName, d.staffTitle || null, d.tcKimlikNo || null, d.sicilNo || null, d.currentSchool || null,
-      d.newSchool || null, d.transferDate, d.transferReason || null, d.academicYear, d.notes || null
-    );
-    return { id, ...d };
+    return prisma.staffTransfer.create({
+      data: {
+        id: uuid(),
+        staffName: d.staffName,
+        staffTitle: d.staffTitle || null,
+        tcKimlikNo: d.tcKimlikNo || null,
+        sicilNo: d.sicilNo || null,
+        currentSchool: d.currentSchool || null,
+        newSchool: d.newSchool || null,
+        transferDate: d.transferDate,
+        transferReason: d.transferReason || null,
+        academicYear: d.academicYear,
+        notes: d.notes || null,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('StaffTransfer', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.staffTransfer.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "StaffTransfer" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.staffTransfer.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 }
 
 // ── Öğrenci Kulüpleri ──
 class StudentClubService {
   async getAll(academicYear: string) {
-    const clubs = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT sc.*, s."name" as "assignedStaffName"
-       FROM "StudentClub" sc LEFT JOIN "Staff" s ON s."id"=sc."assignedStaffId"
-       WHERE sc."academicYear"=? ORDER BY sc."name" ASC`, academicYear
-    );
-    for (const c of clubs) {
-      const countRes = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT COUNT(*) as c FROM "StudentClubMember" WHERE "clubId"=?`, c.id
-      );
-      c.memberCount = Number(countRes[0]?.c || 0);
-    }
-    return clubs;
+    const clubs = await prisma.studentClub.findMany({
+      where: { academicYear, deletedAt: null },
+      orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { members: true } }
+      }
+    });
+    return clubs.map((c: any) => ({
+      ...c,
+      memberCount: c._count?.members || 0
+    }));
   }
-  async create(d: { name: string; description?: string; assignedStaffId?: string; meetingDay?: string; meetingTime?: string; maxMembers?: number; academicYear: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "StudentClub" ("id","name","description","assignedStaffId","meetingDay","meetingTime","maxMembers","academicYear") VALUES (?,?,?,?,?,?,?,?)`,
-      id, d.name.trim(), d.description || null, d.assignedStaffId || null, d.meetingDay || null, d.meetingTime || null, d.maxMembers ?? 30, d.academicYear
-    );
-    return { id, ...d, memberCount: 0 };
+  async create(d: { name: string; description?: string; assignedStaffId?: string; meetingDay?: string; meetingTime?: string; maxMembers?: number; academicYear: string; extraData?: string }) {
+    return prisma.studentClub.create({
+      data: {
+        id: uuid(),
+        name: d.name.trim(),
+        description: d.description || null,
+        assignedStaffId: d.assignedStaffId || null,
+        meetingDay: d.meetingDay || null,
+        meetingTime: d.meetingTime || null,
+        maxMembers: d.maxMembers ?? 30,
+        academicYear: d.academicYear,
+        extraData: d.extraData || null
+      }
+    });
   }
   async update(id: string, data: Record<string, any>) {
-    const u = buildUpdate('StudentClub', id, data);
-    if (u) await prisma.$executeRawUnsafe(u.sql, ...u.vals);
+    return prisma.studentClub.update({ where: { id }, data });
   }
-  async delete(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "StudentClub" WHERE "id"=?`, id); }
+  async delete(id: string) {
+    return prisma.studentClub.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
 
   // Üyeler
   async getMembers(clubId: string) {
-    return prisma.$queryRawUnsafe<any[]>(
-      `SELECT scm.*, st."fullName" as "studentName", st."className"
-       FROM "StudentClubMember" scm LEFT JOIN "Student" st ON st."id"=scm."studentId"
-       WHERE scm."clubId"=? ORDER BY scm."role" ASC, st."fullName" ASC`, clubId
-    );
+    const members = await prisma.studentClubMember.findMany({
+      where: { clubId },
+      include: {
+        student: { select: { fullName: true, className: true } }
+      },
+      orderBy: [{ role: 'asc' }, { student: { fullName: 'asc' } }]
+    });
+    return members.map((m: any) => ({
+      ...m,
+      studentName: m.student?.fullName || null,
+      className: m.student?.className || null
+    }));
   }
   async addMember(d: { clubId: string; studentId: string; role?: string }) {
-    const id = uuid();
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "StudentClubMember" ("id","clubId","studentId","role") VALUES (?,?,?,?)`,
-      id, d.clubId, d.studentId, d.role || 'UYE'
-    );
-    return { id, ...d };
+    // INSERT OR IGNORE mantığını unique constraint var kabul ederek veya upsert ile yapabiliriz.
+    // Şimdilik findFirst ve Create ile yapıyoruz.
+    const exists = await prisma.studentClubMember.findFirst({
+      where: { clubId: d.clubId, studentId: d.studentId }
+    });
+    if (exists) return exists;
+
+    return prisma.studentClubMember.create({
+      data: {
+        id: uuid(),
+        clubId: d.clubId,
+        studentId: d.studentId,
+        role: d.role || 'UYE'
+      }
+    });
   }
-  async removeMember(id: string) { await prisma.$executeRawUnsafe(`DELETE FROM "StudentClubMember" WHERE "id"=?`, id); }
+  async removeMember(id: string) {
+    return prisma.studentClubMember.delete({ where: { id } });
+  }
 }
 
 export const annualPlanService = new AnnualPlanService();

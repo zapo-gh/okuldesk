@@ -5,7 +5,7 @@ class DutyScheduleService {
   // ── Nöbet Noktaları ──
   async getStations() {
     const stations = await prisma.dutyStation.findMany({
-      where: { isActive: 1 },
+      where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }]
     });
     return stations;
@@ -26,7 +26,7 @@ class DutyScheduleService {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
-    if (data.isActive !== undefined) updateData.isActive = data.isActive ? 1 : 0;
+    if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.shift !== undefined) updateData.shift = data.shift;
     if (data.capacity !== undefined) updateData.capacity = data.capacity;
     if (Object.keys(updateData).length === 0) throw new AppError('Güncellenecek alan bulunamadı.', 400);
@@ -72,30 +72,59 @@ class DutyScheduleService {
     academicYear: string;
     year: number;
     month: number;
-    assignments: { staffId: string; stationId: string; dayOfWeek: number; weekNumber?: number }[]
+    assignments: { staffId: string; stationId: string; dayOfWeek: number; weekNumber?: number; year?: number; month?: number }[]
   }) {
-    // Mevcut ay atalamalarını sil
-    await prisma.dutyAssignment.deleteMany({
-      where: {
-        academicYear: options.academicYear,
-        year: options.year,
-        month: options.month
-      }
-    });
+    // Group assignments by year and month
+    const groups: Record<string, { year: number; month: number; assignments: any[] }> = {};
+    
+    // Always ensure the base month is in the groups, so it gets cleared even if empty
+    groups[`${options.year}-${options.month}`] = {
+      year: options.year,
+      month: options.month,
+      assignments: []
+    };
 
-    // Yeni atamaları toplu ekle
-    if (options.assignments.length > 0) {
-      await prisma.dutyAssignment.createMany({
-        data: options.assignments.map(a => ({
-          staffId: a.staffId,
-          stationId: a.stationId,
-          dayOfWeek: a.dayOfWeek,
-          weekNumber: a.weekNumber ?? 0,
-          academicYear: options.academicYear,
-          year: options.year,
-          month: options.month
-        }))
+    for (const a of options.assignments) {
+      const y = a.year || options.year;
+      const m = a.month || options.month;
+      const key = `${y}-${m}`;
+      if (!groups[key]) {
+        groups[key] = { year: y, month: m, assignments: [] };
+      }
+      groups[key].assignments.push({
+        ...a,
+        year: y,
+        month: m
       });
+    }
+
+    // Process each group
+    for (const key in groups) {
+      const group = groups[key];
+      
+      // Delete existing assignments for this month
+      await prisma.dutyAssignment.deleteMany({
+        where: {
+          academicYear: options.academicYear,
+          year: group.year,
+          month: group.month
+        }
+      });
+
+      // Insert new assignments
+      if (group.assignments.length > 0) {
+        await prisma.dutyAssignment.createMany({
+          data: group.assignments.map(a => ({
+            staffId: a.staffId,
+            stationId: a.stationId,
+            dayOfWeek: a.dayOfWeek,
+            weekNumber: a.weekNumber ?? 0,
+            academicYear: options.academicYear,
+            year: group.year,
+            month: group.month
+          }))
+        });
+      }
     }
   }
 
@@ -117,8 +146,17 @@ class DutyScheduleService {
     isFixedStation?: boolean;
     fixedStationId?: string;
     isExempt?: boolean;
+    exemptionReason?: string;
+    exemptionNote?: string;
+    exemptionEndDate?: string;
   }[]) {
     for (const c of configs) {
+      const exemptData = {
+        isExempt: c.isExempt ?? false,
+        exemptionReason: c.isExempt ? (c.exemptionReason ?? null) : null,
+        exemptionNote: c.isExempt ? (c.exemptionNote ?? null) : null,
+        exemptionEndDate: c.isExempt ? (c.exemptionEndDate ?? null) : null,
+      };
       await prisma.dutyStaffConfig.upsert({
         where: { staffId_academicYear: { staffId: c.staffId, academicYear } },
         update: {
@@ -130,7 +168,7 @@ class DutyScheduleService {
           fixedDayOfWeek: c.fixedDayOfWeek ?? null,
           isFixedStation: c.isFixedStation ?? false,
           fixedStationId: c.fixedStationId ?? null,
-          isExempt: c.isExempt ?? false
+          ...exemptData
         },
         create: {
           staffId: c.staffId,
@@ -143,11 +181,12 @@ class DutyScheduleService {
           fixedDayOfWeek: c.fixedDayOfWeek ?? null,
           isFixedStation: c.isFixedStation ?? false,
           fixedStationId: c.fixedStationId ?? null,
-          isExempt: c.isExempt ?? false
+          ...exemptData
         }
       });
     }
   }
+
 
   // ── Aylık İstatistik ──
   async getMonthlyStats(year: number, month: number, academicYear: string) {
@@ -161,11 +200,19 @@ class DutyScheduleService {
       countMap[a.staffId] = (countMap[a.staffId] || 0) + 1;
     });
 
-    const staffIds = Object.keys(countMap);
-    if (!staffIds.length) return [];
+    // Muaf personeli de çek (isExempt=true) — nöbet eşitlik raporu için eksiksiz liste
+    const exemptConfigs = await prisma.dutyStaffConfig.findMany({
+      where: { academicYear, isExempt: true }
+    });
+
+    // Hem atama yapılan hem de muaf olanları birleştir
+    const allStaffIds = new Set([...Object.keys(countMap), ...exemptConfigs.map(c => c.staffId)]);
+    if (!allStaffIds.size) return [];
+
+    const exemptSet = new Set(exemptConfigs.map(c => c.staffId));
 
     const staffList = await prisma.staff.findMany({
-      where: { id: { in: staffIds } },
+      where: { id: { in: [...allStaffIds] } },
       select: { id: true, name: true, unvan: true }
     });
 
@@ -173,8 +220,13 @@ class DutyScheduleService {
       staffId: s.id,
       staffName: s.name,
       title: s.unvan || '',
-      count: countMap[s.id] || 0
-    })).sort((a, b) => b.count - a.count);
+      count: countMap[s.id] || 0,
+      isExempt: exemptSet.has(s.id)
+    })).sort((a, b) => {
+      // Muaf olanlar en alta
+      if (a.isExempt !== b.isExempt) return a.isExempt ? 1 : -1;
+      return b.count - a.count;
+    });
   }
 
   // ── Otomatik Dağıtım ──
@@ -184,11 +236,26 @@ class DutyScheduleService {
     academicYear: string;
     overwriteExisting: boolean;
     targetWeekNum?: number;
+    startDate?: string;
+    endDate?: string;
+    dutyStartDate?: string; // Nöbet başlangıç tarihi (genel ayar)
   }) {
-    const { year, month, academicYear, targetWeekNum } = options;
+    const { year, month, academicYear, targetWeekNum, startDate, endDate, dutyStartDate } = options;
 
     // İş günlerini hesapla (Pzt-Cum)
     let workDays = this._getWorkDays(year, month);
+
+    // Nöbet başlangıç tarihine göre filtrele (genel ayar)
+    if (dutyStartDate) {
+      const startD = new Date(dutyStartDate); startD.setHours(0, 0, 0, 0);
+      workDays = workDays.filter(d => d.date >= startD);
+    }
+
+    if (startDate && endDate) {
+       const sDate = new Date(startDate); sDate.setHours(0,0,0,0);
+       const eDate = new Date(endDate); eDate.setHours(23,59,59,999);
+       workDays = workDays.filter(d => d.date.getTime() >= sDate.getTime() && d.date.getTime() <= eDate.getTime());
+    }
 
     // Ayarlar, nöbet yerleri ve personel konfigürasyonları
     const [settings, stations, staffConfigs] = await Promise.all([
@@ -224,20 +291,20 @@ class DutyScheduleService {
     let newAssignments: any[] = [];
     if (targetWeekNum !== undefined) {
       newAssignments = existingAssignments.filter(a => a.weekNumber !== targetWeekNum);
+    } else if (startDate && endDate && options.overwriteExisting) {
+      const targetWeekDays = workDays.map(d => ({ weekNum: d.weekNum, dayOfWeek: d.dayOfWeek }));
+      newAssignments = existingAssignments.filter(a => 
+        !targetWeekDays.some(tw => tw.weekNum === a.weekNumber && tw.dayOfWeek === a.dayOfWeek)
+      );
     } else if (!options.overwriteExisting) {
       newAssignments = [...existingAssignments];
+    } else {
+      newAssignments = [];
     }
     
-    // Haftayı hesaplayan yerel fonksiyon
-    const getWeekNum = (dayDate: Date) => {
-      const firstDay = new Date(year, month - 1, 1);
-      const diffDays = Math.floor((dayDate.getTime() - firstDay.getTime()) / (1000 * 60 * 60 * 24));
-      return Math.floor(diffDays / 7);
-    };
-
     // Eğer targetWeekNum verilmişse, dağıtımı sadece o haftanın günleri için yap
     if (targetWeekNum !== undefined) {
-      workDays = workDays.filter(d => getWeekNum(d.date) === targetWeekNum);
+      workDays = workDays.filter(d => d.weekNum === targetWeekNum);
     }
     
     // Limit hesaplamaları için, ZATEN YERLEŞMİŞ (korunan) atamaların adetlerini state'e ekle
@@ -251,7 +318,7 @@ class DutyScheduleService {
 
     // Adım 1: Sabit Gün & Sabit Yer olanları (isFixedDay && isFixedStation) yerleştir
     for (const workDay of workDays) {
-      const weekNum = getWeekNum(workDay.date);
+      const weekNum = workDay.weekNum;
       for (const station of sortedStations) {
         for (let slot = 0; slot < (station.capacity || 1); slot++) {
           const assignedCount = newAssignments.filter(a => a.stationId === station.id && a.dayOfWeek === workDay.dayOfWeek && a.weekNumber === weekNum).length;
@@ -280,11 +347,29 @@ class DutyScheduleService {
 
     // Adım 2: Kalan boşlukları doldur
     for (const workDay of workDays) {
-      const weekNum = getWeekNum(workDay.date);
+      const weekNum = workDay.weekNum;
       
+      // ── Rotasyon Offseti: Mutlak hafta sayısı (aylık sıfırlanmayan) ──
+      const absWeekOffset = this._getAbsoluteWeekOffset(year, month, weekNum, academicYear);
       let rotationOffset = 0;
-      if (rotationFreq === 'weekly') rotationOffset = weekNum;
-      else if (rotationFreq === 'biweekly') rotationOffset = Math.floor(weekNum / 2);
+      if (rotationFreq === 'weekly') rotationOffset = absWeekOffset;
+      else if (rotationFreq === 'biweekly') rotationOffset = Math.floor(absWeekOffset / 2);
+      else if (rotationFreq === 'fourweekly') rotationOffset = Math.floor(absWeekOffset / 4);
+      else if (rotationFreq === 'monthly') {
+        const parts = academicYear.split('-');
+        const startYear = Number(parts[0]);
+        const mOffset = (year - startYear) * 12 + (month >= 9 ? month - 9 : month + 3);
+        rotationOffset = mOffset;
+      }
+      else if (rotationFreq === 'custom') {
+        try {
+          const dates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
+          const wdTime = workDay.date.getTime();
+          rotationOffset = dates.filter(d => new Date(d).getTime() <= wdTime).length;
+        } catch (e) {
+          rotationOffset = 0;
+        }
+      }
       
       for (let i = 0; i < sortedStations.length; i++) {
         const station = sortedStations[i];
@@ -316,15 +401,23 @@ class DutyScheduleService {
             const wCount = (weeklyCount[s.id]?.[weekNum] || 0);
             if (config?.maxPerWeek && config.maxPerWeek > 0 && wCount >= config.maxPerWeek) return false;
 
-            // İdareciler sadece idare/müdür nöbet yerlerine, öğretmenler diğer yerlere
+            // Personel türü eşleştirmesi: isAdmin config flag'i öncelikli,
+            // yoksa gorev alanından tespit et
             const isTeacher = s.gorev?.toLowerCase().includes('öğretmen');
-            const isAdminStation = station.name.toLowerCase().includes('idare') || station.name.toLowerCase().includes('müdür');
-            
-            if (isAdminStation && isTeacher) return false;
-            if (!isAdminStation && !isTeacher) return false;
+            const isAdminByConfig = config?.isAdmin === true;
+            const isAdminByRole = s.gorev?.toLowerCase().includes('müdür yardımcısı');
+            const isAdmin = isAdminByConfig || isAdminByRole;
 
-            // Okul öncesi → sadece idareci değilse
-            if (station.shift === 'okuloncesi' && config?.isAdmin) return false;
+            // İdari nöbet yeri (isAdminStation): sadece idareciler
+            const isAdminStation = station.name.toLowerCase().includes('idare') || station.name.toLowerCase().includes('müdür');
+            if (isAdminStation && !isAdmin) return false;
+
+            // Normal nöbet yeri: öğretmenler veya isAdmin=false idareciler
+            // (isAdmin olmayan ama müdür yardımcısı olan personel de normal yerlere atanabilir)
+            if (!isAdminStation && isAdmin && !isTeacher) return false;
+
+            // Okul öncesi → idareciler atanamaz
+            if (station.shift === 'okuloncesi' && isAdmin) return false;
             
             // Aynı gün başka bir yerde nöbeti var mı?
             const hasDutyToday = newAssignments.some(a => a.staffId === s.id && a.dayOfWeek === workDay.dayOfWeek && a.weekNumber === weekNum);
@@ -372,22 +465,216 @@ class DutyScheduleService {
       }
     }
 
-    // Kaydet
+    // Kaydetmeden önce follower (kopyalanacak) haftalara çoğaltma işlemi
+    if (targetWeekNum !== undefined) {
+      let totalDistributed = 0;
+      const numWeeks = rotationFreq === 'biweekly' ? 2 : rotationFreq === 'fourweekly' ? 4 : rotationFreq === 'monthly' ? 4 : 1;
+      const allMonthWorkDays = this._getWorkDays(year, month);
+      const maxWeekNumInMonth = Math.max(0, ...allMonthWorkDays.map(d => d.weekNum));
+
+      // Hedef hafta atamalarını al
+      const baseAssignments = newAssignments.filter(a => a.weekNumber === targetWeekNum);
+
+      // Takip eden haftaları hesapla — ay sınırını aşabilirler
+      const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+      const parts = academicYear.split('-');
+
+      // Tüm akademik yılın hafta dizisini oluştur: [{year, month, weekNum}]
+      const allAcademicWeeks: { year: number; month: number; weekNum: number }[] = [];
+      for (const m of academicMonths) {
+        const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
+        const days = this._getWorkDays(y, m);
+        const weekNums = [...new Set(days.map(d => d.weekNum))].sort((a, b) => a - b);
+        for (const wn of weekNums) {
+          allAcademicWeeks.push({ year: y, month: m, weekNum: wn });
+        }
+      }
+
+      // Şu anki hedef haftanın dizideki konumunu bul
+      const baseIdx = allAcademicWeeks.findIndex(w => w.year === year && w.month === month && w.weekNum === targetWeekNum);
+      console.log('[DEBUG] targetWeekNum:', targetWeekNum, 'year:', year, 'month:', month, 'baseIdx:', baseIdx, 'numWeeks:', numWeeks);
+      console.log('[DEBUG] baseAssignments.length:', baseAssignments.length);
+      console.log('[DEBUG] allAcademicWeeks around base:', allAcademicWeeks.slice(Math.max(0,baseIdx-1), baseIdx+5));
+
+      if (baseIdx !== -1) {
+        // Aynı ay içindeki follower haftaları temizle (eski kayıtlar)
+        for (let i = 1; i < numWeeks; i++) {
+          const nextW = targetWeekNum + i;
+          if (nextW <= maxWeekNumInMonth) {
+            newAssignments = newAssignments.filter(a => a.weekNumber !== nextW);
+          }
+        }
+
+        // Her follower haftası için kopyalama yap
+        const crossMonthBatch: { year: number; month: number; assignments: typeof newAssignments }[] = [];
+
+        for (let i = 1; i < numWeeks; i++) {
+          const followerIdx = baseIdx + i;
+          if (followerIdx >= allAcademicWeeks.length) break;
+          const fw = allAcademicWeeks[followerIdx];
+          console.log(`[DEBUG] follower i=${i} followerIdx=${followerIdx} fw=`, fw);
+
+          if (fw.year === year && fw.month === month) {
+            // Aynı ay — newAssignments'a direkt ekle
+            for (const baseA of baseAssignments) {
+              const fWeekDays = allMonthWorkDays.filter(d => d.weekNum === fw.weekNum);
+              if (fWeekDays.some(d => d.dayOfWeek === baseA.dayOfWeek)) {
+                newAssignments.push({
+                  staffId: baseA.staffId,
+                  stationId: baseA.stationId,
+                  dayOfWeek: baseA.dayOfWeek,
+                  weekNumber: fw.weekNum
+                });
+              }
+            }
+          } else {
+            // Farklı ay — ayrı batch olarak grupla
+            const existingBatch = crossMonthBatch.find(b => b.year === fw.year && b.month === fw.month);
+            const fMonthDays = this._getWorkDays(fw.year, fw.month);
+            const fAssignments: typeof newAssignments = [];
+            for (const baseA of baseAssignments) {
+              const fWeekDays = fMonthDays.filter(d => d.weekNum === fw.weekNum);
+              if (fWeekDays.some(d => d.dayOfWeek === baseA.dayOfWeek)) {
+                fAssignments.push({
+                  staffId: baseA.staffId,
+                  stationId: baseA.stationId,
+                  dayOfWeek: baseA.dayOfWeek,
+                  weekNumber: fw.weekNum
+                });
+              }
+            }
+            console.log(`[DEBUG] cross-month fAssignments.length=${fAssignments.length} for`, fw);
+            if (existingBatch) {
+              existingBatch.assignments.push(...fAssignments);
+            } else {
+              crossMonthBatch.push({ year: fw.year, month: fw.month, assignments: fAssignments });
+            }
+          }
+        }
+
+        console.log('[DEBUG] crossMonthBatch:', JSON.stringify(crossMonthBatch.map(b => ({ year: b.year, month: b.month, count: b.assignments.length }))));
+
+        // Farklı aylara ait atamaları hafta bazında kaydet (tüm ayı silmeden)
+        for (const batch of crossMonthBatch) {
+          // Sadece bu haftanın atalamalarını sil, tüm ayı değil
+          const weekNumsToWrite = [...new Set(batch.assignments.map(a => a.weekNumber))];
+          console.log('[DEBUG] saving cross-month batch year:', batch.year, 'month:', batch.month, 'weekNums:', weekNumsToWrite, 'count:', batch.assignments.length);
+          for (const wn of weekNumsToWrite) {
+            await prisma.dutyAssignment.deleteMany({
+              where: {
+                academicYear,
+                year: batch.year,
+                month: batch.month,
+                weekNumber: wn
+              }
+            });
+          }
+          if (batch.assignments.length > 0) {
+            await prisma.dutyAssignment.createMany({
+              data: batch.assignments.map(a => ({
+                staffId: a.staffId,
+                stationId: a.stationId,
+                dayOfWeek: a.dayOfWeek,
+                weekNumber: a.weekNumber ?? 0,
+                academicYear,
+                year: batch.year,
+                month: batch.month
+              }))
+            });
+          }
+          totalDistributed += batch.assignments.length;
+        }
+      }
+    }
+
+    // Mevcut ayı kaydet
     await this.bulkSaveAssignments({ academicYear, year, month, assignments: newAssignments });
 
     return { distributed: newAssignments.length };
   }
 
-  // Yardımcı: Aylık iş günleri
-  _getWorkDays(year: number, month: number): { date: Date; dayOfWeek: number; dayNum: number }[] {
-    const days = [];
-    const date = new Date(year, month - 1, 1);
-    while (date.getMonth() === month - 1) {
-      const dow = date.getDay(); // 0=Pazar, 1=Pzt, ...
-      if (dow >= 1 && dow <= 5) {
-        days.push({ date: new Date(date), dayOfWeek: dow, dayNum: date.getDate() });
+  // Tarih aralığına göre çoklu ay dağıtımı
+  async autoDistributeRange(options: { startDate: string, endDate: string, academicYear: string, overwriteExisting: boolean }) {
+    const start = new Date(options.startDate);
+    const end = new Date(options.endDate);
+    
+    const monthsSet = new Set<string>();
+    let curr = new Date(start);
+    while (curr <= end) {
+      monthsSet.add(`${curr.getFullYear()}-${curr.getMonth() + 1}`);
+      curr.setDate(curr.getDate() + 1);
+    }
+    
+    let totalDistributed = 0;
+    
+    for (const ym of monthsSet) {
+      const [yStr, mStr] = ym.split('-');
+      const year = parseInt(yStr);
+      const month = parseInt(mStr);
+      
+      const res = await this.autoDistribute({
+         year, month, academicYear: options.academicYear, overwriteExisting: options.overwriteExisting,
+         startDate: options.startDate, endDate: options.endDate
+      });
+      totalDistributed += res.distributed;
+    }
+    return { distributed: totalDistributed };
+  }
+
+  // Yardımcı: Yıl başından (Eylül) itibaren mutlak hafta numarasını hesapla
+  // Bu değer, rotasyon offsetinin aylık sıfırlanmasını önler.
+  _getAbsoluteWeekOffset(year: number, month: number, weekNum: number, academicYear: string): number {
+    const months = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+    const parts = academicYear.split('-');
+    let absoluteWeek = 0;
+    for (const m of months) {
+      const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
+      if (y === year && m === month) {
+        absoluteWeek += weekNum;
+        break;
       }
-      date.setDate(date.getDate() + 1);
+      const w = this._getWorkDays(y, m);
+      const maxW = w.length > 0 ? Math.max(...w.map(d => d.weekNum)) : 0;
+      absoluteWeek += (maxW + 1);
+    }
+    return absoluteWeek;
+  }
+
+  // Yardımcı: Aylık iş günleri
+  _getWorkDays(year: number, month: number): { date: Date; dayOfWeek: number; dayNum: number; weekNum: number }[] {
+    const days: any[] = [];
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const startOfWeek = new Date(firstDay);
+    const dow = startOfWeek.getDay();
+    const diffToMonday = dow === 0 ? -6 : 1 - dow;
+    startOfWeek.setDate(startOfWeek.getDate() + diffToMonday);
+    let current = new Date(startOfWeek);
+    let weekNum = 0;
+    while (current.getTime() <= lastDay.getTime()) {
+      const weekDays = [];
+      
+      // Perşembe gününü bul (Pzt + 3 gün = Perşembe)
+      const thursday = new Date(current);
+      thursday.setDate(current.getDate() + 3);
+      
+      // Eğer Perşembe günü bu aya aitse, haftayı bu aya dahil et
+      if (thursday.getMonth() === month - 1) {
+        for (let i = 0; i < 5; i++) {
+          const d = new Date(current);
+          d.setDate(current.getDate() + i);
+          weekDays.push({
+            date: d,
+            dayOfWeek: d.getDay(),
+            dayNum: d.getDate(),
+            weekNum: weekNum,
+          });
+        }
+        days.push(...weekDays);
+        weekNum++;
+      }
+      
+      current.setDate(current.getDate() + 7);
     }
     return days;
   }

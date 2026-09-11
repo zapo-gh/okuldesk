@@ -4,9 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import api from '../../../services/api';
-import { Calendar, Users2, Plus, Trash2, Edit, Printer, X, PlusCircle, AlertCircle, Save, Loader2 } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
-import { ParentAssociationPrintTemplate } from './print/ParentAssociationPrintTemplate';
+import { Calendar, Users2, Plus, Trash2, Edit, Printer, X, PlusCircle, Save, Loader2 } from 'lucide-react';
+import { printPdfBlob } from '../../../utils/printPdf';
 import { Button } from '../../../components/ui/Button';
 import { useConfirm } from '../../../hooks/useConfirm';
 
@@ -146,11 +145,21 @@ export default function ParentAssociationPage() {
     });
   };
 
-  const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: 'OAB_Karar_Tutanagi'
-  });
+  const handlePrint = async () => {
+    try {
+      const payload = {
+        meeting: formData,
+        schoolName: settings?.schoolName,
+        principalName: settings?.principalName
+      };
+      toast.loading('PDF oluşturuluyor...', { id: 'pdf' });
+      const res = await api.post('/parent-association/meetings/generate-pdf', payload, { responseType: 'blob' });
+      printPdfBlob(res.data);
+      toast.success('PDF hazır', { id: 'pdf' });
+    } catch {
+      toast.error('PDF oluşturulamadı', { id: 'pdf' });
+    }
+  };
 
   const columns: Column<any>[] = [
     { header: 'Toplantı Türü', accessor: 'type', render: (row: any) => <span className="font-semibold">{row.type}</span> },
@@ -240,7 +249,7 @@ export default function ParentAssociationPage() {
               
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Toplantı Türü / Başlığı</label>
                       <input type="text" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Örn: Yönetim Kurulu Toplantısı" />
@@ -272,7 +281,7 @@ export default function ParentAssociationPage() {
                      </Button>
                   </div>
                   {formData.agendaItems.map((item: any, idx: number) => (
-                    <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col space-y-3 relative group">
+                    <div key={item.id} className="p-4 flex flex-col space-y-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="flex justify-between items-center mb-1">
                         <h4 className="font-semibold text-slate-800">Karar Madde {idx + 1}</h4>
                         <Button onClick={() => removeAgendaItem(item.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -299,7 +308,7 @@ export default function ParentAssociationPage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Okul Aile Birliği Karar Tutanağı</h3>
@@ -329,9 +338,7 @@ export default function ParentAssociationPage() {
         </div>
       )}
 
-      <div className="hidden">
-        <ParentAssociationPrintTemplate ref={printRef} formData={formData} />
-      </div>
+
 
     
       {confirmModal}

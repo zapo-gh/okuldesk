@@ -3,8 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
-import { useReactToPrint } from 'react-to-print';
-import { ParentMeetingPrintTemplate, ParentMeetingPdfData } from './print/ParentMeetingPrintTemplate';
+import { printPdfBlob } from '../../utils/printPdf';
 import { FileSignature, CheckSquare, Square, Download, Users, Calendar, BookOpen, UserCheck, Search, Loader2, Printer } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
@@ -17,9 +16,6 @@ export default function ParentMeetingPage() {
   const [term,            setTerm]            = useState('2. DÖNEM');
   const [includeParent,   setIncludeParent]   = useState(true);
   const [loading,         setLoading]         = useState(false);
-  const [printData,       setPrintData]       = useState<ParentMeetingPdfData[]>([]);
-  const [isPrinting,      setIsPrinting]      = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
   const [loadingClasses,  setLoadingClasses]  = useState(true);
   
   const [success,         setSuccess]         = useState('');
@@ -51,41 +47,24 @@ export default function ParentMeetingPage() {
   const selectAll = () => setSelectedClasses([...filteredClasses]);
   const clearAll  = () => setSelectedClasses([]);
 
-  const handlePrintAction = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: 'Veli_Toplantisi_Imza_Sirkusu',
-    onAfterPrint: () => {
-      setIsPrinting(false);
-      setLoading(false);
-    },
-    onPrintError: () => {
-      setIsPrinting(false);
-      setLoading(false);
-      toast.error('Yazdırma işlemi iptal edildi veya bir hata oluştu.');
-    }
-  });
-
   const handleGenerate = async () => {
     if (selectedClasses.length === 0) return;
     setLoading(true);
-    setIsPrinting(true);
     try {
-      const response = await api.post('/parent-meeting/data', {
+      const response = await api.post('/parent-meeting/generate-pdf', {
         classNames: selectedClasses,
         meetingDate,
         schoolYear,
         term,
         includeParentName: includeParent
-      });
-      setPrintData(response.data.data);
-      // Data is set, wait a moment for React to render the hidden component before printing
-      setTimeout(() => {
-        handlePrintAction();
-      }, 100);
+      }, { responseType: 'blob' });
+      
+      printPdfBlob(response.data);
+      setSuccess(`${selectedClasses.length} sınıf için imza sirküsü yazdırılıyor...`);
     } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Bilinmeyen hata');
+    } finally {
       setLoading(false);
-      setIsPrinting(false);
-      toast.error('Bir hata oluştu.');
     }
   };
 
@@ -106,7 +85,7 @@ export default function ParentMeetingPage() {
       <PageHeader
         title="Veli Toplantısı İmza Sirküsü"
         description="Sınıf seçin, toplantı detaylarını belirleyin ve veli imza sirkülerini PDF olarak indirin."
-        icon={<FileSignature size={28} className="text-indigo-600" />}
+        icon={<FileSignature size={28} />}
       />
 
       
@@ -120,7 +99,7 @@ export default function ParentMeetingPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
 
         {/* SOL: Sınıf Seçimi */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+        <div className="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Users size={20} /></div>
@@ -171,7 +150,7 @@ export default function ParentMeetingPage() {
                 {Object.entries(grouped).map(([grade, gradeClasses]) => {
                   const allGradeSelected = gradeClasses.every(c => selectedClasses.includes(c));
                   return (
-                    <div key={grade} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                    <div key={grade} className="p-5 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
                         <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">{grade}</span>
                         <Button 
@@ -228,7 +207,7 @@ export default function ParentMeetingPage() {
         <div className="flex flex-col gap-6">
 
           {/* Ayarlar kartı */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-5 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Calendar size={20} /></div>
@@ -294,7 +273,7 @@ export default function ParentMeetingPage() {
           </div>
 
           {/* Özet + Oluştur */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6">
               {someSelected && (
                 <div className="mb-5 p-4 bg-green-50 rounded-xl border border-green-100">
@@ -315,7 +294,7 @@ export default function ParentMeetingPage() {
                 leftIcon={loading ? <Loader2 size={20} className="animate-spin" /> : <Printer size={20} />}
               >
                 {loading 
-                  ? (isPrinting ? 'Yazdırma Hazırlanıyor...' : 'Lütfen Bekleyin...') 
+                  ? 'Hazırlanıyor...' 
                   : `Yazdır ${someSelected ? `(${selectedClasses.length})` : ''}`
                 }
               </Button>
@@ -324,10 +303,6 @@ export default function ParentMeetingPage() {
         </div>
       </div>
       
-      {/* Gizli Yazdırma Alanı */}
-      <div className="hidden">
-        <ParentMeetingPrintTemplate ref={printRef} data={printData} />
-      </div>
     </div>
   );
 }

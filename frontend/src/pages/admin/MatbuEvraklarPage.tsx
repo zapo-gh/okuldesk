@@ -155,12 +155,12 @@ export default function MatbuEvraklarPage() {
         <PageHeader
           title="Kayıt Evrakları"
           description="Standart okul formlarını yazdırın veya indirin"
-          icon={<FileSymlink size={28} className="text-gray-700" />}
+          icon={<FileSymlink size={28} />}
         />
       </div>
 
       {/* Öğrenci Seçim Kartı */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 print:hidden">
+      <div className="p-6 print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex items-start gap-4">
           <div className="bg-indigo-50 p-3 rounded-lg text-indigo-600">
             <Search size={24} />
@@ -185,7 +185,7 @@ export default function MatbuEvraklarPage() {
               />
               
               {isDropdownOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="w-full mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div 
                     className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 cursor-pointer"
                     onClick={() => {
@@ -229,7 +229,7 @@ export default function MatbuEvraklarPage() {
       {/* Evrak Kartları */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print:hidden">
         {DOCUMENTS.map((doc) => (
-          <div key={doc.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col">
+          <div key={doc.id} className="hover:shadow-md p-6 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-indigo-50 p-2.5 rounded-lg text-indigo-600">
                 <FileText size={22} />
@@ -299,7 +299,7 @@ export default function MatbuEvraklarPage() {
       {isElectiveSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
           <div className="fixed inset-0 bg-gray-900/60 transition-opacity" onClick={() => setIsElectiveSettingsOpen(false)}></div>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl flex flex-col max-h-[90vh] z-10 relative">
+          <div className="w-full max-w-3xl flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Settings size={20} className="text-indigo-600" />
@@ -312,7 +312,7 @@ export default function MatbuEvraklarPage() {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-gray-50/50">
               {electiveGroups.map((group, groupIdx) => (
-                <div key={groupIdx} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <div key={groupIdx} className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="flex items-center gap-3 mb-4">
                     <input
                       type="text"
@@ -392,8 +392,8 @@ export default function MatbuEvraklarPage() {
               </button>
             </div>
 
-            <div className="p-5 border-t border-gray-100 flex justify-end gap-3 bg-white rounded-b-xl">
-              <Button variant="ghost" onClick={() => setIsElectiveSettingsOpen(false)}>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl">
+              <Button variant="outline" onClick={() => setIsElectiveSettingsOpen(false)}>
                 İptal
               </Button>
               <Button variant="primary" onClick={handleSaveElectiveSettings}>

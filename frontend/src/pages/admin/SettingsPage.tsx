@@ -2,14 +2,20 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { Settings, Save, Edit, ShieldAlert, School, KeyRound, MessageCircle, AlertTriangle, CheckCircle2, X, Info } from 'lucide-react';
+import { Settings, Save, Edit, ShieldAlert, School, KeyRound, MessageCircle, AlertTriangle, CheckCircle2, X, Info, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
 
 export default function SettingsPage() {
   const { user, clearMustChangePassword } = useAuth();
   const { refreshSettings } = useSettings();
+  const { confirm, confirmModal } = useConfirm();
+
+  // ── Restore Backup ──
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // ── Okul bilgileri ──
   const [schoolName,    setSchoolName]    = useState('');
@@ -93,34 +99,126 @@ export default function SettingsPage() {
     finally { setPwLoading(false); }
   };
 
+  const handleRestoreBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Uzantı kontrolü (.db, .sqlite)
+    if (!file.name.endsWith('.db') && !file.name.endsWith('.sqlite')) {
+      toast.error('Lütfen sadece .db veya .sqlite uzantılı geçerli bir yedek dosyası seçin.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const ok = await confirm('DİKKAT: Veritabanı geri yüklendiğinde mevcut tüm verileriniz silinecek ve yedekteki veriler geçerli olacaktır. İşleme devam etmek istediğinize emin misiniz?');
+    if (!ok) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsRestoring(true);
+    const toastId = toast.loading('Yedek yükleniyor...');
+
+    try {
+      const formData = new FormData();
+      formData.append('dbfile', file);
+
+      const res = await api.post('/settings/restore', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data.success) {
+        toast.success(res.data.message || 'Geri yükleme başarılı.', { id: toastId, duration: 5000 });
+        // Başarı durumunda çıkış yaptırıp uygulamayı yeniden başlatmaya teşvik edebiliriz
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Geri yükleme işlemi sırasında bir hata oluştu.', { id: toastId });
+    } finally {
+      setIsRestoring(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Sistem Ayarları"
         description="Okul bilgileri, mesaj şablonları ve hesap güvenliğini yönetin."
-        icon={<Settings size={28} className="text-gray-700" />}
+        icon={<Settings size={28} />}
         actions={
-          <Button 
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const res = await api.get('/settings/backup', { responseType: 'blob' });
+                  const date = new Date().toISOString().slice(0, 10);
+                  const url = URL.createObjectURL(res.data as Blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `okuldesk-yedek-${date}.db`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Veritabanı yedeği indirildi.');
+                } catch {
+                  toast.error('Yedek alınamadı. Lütfen tekrar deneyin.');
+                }
+              }}
+            >
+              <Save size={18} /> Veritabanı Yedeği İndir
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isRestoring}
+              className="gap-2 border-amber-300 text-amber-50 hover:bg-amber-500/20"
+            >
+              {isRestoring ? <span className="animate-spin text-lg">⚙️</span> : <UploadCloud size={18} />}
+              Yedeği Geri Yükle
+            </Button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleRestoreBackup}
+              accept=".db,.sqlite"
+              className="hidden"
+            />
+          </div>
+          
+          <Button
             variant="outline"
+            className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 mt-2"
             onClick={async () => {
               try {
-                const res = await api.get('/settings/backup', { responseType: 'blob' });
-                const date = new Date().toISOString().slice(0, 10);
-                const url = URL.createObjectURL(res.data as Blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `okuldesk-yedek-${date}.db`;
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch {
-                toast('Yedek alınamadı. Lütfen tekrar deneyin.');
+                const { check } = await import('@tauri-apps/plugin-updater');
+                const toastId = toast.loading('Güncellemeler kontrol ediliyor...');
+                const update = await check();
+                if (update) {
+                  toast.success(`Yeni sürüm (${update.version}) bulundu! İndiriliyor...`, { id: toastId });
+                  await update.downloadAndInstall((event) => {
+                    if (event.event === 'Finished') {
+                      toast.success('Güncelleme yüklendi. Uygulamayı yeniden başlatın.', { id: toastId, duration: 8000 });
+                    }
+                  });
+                } else {
+                  toast.success('Sisteminiz güncel. En son sürümü kullanıyorsunuz.', { id: toastId });
+                }
+              } catch (error: any) {
+                toast.error('Güncelleme kontrolü başarısız: ' + error.toString());
               }
             }}
           >
-            <Save size={18} className="text-gray-500" /> Veritabanı Yedeği İndir
+            🔄 Güncellemeleri Kontrol Et
           </Button>
+        </div>
         }
       />
+
+      {confirmModal}
 
       {user?.mustChangePassword && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 shadow-sm">
@@ -134,7 +232,7 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Okul Bilgileri */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><School size={20} /></div>
@@ -168,7 +266,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Şifre Değiştir */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><KeyRound size={20} /></div>
@@ -209,7 +307,7 @@ export default function SettingsPage() {
       </div>
 
       {/* WhatsApp Şablonları */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><MessageCircle size={20} /></div>

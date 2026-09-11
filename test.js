@@ -1,0 +1,1 @@
+const fs = require('fs'); const txt = fs.readFileSync('C:\\\\Users\\\\AlizMTAL\\\\Desktop\\\\Programlar\\\\okulDesk v2\\\\int.xml', 'utf8'); const clean = txt.replace(/<cbc:EmbeddedDocumentBinaryObject[\\s\\S]*?<\\/cbc:EmbeddedDocumentBinaryObject>/gi, '').replace(/<ds:SignatureValue[\\s\\S]*?<\\/ds:SignatureValue>/gi, ''); console.log(clean.toLowerCase().includes('gsm'));

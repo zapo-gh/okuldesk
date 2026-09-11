@@ -7,8 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// SQLite enum desteklemediği için String kullanılır (değerler: ADMIN, PARENT)
-// (değerler: ACTIVE, INACTIVE)
+// SQLite enum desteklemediÄŸi iÃ§in String kullanÄ±lÄ±r (deÄŸerler: ADMIN, PARENT)
+// (deÄŸerler: ACTIVE, INACTIVE)
 
 model User {
   id                 String   @id @default(uuid())
@@ -18,7 +18,8 @@ model User {
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 
-  parent Parent?
+  parent    Parent?
+  staff     Staff?
   auditLogs AuditLog[]
 }
 
@@ -30,34 +31,37 @@ model Student {
   status       String   @default("ACTIVE")
   createdAt    DateTime @default(now())
 
-  parents              Parent[]             @relation("StudentParents")
-  absenteeisms         Absenteeism[]
-  writtenWarnings      WrittenWarning[]
-  dailyViolations      DailyViolation[]
-  gradeReportStudents  GradeReportStudent[]
-  clubMembers          StudentClubMember[]
+  parents             Parent[]             @relation("StudentParents")
+  absenteeisms        Absenteeism[]
+  writtenWarnings     WrittenWarning[]
+  dailyViolations     DailyViolation[]
+  gradeReportStudents GradeReportStudent[]
+  clubMembers         StudentClubMember[]
+  leaves              StudentLeave[]
+  deletedAt           DateTime?
 }
 
 model Parent {
   id       String @id @default(uuid())
   userId   String @unique
   fullName String
-  
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  students Student[] @relation("StudentParents")
-  contacts ParentContact[]
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students  Student[]       @relation("StudentParents")
+  contacts  ParentContact[]
+  deletedAt DateTime?
 }
 
 model ParentContact {
   id              String    @id @default(uuid())
   parentId        String
-  name            String    // Örn: Anne, Baba, Vasi
+  name            String // Ã–rn: Anne, Baba, Vasi
   phone           String
   isPrimary       Boolean   @default(false)
   waConsentStatus String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
   waConsentDate   DateTime?
-  
-  parent          Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
   @@index([phone])
 }
@@ -71,16 +75,31 @@ model Absenteeism {
   previewPath    String?
   excusedDays    Float?
   unexcusedDays  Float?
+  className      String?
+  academicYear   String?
   createdAt      DateTime  @default(now())
   viewedByParent Boolean   @default(false)
   waSentAt       DateTime?
   deletedAt      DateTime?
 
-  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
 }
 
+model StudentLeave {
+  id           String    @id @default(uuid())
+  studentId    String
+  dateRanges   String    @default("[]")
+  reason       String?
+  academicYear String
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
 
 model WrittenWarning {
   id                  String    @id @default(uuid())
@@ -93,7 +112,9 @@ model WrittenWarning {
   classTeacherName    String?
   schoolCounselorName String?
   pdfPath             String
-  issuedBy            String    @default("Okul Yönetimi")
+  className           String?
+  academicYear        String?
+  issuedBy            String    @default("Okul YÃ¶netimi")
   issuedAt            DateTime  @default(now())
   createdAt           DateTime  @default(now())
   waSentAt            DateTime?
@@ -104,90 +125,108 @@ model WrittenWarning {
   @@index([studentId])
 }
 
-// ── Günlük İhlal Takip Sistemi ──────────────────────
-// ViolationType değerleri: KIYAFET, TOREN_GEC, DIGER
+// â”€â”€ GÃ¼nlÃ¼k Ä°hlal Takip Sistemi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ViolationType deÄŸerleri: KIYAFET, TOREN_GEC, DIGER
 
 model ViolationUpload {
-  id          String  @id @default(uuid())
-  type        String
-  description String?
-  imagePath   String
-  ocrRawText  String?
-  uploadedBy  String        @default("Okul Yönetimi")
-  violationDate DateTime    @default(now())
-  createdAt   DateTime      @default(now())
+  id            String    @id @default(uuid())
+  type          String
+  description   String?
+  imagePath     String
+  ocrRawText    String?
+  uploadedBy    String    @default("Okul YÃ¶netimi")
+  violationDate DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
 
   records DailyViolation[]
 }
 
 model DailyViolation {
-  id              String   @id @default(uuid())
-  studentId       String
-  uploadId        String
-  type            String
-  violationDate   DateTime      @default(now())
-  matchedBy       String        @default("OCR")   // OCR, MANUAL
-  isConfirmed     Boolean       @default(false)
-  createdAt       DateTime      @default(now())
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  studentId     String
+  uploadId      String
+  className     String?
+  academicYear  String?
+  violationDate DateTime  @default(now())
+  matchedBy     String    @default("OCR") // OCR, MANUAL
+  isConfirmed   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
 
-  student Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  upload  ViolationUpload  @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  student Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  upload  ViolationUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, uploadId])
   @@index([studentId])
   @@index([uploadId])
-  @@index([type])
   @@index([violationDate])
 }
 
-// ── Okul Ayarları ──────────────────────────────────
+// â”€â”€ Okul AyarlarÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model SchoolSettings {
-  id               String   @id @default("singleton")
-  schoolName       String   @default("")
-  principalName    String   @default("")
-  academicYear     String   @default("2025-2026")
-  waTemplate1      String?  @default("")
-  waTemplate2      String?  @default("")
-  waTemplate3      String?  @default("")
-  dutyRotationFreq String   @default("weekly") // none, weekly, biweekly, monthly
-  lastRotationDate String?  
-  updatedAt        DateTime @updatedAt
+  id                String    @id @default("singleton")
+  schoolName        String    @default("")
+  principalName     String    @default("")
+  academicYear      String    @default("2025-2026")
+  waTemplate1       String?   @default("")
+  waTemplate2       String?   @default("")
+  waTemplate3       String?   @default("")
+  dutyRotationFreq  String    @default("weekly") // none, weekly, biweekly, monthly, custom
+  dutyRotationDates String?   @default("[]") // JSON string array of dates for custom rotation
+  dutyStartDate     String? // "YYYY-MM-DD" â€” nÃ¶bet baÅŸlangÄ±Ã§ tarihi (null = kÄ±sÄ±tsÄ±z)
+  lastRotationDate  DateTime?
+  updatedAt         DateTime  @updatedAt
 }
 
-// ── Personel ───────────────────────────────────────
-// role değerleri: MUDUR_YARDIMCISI | REHBER_OGRETMEN | SINIF_REHBER_OGRETMEN
+// â”€â”€ Personel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// role deÄŸerleri: MUDUR_YARDIMCISI | REHBER_OGRETMEN | SINIF_REHBER_OGRETMEN
 
 model Staff {
-  id        String   @id @default(uuid())
-  name      String
-  role          String
-  className     String?  // Sadece SINIF_REHBER_OGRETMEN için (örn: "10-A")
+  id            String    @id @default(uuid())
+  userId        String?   @unique
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name          String
+  title         String
+  className     String? // Sadece SINIF_REHBER_OGRETMEN iÃ§in (Ã¶rn: "10-A")
   tcKimlikNo    String?
   brans         String?
   kurumSicilNo  String?
   emekliSicilNo String?
   unvan         String?
   gorev         String?
-  isActive      Boolean  @default(true)
-  createdAt DateTime @default(now())
-  deletedAt DateTime?
-  extraData String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  deletedAt     DateTime?
+  extraData     String?
 
   commissionAssignments CommissionAssignment[]
+  dutyAssignments       DutyAssignment[]
+  dutyConfigs           DutyStaffConfig[]
+  studentClubs          StudentClub[]
+  extracurriculars      Extracurricular[]
+  socialActivities      SocialActivity[]
+  fieldTrips            FieldTrip[]
+  commemorativeDays     CommemorativeDay[]
+  travelAllowances      TravelAllowance[]
+  tebligDocuments       TebligDocument[]
+  TimetableEntry        TimetableEntry[]
+  absences              StaffAbsence[]
+  absentCovers          CoverAssignment[]      @relation("AbsentStaff")
+  substituteCovers      CoverAssignment[]      @relation("SubstituteStaff")
 
-  @@index([role])
+  @@index([title])
 }
 
-// ── Karne / Akademik Başarısızlık Bildirimi ────────
+// â”€â”€ Karne / Akademik BaÅŸarÄ±sÄ±zlÄ±k Bildirimi â”€â”€â”€â”€â”€â”€â”€â”€
 
 model GradeReport {
   id          String   @id @default(uuid())
   className   String
   schoolYear  String
   meetingDate DateTime @default(now())
-  karneText   String?  // ham çıkarılan metin (debug)
+  karneText   String? // ham Ã§Ä±karÄ±lan metin (debug)
   uploadedAt  DateTime @default(now())
   archived    Boolean  @default(false)
 
@@ -195,18 +234,18 @@ model GradeReport {
 }
 
 model GradeReportStudent {
-  id             String   @id @default(uuid())
-  reportId       String
-  studentId      String?  // DB'de eşleşen öğrenci (null = eşleşme yok)
-  fullName       String   // karneden okunan isim
-  className      String
-  tcKimlikNo     String?
-  schoolNumber   String?
-  pdfPath        String?  // üretilen PDF yolu
-  createdAt      DateTime @default(now())
+  id           String   @id @default(uuid())
+  reportId     String
+  studentId    String? // DB'de eÅŸleÅŸen Ã¶ÄŸrenci (null = eÅŸleÅŸme yok)
+  fullName     String // karneden okunan isim
+  className    String
+  tcKimlikNo   String?
+  schoolNumber String?
+  pdfPath      String? // Ã¼retilen PDF yolu
+  createdAt    DateTime @default(now())
 
-  report  GradeReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  student Student?    @relation(fields: [studentId], references: [id])
+  report             GradeReport                 @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  student            Student?                    @relation(fields: [studentId], references: [id])
   failedSubjectsList GradeReportStudentSubject[]
 
   @@index([reportId])
@@ -218,23 +257,23 @@ model GradeReportStudentSubject {
   gradeReportStudentId String
   subject              String
   grade                Float
-  
-  gradeReportStudent   GradeReportStudent @relation(fields: [gradeReportStudentId], references: [id], onDelete: Cascade)
-  
+
+  gradeReportStudent GradeReportStudent @relation(fields: [gradeReportStudentId], references: [id], onDelete: Cascade)
+
   @@index([gradeReportStudentId])
 }
 
 // ----------------------------------------------------
-// İDARE YARDIMCISI 16 MODÜL VERİTABANI ALTYAPISI
+// Ä°DARE YARDIMCISI 16 MODÃœL VERÄ°TABANI ALTYAPISI
 // ----------------------------------------------------
 
 model DutyStation {
-  id        String   @id @default(uuid())
-  name      String
-  sortOrder Int      @default(0)
-  isActive  Int      @default(1)
-  shift     String   @default("tum") // sabah | oglen | tum | okuloncesi
-  capacity  Int      @default(1) // Kaç nöbetçi olacağı
+  id          String           @id @default(uuid())
+  name        String
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  shift       String           @default("tum") // sabah | oglen | tum | okuloncesi
+  capacity    Int              @default(1) // KaÃ§ nÃ¶betÃ§i olacaÄŸÄ±
   assignments DutyAssignment[]
 }
 
@@ -245,32 +284,40 @@ model DutyAssignment {
   dayOfWeek    Int
   weekNumber   Int    @default(0)
   academicYear String
-  month        Int    @default(0) // 0=haftalık mod, 1-12=Ocak-Aralık
+  month        Int    @default(0) // 0=haftalÄ±k mod, 1-12=Ocak-AralÄ±k
   year         Int    @default(0)
 
+  staff   Staff       @relation(fields: [staffId], references: [id], onDelete: Cascade)
   station DutyStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
 }
 
 model DutyStaffConfig {
-  id              String  @id @default(uuid())
-  staffId         String
-  academicYear    String
-  availableDays   String  @default("1,2,3,4,5") // virgülle ayrılmış gün no (1-5)
-  maxPerMonth     Int     @default(0)             // 0 = sınırsız
-  maxPerWeek      Int     @default(0)             // 0 = sınırsız
-  isAdmin         Boolean @default(false)         // İdareci mi?
-  isFixedDay      Boolean @default(false)         // Nöbet günü sabit mi?
-  fixedDayOfWeek  Int?                            // Sabit gün ise hangisi (1: Pzt, ..., 5: Cuma)
-  isFixedStation  Boolean @default(false)
-  isExempt        Boolean @default(false)         // Nöbet muaf mı?         // Nöbet yeri sabit mi?
-  fixedStationId  String?                         // Sabit nöbet yeri ID'si
+  id               String    @id @default(uuid())
+  staffId          String
+  academicYear     String
+  availableDays    String    @default("1,2,3,4,5") // virgÃ¼lle ayrÄ±lmÄ±ÅŸ gÃ¼n no (1-5)
+  maxPerMonth      Int       @default(0) // 0 = sÄ±nÄ±rsÄ±z
+  maxPerWeek       Int       @default(0) // 0 = sÄ±nÄ±rsÄ±z
+  staff            Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  isAdmin          Boolean   @default(false) // Ä°dareci mi?
+  isFixedDay       Boolean   @default(false) // NÃ¶bet gÃ¼nÃ¼ sabit mi?
+  fixedDayOfWeek   Int? // Sabit gÃ¼n ise hangisi (1: Pzt, ..., 5: Cuma)
+  isFixedStation   Boolean   @default(false) // NÃ¶bet yeri sabit mi?
+  isExempt         Boolean   @default(false) // NÃ¶bet muaf mÄ±?
+  fixedStationId   String? // Sabit nÃ¶bet yeri ID'si
+  // â”€â”€ MEB MevzuatÄ±: Muafiyet GerekÃ§esi AlanlarÄ± â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // exemptionReason deÄŸerleri: HAMILE | DOGUM_SONRASI | HIZMET_YILI_KADIN |
+  //   HIZMET_YILI_ERKEK | ENGELLI | ENGELLI_BAKIM | OZEL_EGITIM | DIGER
+  exemptionReason  String? // Muafiyet gerekÃ§e kodu
+  exemptionNote    String? // Serbest aÃ§Ä±klama notu
+  exemptionEndDate DateTime? // Muafiyetin bitiÅŸ tarihi (YYYY-MM-DD), opsiyonel
 
   @@unique([staffId, academicYear])
   @@index([academicYear])
 }
 
 model Supplier {
-  id            String @id @default(uuid())
+  id            String   @id @default(uuid())
   name          String
   taxNumber     String?
   taxOffice     String?
@@ -279,67 +326,76 @@ model Supplier {
   email         String?
   iban          String?
   contactPerson String?
-  isActive      Boolean @default(true)
+  isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
 
-  offers ProcurementOffer[]
+  offers       ProcurementOffer[]
+  orderLetters OrderLetter[]
+  deletedAt    DateTime?
 }
 
 model OrderLetter {
-  id            String   @id @default(uuid())
-  subject       String
-  supplierName  String
+  id              String    @id @default(uuid())
+  subject         String
+  supplierName    String
+  supplierId      String?
   supplierAddress String?
-  date          String
-  deliveryDate  String
-  academicYear  String
-  notes         String?
-  extraData     String?
-  createdAt     DateTime @default(now())
+  date            DateTime?
+  deliveryDate    DateTime?
+  academicYear    String
+  procurementId   String?
+  notes           String?
+  extraData       String?
+  createdAt       DateTime  @default(now())
 
-  orderItems    OrderLetterItem[]
+  supplier    Supplier?         @relation(fields: [supplierId], references: [id])
+  procurement Procurement?      @relation(fields: [procurementId], references: [id])
+  orderItems  OrderLetterItem[]
+  deletedAt   DateTime?
 }
 
 model OrderLetterItem {
-  id          String      @id @default(uuid())
-  orderId     String
-  name        String
-  quantity    Int
-  unit        String
-  unitPrice   Float
-  total       Float
-  
-  order       OrderLetter @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+  id        String @id @default(uuid())
+  orderId   String
+  name      String
+  quantity  Int
+  unit      String
+  unitPrice Float
+  total     Float
+
+  order OrderLetter @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   @@index([orderId])
 }
 
 model Procurement {
-  id            String @id @default(uuid())
+  id            String    @id @default(uuid())
   title         String
-  date          String
-  procedureType String @default("22/d")
-  estimatedCost Float  @default(0)
-  status        String @default("ONAY_BEKLIYOR")
+  date          DateTime?
+  procedureType String    @default("22/d")
+  estimatedCost Float     @default(0)
+  status        String    @default("ONAY_BEKLIYOR")
   academicYear  String
-  itemCount     Int    @default(0)
-  supplierCount Int    @default(0)
-  createdAt     DateTime @default(now())
+  itemCount     Int       @default(0)
+  supplierCount Int       @default(0)
+  createdAt     DateTime  @default(now())
 
-  items  ProcurementItem[]
-  offers ProcurementOffer[]
+  items                 ProcurementItem[]
+  offers                ProcurementOffer[]
   commissionMembersList ProcurementCommissionMember[]
-  extraData String?
+  orderLetters          OrderLetter[]
+  extraData             String?
+  deletedAt             DateTime?
 }
 
 model ProcurementCommissionMember {
-  id            String @id @default(uuid())
+  id            String  @id @default(uuid())
   procurementId String
   fullName      String
   role          String?
-  
-  procurement   Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
-  
+
+  procurement Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+
   @@index([procurementId])
 }
 
@@ -351,185 +407,198 @@ model ProcurementItem {
   unit               String
   estimatedUnitPrice Float
 
-  procurement Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  procurement Procurement        @relation(fields: [procurementId], references: [id], onDelete: Cascade)
   offers      ProcurementOffer[]
 }
 
 model ProcurementOffer {
-  id            String @id @default(uuid())
+  id            String  @id @default(uuid())
   procurementId String
   itemId        String
   supplierId    String
   offeredPrice  Float
   isWinner      Boolean @default(false)
 
-  procurement Procurement @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+  procurement Procurement     @relation(fields: [procurementId], references: [id], onDelete: Cascade)
   item        ProcurementItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier    Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 }
 
 model StudentClub {
-  id               String @id @default(uuid())
-  name             String
-  description      String?
-  assignedStaffId  String?
-  assignedStaffName String?
-  meetingDay       String?
-  meetingTime      String?
-  maxMembers       Int     @default(30)
-  academicYear     String
-  isActive         Int     @default(1)
-  memberCount      Int     @default(0)
+  id              String  @id @default(uuid())
+  name            String
+  description     String?
+  assignedStaffId String?
+  assignedStaff   Staff?  @relation(fields: [assignedStaffId], references: [id])
+  meetingDay      String?
+  meetingTime     String?
+  maxMembers      Int     @default(30)
+  academicYear    String
+  isActive        Boolean @default(true)
 
-  members StudentClubMember[]
-  extraData String?
+  members           StudentClubMember[]
+  commemorativeDays CommemorativeDay[]
+  extraData         String?
+  deletedAt         DateTime?
 }
 
 model StudentClubMember {
   id        String @id @default(uuid())
   clubId    String
   studentId String
-  role      String @default("Üye")
+  role      String @default("Ãœye")
 
-  club StudentClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  club    StudentClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model Extracurricular {
-  id               String @id @default(uuid())
-  branch           String
-  assignedStaffId  String?
-  assignedStaffName String?
-  schedule         String?
-  academicYear     String
-  notes            String?
-  status           String @default("ONAY_BEKLIYOR")
-  extraData        String?
+  id              String    @id @default(uuid())
+  branch          String
+  assignedStaffId String?
+  assignedStaff   Staff?    @relation(fields: [assignedStaffId], references: [id])
+  schedule        String?
+  academicYear    String
+  notes           String?
+  status          String    @default("ONAY_BEKLIYOR")
+  extraData       String?
+  deletedAt       DateTime?
 }
 
 model SocialActivity {
-  id               String @id @default(uuid())
-  name             String
-  type             String
-  description      String?
-  plannedDate      String?
-  academicYear     String
-  assignedStaffId  String?
-  assignedStaffName String?
-  status           String @default("PLAN_ASAMASINDA")
-  notes            String?
-  extraData        String?
+  id              String    @id @default(uuid())
+  name            String
+  type            String
+  description     String?
+  plannedDate     DateTime?
+  academicYear    String
+  assignedStaffId String?
+  assignedStaff   Staff?    @relation(fields: [assignedStaffId], references: [id])
+  status          String    @default("PLAN_ASAMASINDA")
+  notes           String?
+  extraData       String?
+  deletedAt       DateTime?
 }
 
 model FieldTrip {
-  id                 String @id @default(uuid())
+  id                 String    @id @default(uuid())
   title              String
   destination        String
-  date               String
-  returnDate         String?
+  date               DateTime?
+  returnDate         DateTime?
   purpose            String?
   transportation     String?
   assignedStaffId    String?
-  assignedStaffName  String?
+  assignedStaff      Staff?    @relation(fields: [assignedStaffId], references: [id])
   participantClasses String?
   academicYear       String
   notes              String?
-  status             String @default("PLAN_ASAMASINDA")
+  status             String    @default("PLAN_ASAMASINDA")
   extraData          String?
+  deletedAt          DateTime?
 }
 
 model BoardMeeting {
-  id               String @id @default(uuid())
-  title            String
-  date             String
-  time             String?
-  location         String?
-  academicYear     String
-  agenda           String?
-  decisions        String?
-  status           String @default("PLANLANDI")
-  extraData        String?
+  id           String    @id @default(uuid())
+  title        String
+  date         DateTime?
+  time         String?
+  location     String?
+  academicYear String
+  agenda       String?
+  decisions    String?
+  status       String    @default("PLANLANDI")
+  extraData    String?
 
-  agendaItems      BoardAgendaItem[]
+  agendaItems BoardAgendaItem[]
+  deletedAt   DateTime?
 }
 
 model Commission {
-  id               String @id @default(uuid())
-  name             String
-  description      String?
-  academicYear     String
-  members          String? 
-  status           String @default("AKTIF")
-  extraData        String?
+  id           String  @id @default(uuid())
+  name         String
+  description  String?
+  academicYear String
+  members      String?
+  status       String  @default("AKTIF")
+  extraData    String?
 
-  roles            CommissionRole[]
+  roles     CommissionRole[]
+  deletedAt DateTime?
 }
 
 model CommemorativeDay {
-  id               String @id @default(uuid())
-  name             String
-  startDate        String
-  endDate          String
-  assignedStaffId  String?
-  assignedStaffName String?
-  description      String?
-  academicYear     String
-  status           String @default("BEKLIYOR")
-  extraData        String?
+  id              String       @id @default(uuid())
+  name            String
+  startDate       DateTime?
+  endDate         DateTime?
+  assignedStaffId String?
+  assignedStaff   Staff?       @relation(fields: [assignedStaffId], references: [id])
+  assignedClubId  String?
+  assignedClub    StudentClub? @relation(fields: [assignedClubId], references: [id])
+  description     String?
+  academicYear    String
+  status          String       @default("BEKLIYOR")
+  extraData       String?
+  deletedAt       DateTime?
 }
 
 model Holiday {
-  id        String @id @default(uuid())
-  name      String
-  startDate String
-  endDate   String?
-  type      String @default("RESMI_TATIL")
+  id           String    @id @default(uuid())
+  name         String
+  startDate    DateTime?
+  endDate      DateTime?
+  type         String    @default("RESMI_TATIL")
   academicYear String
   extraData    String?
+  deletedAt    DateTime?
 }
 
 model AnnualPlanItem {
-  id           String @id @default(uuid())
+  id           String    @id @default(uuid())
   academicYear String
   month        Int
   title        String
   description  String?
   category     String?
-  sortOrder    Int     @default(0)
+  sortOrder    Int       @default(0)
   extraData    String?
+  deletedAt    DateTime?
 }
 
 model ParentAssociationMeeting {
-  id               String @id @default(uuid())
-  date             String
-  type             String @default("OLAGAN")
-  meetingNumber    Int    @default(1)
-  academicYear     String
-  notes            String?
-  decisions        String?
-  status           String @default("PLANLANDI")
-  extraData        String?
+  id            String    @id @default(uuid())
+  date          DateTime?
+  type          String    @default("OLAGAN")
+  meetingNumber Int       @default(1)
+  academicYear  String
+  notes         String?
+  decisions     String?
+  status        String    @default("PLANLANDI")
+  extraData     String?
+  deletedAt     DateTime?
 }
 
 model ParentAssociationMember {
-  id           String @id @default(uuid())
+  id           String    @id @default(uuid())
   fullName     String
-  role         String @default("UYE")
+  role         String    @default("UYE")
   phone        String?
   academicYear String
   extraData    String?
+  deletedAt    DateTime?
 }
 
 model TravelAllowance {
-  id                String @id @default(uuid())
+  id                String    @id @default(uuid())
   staffId           String?
-  staffName         String?
+  staff             Staff?    @relation(fields: [staffId], references: [id])
   title             String?
   purpose           String?
   departurePlace    String?
   arrivalPlace      String?
-  departureDate     String?
-  returnDate        String?
+  departureDate     DateTime?
+  returnDate        DateTime?
   transportType     String?
   transportCost     Float?
   dailyAllowance    Float?
@@ -538,23 +607,24 @@ model TravelAllowance {
   academicYear      String
   notes             String?
   extraData         String?
+  deletedAt         DateTime?
 }
 
 model StaffTransfer {
-  id             String @id @default(uuid())
+  id             String    @id @default(uuid())
   staffName      String
   staffTitle     String?
   tcKimlikNo     String?
   sicilNo        String?
   currentSchool  String?
   newSchool      String?
-  transferDate   String
+  transferDate   DateTime?
   transferReason String?
   academicYear   String
   notes          String?
   extraData      String?
+  deletedAt      DateTime?
 }
-
 
 model AuditLog {
   id        String   @id @default(uuid())
@@ -565,7 +635,7 @@ model AuditLog {
   metadata  String?
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([entity, entityId])
@@ -581,19 +651,19 @@ model BoardAgendaItem {
   explanation String?
   createdAt   DateTime @default(now())
 
-  meeting     BoardMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting BoardMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 
   @@index([meetingId])
 }
 
 model CommissionRole {
-  id           String   @id @default(uuid())
+  id           String @id @default(uuid())
   commissionId String
   roleName     String
-  sortOrder    Int      @default(0)
+  sortOrder    Int    @default(0)
 
-  commission   Commission @relation(fields: [commissionId], references: [id], onDelete: Cascade)
-  assignments  CommissionAssignment[]
+  commission  Commission             @relation(fields: [commissionId], references: [id], onDelete: Cascade)
+  assignments CommissionAssignment[]
 
   @@index([commissionId])
 }
@@ -603,10 +673,114 @@ model CommissionAssignment {
   roleId  String
   staffId String
 
-  role    CommissionRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  staff   Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  role  CommissionRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  staff Staff          @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@index([roleId])
   @@index([staffId])
 }
 
+// â”€â”€ Fatura Takip Sistemi (Ã–denek ve Ã–deme SÃ¼reÃ§leri) â”€â”€â”€â”€â”€â”€â”€â”€
+model Invoice {
+  id            String    @id @default(uuid())
+  invoiceNumber String?
+  companyName   String
+  type          String // Elektrik, Su, DoÄŸalgaz, Ä°nternet, Telefon, KÄ±rtasiye, DiÄŸer
+  amount        Float     @default(0)
+  invoiceDate   DateTime?
+  dueDate       DateTime?
+  status        String    @default("BEKLEYEN_ODENEK_TALEBI")
+  // BEKLEYEN_ODENEK_TALEBI, ODENEK_TALEP_EDILDI, ODENEK_GELDI_MYS_BEKLIYOR, ODENDI
+
+  mebbisNo     String? // MEBBÄ°S Talep No
+  mysNo        String? // MYS Ã–EB No
+  notes        String?
+  academicYear String    @default("2025-2026")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  @@index([status])
+  @@index([dueDate])
+}
+
+model TebligDocument {
+  id              String    @id @default(uuid())
+  staffId         String?
+  personnelName   String
+  documentSubject String?
+  documentDateNum String?
+  pdfPath         String
+  academicYear    String    @default("2025-2026")
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  staff Staff? @relation(fields: [staffId], references: [id])
+}
+
+model Timetable {
+  id           String   @id @default(uuid())
+  academicYear String
+  name         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  entries TimetableEntry[]
+}
+
+model TimetableEntry {
+  id          String  @id @default(uuid())
+  timetableId String
+  staffId     String?
+  className   String?
+  dayOfWeek   Int
+  period      Int
+  subject     String?
+  room        String?
+
+  timetable Timetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  staff     Staff?    @relation(fields: [staffId], references: [id])
+
+  @@index([timetableId])
+  @@index([staffId])
+  @@index([className])
+}
+
+// Öğretmen İzin/Rapor Durumları (Gelmeyen Öğretmenler)
+model StaffAbsence {
+  id           String   @id @default(uuid())
+  staffId      String
+  academicYear String
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  staff  Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  covers CoverAssignment[]
+
+  @@index([staffId])
+  @@index([startDate, endDate])
+}
+
+// Boş Ders Doldurma (Nöbetçi) Atamaları
+model CoverAssignment {
+  id                String   @id @default(uuid())
+  absenceId         String?
+  absentStaffId     String
+  substituteStaffId String
+  date              DateTime
+  period            Int
+  className         String
+  subject           String?
+  academicYear      String
+  createdAt         DateTime @default(now())
+
+  absence         StaffAbsence? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
+  absentStaff     Staff         @relation("AbsentStaff", fields: [absentStaffId], references: [id], onDelete: Cascade)
+  substituteStaff Staff         @relation("SubstituteStaff", fields: [substituteStaffId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([substituteStaffId])
+  @@unique([date, absentStaffId, period])
+}

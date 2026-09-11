@@ -284,7 +284,7 @@ export default function AbsenteeismPage() {
       <PageHeader
         title="Devamsızlık Mektubu Gönderimi"
         description="Öğrenci devamsızlık mektuplarını PDF olarak yükleyin ve WhatsApp üzerinden velilere otomatik gönderin."
-        icon={<Mail size={28} className="text-indigo-600" />}
+        icon={<Mail size={28} />}
         actions={
           <Button onClick={() => { resetUploadForm(); setShowUploadModal(true); }} variant="primary" leftIcon={<Plus size={18} />}>
             Mektup Yükle
@@ -293,7 +293,7 @@ export default function AbsenteeismPage() {
       />
 
       {/* 2. Main Content */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         
         {/* Search */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">

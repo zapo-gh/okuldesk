@@ -54,12 +54,11 @@ export class Student360Service {
           orderBy: { violationDate: 'desc' },
           select: {
             id: true,
-            type: true,
             violationDate: true,
             matchedBy: true,
             isConfirmed: true,
             createdAt: true,
-            upload: { select: { id: true, description: true, imagePath: true, uploadedBy: true } },
+            upload: { select: { id: true, type: true, description: true, imagePath: true, uploadedBy: true } },
           },
         },
       },

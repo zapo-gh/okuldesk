@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import api from '../../../services/api';
-import { FileSignature, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, CheckCircle2 } from 'lucide-react';
+import { FileSignature, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+
 import { useReactToPrint } from 'react-to-print';
 import { ProcurementPrintTemplate } from './print/ProcurementPrintTemplate';
 import { Button } from '../../../components/ui/Button';
@@ -53,7 +54,8 @@ export default function ProcurementPage() {
         api.get('/supplier'),
         api.get('/staff')
       ]);
-      setProcurements(procRes.data.data || []);
+      const procList = procRes.data.data || [];
+      setProcurements(procList);
       // Sadece aktif firmalar
       setSuppliers((suppRes.data.data || []).filter((s: any) => s.isActive));
       setStaff(staffRes.data.data?.staff || staffRes.data.data || []);
@@ -170,16 +172,36 @@ export default function ProcurementPage() {
   const getOffer = (itemId: string, supplierId: string) => {
     return formData.offers.find((o: any) => o.tempItemId === itemId && o.supplierId === supplierId);
   };
-  const updateOffer = (itemId: string, supplierId: string, price: string) => {
-    const existing = getOffer(itemId, supplierId);
-    let newOffers = [...formData.offers];
-    if (existing) {
-      existing.offeredPrice = price;
+  const updateOffer = (tempItemId: string, supplierId: string, value: string) => {
+    const existingIndex = formData.offers.findIndex((o: any) => o.tempItemId === tempItemId && o.supplierId === supplierId);
+    const newOffers = [...formData.offers];
+    if (existingIndex >= 0) {
+      newOffers[existingIndex].offeredPrice = value;
     } else {
-      newOffers.push({ tempItemId: itemId, supplierId, offeredPrice: price, isWinner: false });
+      newOffers.push({ tempItemId, supplierId, offeredPrice: value, isWinner: false });
     }
+    setFormData({...formData, offers: newOffers});
+  };
+
+  const autoSelectLowestPrices = () => {
+    let newOffers = [...formData.offers].map(o => ({ ...o, isWinner: false }));
+    
+    formData.items.forEach((item: any) => {
+      const itemOffers = newOffers.filter(o => o.tempItemId === item.tempId && o.offeredPrice !== undefined && o.offeredPrice !== '' && Number(o.offeredPrice) > 0);
+      if (itemOffers.length > 0) {
+        let lowestOffer = itemOffers[0];
+        for (const o of itemOffers) {
+          if (Number(o.offeredPrice) < Number(lowestOffer.offeredPrice)) {
+            lowestOffer = o;
+          }
+        }
+        lowestOffer.isWinner = true;
+      }
+    });
+    
     setFormData({ ...formData, offers: newOffers });
   };
+  
   const setWinner = (itemId: string, supplierId: string) => {
     // Aynı kalemdeki diğer firmaların winner flag'ini kaldır, bunu winner yap
     const newOffers = formData.offers.map((o: any) => {
@@ -239,6 +261,18 @@ export default function ProcurementPage() {
     documentTitle: 'Onay_Belgesi_' + formData.title
   });
 
+  const teklifIstemeRef = useRef<HTMLDivElement>(null);
+  const printTeklifIsteme = useReactToPrint({
+    contentRef: teklifIstemeRef,
+    documentTitle: 'Teklif_Isteme_' + formData.title
+  });
+
+  const siparisYazisiRef = useRef<HTMLDivElement>(null);
+  const printSiparisYazisi = useReactToPrint({
+    contentRef: siparisYazisiRef,
+    documentTitle: 'Siparis_Yazisi_' + formData.title
+  });
+
   const printPiyasaArastirma = useReactToPrint({
     contentRef: piyasaArastirmaRef,
     documentTitle: 'Piyasa_Arastirma_' + formData.title
@@ -274,7 +308,41 @@ export default function ProcurementPage() {
         }
       />
 
-      
+      {/* 2024 Yıllık İzleme Kartı */}
+      {(() => {
+        const yearTotal = procurements
+          .filter((p: any) => p.status !== 'IPTAL')
+          .reduce((sum: number, p: any) => sum + (Number(p.estimatedCost) || 0), 0);
+        const limitWarning = yearTotal > 500000;
+        const limitCaution = yearTotal > 400000;
+        return (
+          <div className={`rounded-xl border px-5 py-4 flex flex-wrap items-center justify-between gap-4 ${
+            limitWarning ? 'bg-red-50 border-red-200' :
+            limitCaution ? 'bg-amber-50 border-amber-200' :
+            'bg-blue-50 border-blue-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <Info size={18} className={limitWarning ? 'text-red-500' : limitCaution ? 'text-amber-500' : 'text-blue-500'} />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  {academicYear} Dönemi Toplam Doğrudan Temin: <span className={`font-bold ${
+                    limitWarning ? 'text-red-600' : limitCaution ? 'text-amber-600' : 'text-blue-600'
+                  }`}>{yearTotal.toLocaleString('tr-TR')} TL</span>
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  4734 SK Madde 5: İhtiyaçlar parçalara bölünemez. Yıllık limitin (%10) aşılmasına dikkat ediniz.
+                </p>
+              </div>
+            </div>
+            {limitWarning && (
+              <div className="flex items-center gap-1.5 text-red-600 text-sm font-semibold">
+                <AlertTriangle size={16} />
+                Limit uyarısı — Strateji birimi ile görüşün
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <DataTable columns={columns} data={procurements} emptyMessage="Kayıtlı doğrudan temin dosyası bulunamadı." />
@@ -322,13 +390,24 @@ export default function ProcurementPage() {
               ))}
             </div>
 
+            {/* 2024 Tebliği Uyarı Banterı */}
+            <div className="mx-6 mt-4 mb-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start shrink-0">
+              <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+              <div className="text-xs text-amber-800 space-y-0.5">
+                <p className="font-semibold">1 Şubat 2024 Tebliği — Doğrudan Temin Kural Hatırlatıcısı</p>
+                <p>• Piyasa fiyat araştırmasında <strong>en az 3 firmadan</strong> teklif alınmalıdır. (EKAP üzerinden e-fiyat teklifi tercih edilmelidir.)</p>
+                <p>• İhtiyaçları limite girmeyi engellemek için parçalara bölmek <strong>kesinlikle yasaktır</strong> (4734 SK Madde 5).</p>
+                <p>• Onay Belgesi MYS üzerinden oluşturulmalı, kullanılabilir ödenek belirtilmelidir.</p>
+              </div>
+            </div>
+
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
               
               {/* TAB: INFO */}
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <h3 className="font-semibold text-slate-800 border-b pb-2">Temel Bilgiler</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
@@ -351,7 +430,7 @@ export default function ProcurementPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <h3 className="font-semibold text-slate-800 border-b pb-2">Komisyon ve İlgili Kişiler</h3>
                     {formData.commissionMembers.map((member: any, idx: number) => (
                       <div key={idx} className="flex space-x-4 items-center">
@@ -392,22 +471,22 @@ export default function ProcurementPage() {
               {/* TAB: ITEMS */}
               {activeTab === 'items' && (
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+                  <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <p className="text-sm text-slate-600">Alınacak mal veya hizmetleri bu listeye ekleyin.</p>
                     <Button onClick={addItem} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-sm flex items-center space-x-1">
                       <Plus className="w-4 h-4"/> <span>Kalem Ekle</span>
                     </Button>
                   </div>
                   
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                         <tr>
-                          <th className="px-4 py-3 w-12 text-center">#</th>
-                          <th className="px-4 py-3">Mal / Hizmet Cinsi</th>
-                          <th className="px-4 py-3 w-32">Miktar</th>
-                          <th className="px-4 py-3 w-32">Birim</th>
-                          <th className="px-4 py-3 w-16 text-center">İşlem</th>
+                          <th className="w-12 text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">#</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Mal / Hizmet Cinsi</th>
+                          <th className="w-32 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Miktar</th>
+                          <th className="w-32 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Birim</th>
+                          <th className="w-16 text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -439,23 +518,40 @@ export default function ProcurementPage() {
               {/* TAB: OFFERS (Piyasa Araştırması) */}
               {activeTab === 'offers' && (
                 <div className="space-y-4">
+                  {formData.items.length > 0 && suppliers.length > 0 && (
+                    <div className="flex justify-end mb-2">
+                      <Button onClick={autoSelectLowestPrices} variant="secondary" className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200">
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" /> En Düşük Fiyatları Otomatik Seç
+                      </Button>
+                    </div>
+                  )}
+                  {/* 3-firma uyarısı */}
+                  {formData.items.length > 0 && suppliers.length > 0 && suppliers.length < 3 && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800">
+                      <AlertTriangle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                      <span>
+                        <strong>Uyarı:</strong> Sistemde {suppliers.length} aktif firma var. 2024 Tebliği gereğince en az <strong>3 firmadan</strong> teklif alınmalıdır.
+                        Lütfen <em>Firma Rehberi</em>'ne ek firma ekleyin veya &quot;Tek Kaynak&quot; durumunu onay belgesi ile belgeleyin.
+                      </span>
+                    </div>
+                  )}
                   {formData.items.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">
+                    <div className="text-center py-12 text-slate-500 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       Önce <strong>İhtiyaç Listesi (Kalemler)</strong> sekmesinden malzeme eklemelisiniz.
                     </div>
                   ) : suppliers.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500">
-                      Sistemde aktif "Firma/Tedarikçi" bulunmuyor. Lütfen Firma Rehberine firma ekleyin.
+                    <div className="text-center py-12 text-slate-500 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      Sistemde aktif &quot;Firma/Tedarikçi&quot; bulunmuyor. Lütfen Firma Rehberine firma ekleyin.
                     </div>
                   ) : (
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm pb-8">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <table className="w-full text-left text-sm border-collapse min-w-max">
                         <thead className="bg-slate-800 text-slate-100">
                           <tr>
-                            <th className="px-4 py-3 border-r border-slate-700 sticky left-0 z-10 bg-slate-900 w-64">Malzeme / Kalem Adı</th>
-                            <th className="px-4 py-3 border-r border-slate-700 w-24 text-center">Miktar</th>
+                            <th className="sticky left-0 z-10 w-64 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Malzeme / Kalem Adı</th>
+                            <th className="w-24 text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Miktar</th>
                             {suppliers.map(sup => (
-                              <th key={sup.id} className="px-4 py-3 border-r border-slate-700 min-w-[200px] text-center">
+                              <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
                                 <div className="font-semibold truncate">{sup.name}</div>
                                 <div className="text-[10px] text-slate-400 font-normal mt-1">Birim Fiyat Teklifi</div>
                               </th>
@@ -512,7 +608,7 @@ export default function ProcurementPage() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4 hover:border-indigo-300 transition-colors">
+                    <div className="p-6 flex flex-col items-center text-center space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
                         <Printer className="w-6 h-6" />
                       </div>
@@ -526,7 +622,21 @@ export default function ProcurementPage() {
                       </Button>
                     </div>
 
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4 hover:border-indigo-300 transition-colors">
+                    <div className="p-6 flex flex-col items-center text-center space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+                        <Printer className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 mb-1">Teklif İsteme Mektubu</h4>
+                        <p className="text-xs text-slate-500 px-4">Firmalardan fiyat teklifi alabilmek için boş mektup şablonu.</p>
+                      </div>
+                      <Button variant="primary" onClick={printTeklifIsteme} className="w-full justify-center mt-auto">
+                        <Printer className="w-4 h-4 mr-1" />
+                        Yazdır
+                      </Button>
+                    </div>
+
+                    <div className="p-6 flex flex-col items-center text-center space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
                         <Printer className="w-6 h-6" />
                       </div>
@@ -540,7 +650,7 @@ export default function ProcurementPage() {
                       </Button>
                     </div>
 
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4 hover:border-indigo-300 transition-colors">
+                    <div className="p-6 flex flex-col items-center text-center space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
                         <FileSignature className="w-6 h-6" />
                       </div>
@@ -554,6 +664,20 @@ export default function ProcurementPage() {
                       </Button>
                     </div>
 
+                    <div className="p-6 flex flex-col items-center text-center space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center">
+                        <FileSignature className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-800 mb-1">Sipariş / Sözleşme Yazısı</h4>
+                        <p className="text-xs text-slate-500 px-4">Kazanan firmaya işin tebliğ edildiğine dair resmi yazı.</p>
+                      </div>
+                      <Button variant="primary" onClick={printSiparisYazisi} className="w-full justify-center mt-auto">
+                        <Printer className="w-4 h-4 mr-1" />
+                        Yazdır
+                      </Button>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -561,7 +685,9 @@ export default function ProcurementPage() {
             {/* Gizli Yazdırma Şablonları */}
             <div className="hidden">
               <ProcurementPrintTemplate ref={onayBelgesiRef} type="onay_belgesi" formData={formData} suppliers={suppliers} />
+              <ProcurementPrintTemplate ref={teklifIstemeRef} type="teklif_isteme" formData={formData} suppliers={suppliers} />
               <ProcurementPrintTemplate ref={piyasaArastirmaRef} type="piyasa_arastirma" formData={formData} suppliers={suppliers} />
+              <ProcurementPrintTemplate ref={siparisYazisiRef} type="siparis_yazisi" formData={formData} suppliers={suppliers} />
               <ProcurementPrintTemplate ref={muayeneKabulRef} type="muayene_kabul" formData={formData} suppliers={suppliers} />
             </div>
             </div>

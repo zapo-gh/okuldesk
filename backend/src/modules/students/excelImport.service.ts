@@ -109,16 +109,23 @@ export function parseExcelFile(buffer: Buffer): ParsedStudent[] {
  * Output: "9/A"
  */
 function extractClassName(text: string): string {
-  // Pattern: "X. Sınıf / Y Şubesi"
-  const match = text.match(/(\d+)\.\s*S\u0131n\u0131f\s*\/\s*([A-Za-z\u00C0-\u024F\u0100-\u017F]+)\s*\u015Eubesi/i);
+  let prefix = '';
+  const upperText = text.toUpperCase();
+  
+  if (upperText.includes('ATP') || upperText.includes('ANADOLU TEKNİK')) {
+    prefix = 'A-';
+  }
+
+  // Pattern: "X. Sınıf / Y Şubesi" or "X. Akademik Destek / Y Şubesi"
+  const match = text.match(/(\d+)\..*?\/\s*([A-Za-z\u00C0-\u024F\u0100-\u017F0-9]+)\s*\u015Eubesi/i);
   if (match) {
-    return `${match[1]}/${match[2].toUpperCase()}`;
+    return `${prefix}${match[1]}/${match[2].toUpperCase()}`;
   }
 
   // Fallback: try simpler pattern
   const simpleMatch = text.match(/(\d+)\s*\/\s*([A-Za-z])\b/);
   if (simpleMatch) {
-    return `${simpleMatch[1]}/${simpleMatch[2].toUpperCase()}`;
+    return `${prefix}${simpleMatch[1]}/${simpleMatch[2].toUpperCase()}`;
   }
 
   return text.slice(0, 30).trim();

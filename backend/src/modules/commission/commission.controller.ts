@@ -5,7 +5,7 @@ import { AppError } from '../shared/middleware/errorHandler.middleware';
 
 const createSchema = z.object({
   name: z.string().min(1), description: z.string().optional(),
-  academicYear: z.string().min(1), sortOrder: z.number().optional(),
+  academicYear: z.string().min(1),
 
   extraData: z.string().optional(),
 });

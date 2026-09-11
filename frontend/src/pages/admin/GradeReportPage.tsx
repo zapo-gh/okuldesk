@@ -250,7 +250,7 @@ export default function GradeReportPage() {
       <PageHeader
         title="Başarısızlık Riski Bildirimi"
         description="Not listesi yükleyin — 4 veya daha fazla zayıfı olan öğrenciler için veli bildirim formu oluşturun."
-        icon={<LineChart size={28} className="text-indigo-600" />}
+        icon={<LineChart size={28} />}
         actions={
           <div className="flex gap-2">
             <Button 
@@ -279,7 +279,7 @@ export default function GradeReportPage() {
 
       {/* ── Yükleme formu ── */}
       {activePanel === 'none' && !result && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><UploadCloud size={20} /></div>
             Not Listesi Yükle
@@ -312,7 +312,7 @@ export default function GradeReportPage() {
                   ref={fileRef}
                   type="file"
                   accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf"
-                  className="w-full p-2.5 border border-dashed border-gray-300 rounded-xl text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer bg-gray-50/50"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
                 />
               </div>
             </div>
@@ -330,7 +330,7 @@ export default function GradeReportPage() {
 
       {/* ── Raporlar paneli ── */}
       {activePanel === 'reports' && reports && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ClipboardList size={20} /></div>
@@ -346,12 +346,12 @@ export default function GradeReportPage() {
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Sınıf</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Eğitim Yılı</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Toplantı</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Öğrenci</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Yüklenme</th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">İşlem</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eğitim Yılı</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Toplantı</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yüklenme</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
@@ -379,10 +379,10 @@ export default function GradeReportPage() {
 
       {/* ── Arşiv paneli ── */}
       {activePanel === 'archived' && archivedReports && (
-        <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
             <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
-              <div className="p-2 bg-white text-amber-600 rounded-lg shadow-sm"><Archive size={20} /></div>
+              <div className="p-2 text-amber-600 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><Archive size={20} /></div>
               Arşivlenmiş Raporlar
             </h2>
             <span className="px-3 py-1 bg-white text-amber-700 rounded-full text-xs font-bold shadow-sm">{archivedReports.length} Rapor</span>
@@ -395,12 +395,12 @@ export default function GradeReportPage() {
               <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Sınıf</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Eğitim Yılı</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Toplantı</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Öğrenci</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Yüklenme</th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">İşlem</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eğitim Yılı</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Toplantı</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yüklenme</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
@@ -434,7 +434,7 @@ export default function GradeReportPage() {
 
       {/* ── Analiz sonuçları ── */}
       {result && activePanel === 'none' && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
@@ -493,13 +493,13 @@ export default function GradeReportPage() {
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-center w-12"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-12">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Öğrenci Adı</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Sınıf</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Veritabanı Eşleşmesi</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-1/3">Zayıf Dersler</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">PDF</th>
+                  <th className="text-center w-12 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>
+                  <th className="text-left w-12 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">#</th>
+                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci Adı</th>
+                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
+                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veritabanı Eşleşmesi</th>
+                  <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Zayıf Dersler</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">PDF</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">

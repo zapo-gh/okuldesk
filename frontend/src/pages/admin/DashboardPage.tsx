@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
+import { LayoutDashboard, Receipt } from 'lucide-react';
 
 interface DashboardData {
   totalStudents: number;
@@ -32,6 +34,12 @@ interface DashboardData {
   fieldTripsCount: number;
   commissionsCount: number;
   dutyCount: number;
+  invoices: {
+    bekleyenOdenekTalebi: number;
+    odenekTalepEdildi: number;
+    odenekGeldiMysBekliyor: number;
+    odendi: number;
+  };
   chartData?: { date: string; ihlal: number; devamsizlik: number }[];
 }
 
@@ -47,6 +55,7 @@ const emptyData: DashboardData = {
   fieldTripsCount: 0,
   commissionsCount: 0,
   dutyCount: 0,
+  invoices: { bekleyenOdenekTalebi: 0, odenekTalepEdildi: 0, odenekGeldiMysBekliyor: 0, odendi: 0 },
 };
 
 export default function DashboardPage() {
@@ -88,26 +97,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Gösterge Paneli</h1>
-          <p className="mt-1 text-[13px] text-slate-500">
-            {data.schoolName || 'OkulDesk Yönetim Paneli'}
-            {data.principalName ? ` · Müdür: ${data.principalName}` : ''}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            to="/admin/settings"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-medium hover:bg-slate-50"
-          >
-            <Settings size={15} /> Ayarlar
-          </Link>
-          <Button variant="outline" size="sm" onClick={load} className="flex items-center gap-1.5 px-3.5 py-2 text-[13px]">
-            <RefreshCw size={15} /> Yenile
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Gösterge Paneli"
+        description={`${data.schoolName || 'OkulDesk Yönetim Paneli'}${data.principalName ? ` · Müdür: ${data.principalName}` : ''}`}
+        icon={<LayoutDashboard size={28} />}
+        actions={
+          <>
+            <Link
+              to="/admin/settings"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 text-slate-700"
+            >
+              <Settings size={15} /> Ayarlar
+            </Link>
+            <Button variant="outline" size="sm" onClick={load} className="flex items-center gap-1.5 px-3.5 py-2 text-sm">
+              <RefreshCw size={15} /> Yenile
+            </Button>
+          </>
+        }
+      />
 
       {new Date().getDay() === 5 && settings?.dutyRotationFreq && settings.dutyRotationFreq !== 'none' && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-indigo-800">
@@ -117,7 +124,8 @@ export default function DashboardPage() {
             <p className="text-xs mt-1">
               Bugün Cuma. Nöbet yerlerinde {
                 settings.dutyRotationFreq === 'weekly' ? 'haftalık' :
-                settings.dutyRotationFreq === 'biweekly' ? '2 haftalık' : 'aylık'
+                settings.dutyRotationFreq === 'biweekly' ? '2 haftalık' :
+                settings.dutyRotationFreq === 'fourweekly' ? '4 haftalık' : 'aylık'
               } rotasyon uygulanıyor. Gelecek haftanın nöbet yerlerini oluşturmayı unutmayın.
             </p>
           </div>
@@ -134,7 +142,7 @@ export default function DashboardPage() {
             to={path}
             className="flex min-h-[108px] items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div><div className="mb-1 text-[12px] font-medium text-slate-500">{label}</div><div className={`text-2xl font-bold ${color}`}>{value}</div></div>
+            <div><div className="mb-1 text-xs font-medium text-slate-500">{label}</div><div className={`text-2xl font-bold ${color}`}>{value}</div></div>
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}><Icon size={20} className={color} /></div>
           </Link>
         ))}
@@ -146,7 +154,7 @@ export default function DashboardPage() {
           <MiniStat value={data.absenteeism.sentCount} label="Gönderildi" className="text-green-600" />
           <MiniStat value={data.absenteeism.total} label="Toplam" className="text-indigo-600" />
         </DetailCard>
-        <DetailCard title="Yazılı Uyardılar" icon={AlertTriangle} to="/admin/warnings">
+        <DetailCard title="Yazılı Uyardılar" icon={AlertTriangle} to="/admin/warnings" cols={2}>
           <MiniStat value={data.warnings.total} label="Toplam" className="text-amber-600" />
           <MiniStat value={data.warnings.studentsWithWarnings} label="Öğrenci" className="text-purple-600" />
         </DetailCard>
@@ -155,11 +163,14 @@ export default function DashboardPage() {
           <MiniStat value={data.violations.totalViolations} label="Toplam" className="text-orange-600" />
           <MiniStat value={data.violations.confirmedViolations} label="Onaylı" className="text-red-600" />
         </DetailCard>
-        <DetailCard title="WhatsApp" icon={MessageSquare} to="/admin/whatsapp">
-          <div className="col-span-3 flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-            <CheckCircle2 size={20} className="text-green-600" />
-            <div><div className="text-lg font-bold text-slate-900">{data.whatsapp.consentedParents}</div><div className="text-[11px] text-slate-500">Onaylı veli</div></div>
-          </div>
+        <DetailCard title="WhatsApp" icon={MessageSquare} to="/admin/whatsapp" cols={1}>
+          <MiniStat value={data.whatsapp.consentedParents} label="Onaylı Veli" className="text-green-600" />
+        </DetailCard>
+        <DetailCard title="Fatura Takibi" icon={Receipt} to="/admin/invoice-tracking" cols={4} className="md:col-span-2 xl:col-span-2">
+          <MiniStat value={data.invoices.bekleyenOdenekTalebi} label="Ödenek Bekleyen" className="text-red-600" />
+          <MiniStat value={data.invoices.odenekTalepEdildi} label="Talep Edildi" className="text-orange-600" />
+          <MiniStat value={data.invoices.odenekGeldiMysBekliyor} label="MYS Bekleyen" className="text-blue-600" />
+          <MiniStat value={data.invoices.odendi} label="Ödendi" className="text-green-600" />
         </DetailCard>
       </section>
 
@@ -198,10 +209,27 @@ export default function DashboardPage() {
   );
 }
 
-function DetailCard({ title, icon: Icon, to, children }: { title: string; icon: React.ElementType; to: string; children: React.ReactNode }) {
-  return <Link to={to} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:shadow-md"><div className="mb-4 flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100"><Icon size={18} className="text-slate-700" /></div><h2 className="text-sm font-semibold text-slate-900">{title}</h2></div><div className="grid grid-cols-3 gap-2">{children}</div></Link>;
+function DetailCard({ title, icon: Icon, to, children, className = '' }: { title: string; icon: React.ElementType; to: string; children: React.ReactNode; cols?: number; className?: string }) {
+  return (
+    <Link to={to} className={`flex flex-col rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${className}`}>
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-600">
+          <Icon size={18} />
+        </div>
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+      </div>
+      <div className="mt-auto flex w-full items-stretch rounded-xl bg-slate-50/80 border border-slate-100 p-1.5 divide-x divide-slate-200/60">
+        {children}
+      </div>
+    </Link>
+  );
 }
 
 function MiniStat({ value, label, className }: { value: number; label: string; className: string }) {
-  return <div className="rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-center"><div className={`text-xl font-bold ${className}`}>{value}</div><div className="mt-1 truncate text-[10px] font-medium text-slate-500">{label}</div></div>;
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center p-2 text-center">
+      <div className={`text-xl font-bold ${className}`}>{value}</div>
+      <div className="mt-1 w-full text-xs font-medium text-slate-500 leading-tight break-words">{label}</div>
+    </div>
+  );
 }

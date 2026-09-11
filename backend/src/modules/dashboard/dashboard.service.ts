@@ -18,6 +18,10 @@ export class DashboardService {
       fieldTripsCount,
       commissionsCount,
       dutyCount,
+      invoiceBekleyenOdenekTalebi,
+      invoiceOdenekTalepEdildi,
+      invoiceOdenekGeldiMysBekliyor,
+      invoiceOdendi,
     ] = await Promise.all([
       prisma.student.count({ where: { status: 'ACTIVE' } }),
       prisma.staff.count({ where: { isActive: true, deletedAt: null } }),
@@ -31,14 +35,18 @@ export class DashboardService {
         FROM WrittenWarning
         WHERE deletedAt IS NULL
       `,
-      prisma.violationUpload.count(),
+      prisma.violationUpload.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { isConfirmed: true, deletedAt: null } }),
       prisma.parent.count({ where: { contacts: { some: { waConsentStatus: 'ACCEPTED' } } } }),
       prisma.schoolSettings.findUnique({ where: { id: 'singleton' } }),
       prisma.fieldTrip.count(),
       prisma.commission.count({ where: { status: 'AKTIF' } }),
-      prisma.dutyStation.count({ where: { isActive: 1 } }),
+      prisma.dutyStation.count({ where: { isActive: true } }),
+      prisma.invoice.count({ where: { status: 'BEKLEYEN_ODENEK_TALEBI', deletedAt: null } }),
+      prisma.invoice.count({ where: { status: 'ODENEK_TALEP_EDILDI', deletedAt: null } }),
+      prisma.invoice.count({ where: { status: 'ODENEK_GELDI_MYS_BEKLIYOR', deletedAt: null } }),
+      prisma.invoice.count({ where: { status: 'ODENDI', deletedAt: null } }),
     ]);
 
     const thirtyDaysAgo = new Date();
@@ -107,6 +115,12 @@ export class DashboardService {
       fieldTripsCount,
       commissionsCount,
       dutyCount,
+      invoices: {
+        bekleyenOdenekTalebi: invoiceBekleyenOdenekTalebi,
+        odenekTalepEdildi: invoiceOdenekTalepEdildi,
+        odenekGeldiMysBekliyor: invoiceOdenekGeldiMysBekliyor,
+        odendi: invoiceOdendi,
+      },
       chartData: Object.values(dateMap),
     };
   }

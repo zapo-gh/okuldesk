@@ -25,3 +25,10 @@ src-tauri/binaries/*.exe
 
 # Test dosyaları
 frontend/test*.css
+
+# Security / Keys
+*.key
+!*.key.pub
+
+# Tauri Target
+src-tauri/target/

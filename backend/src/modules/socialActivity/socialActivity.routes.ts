@@ -3,6 +3,7 @@ import { socialActivityService } from '../shared/services/moduleServices';
 import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { z } from 'zod';
+import { generateSingleActivityPdf, generateAllActivitiesPdf } from './socialActivityPdf.generator';
 
 const createSchema = z.object({
   name: z.string().min(1), type: z.string().optional(), description: z.string().optional(),
@@ -30,13 +31,48 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, 
 });
 
 router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
-  try { await socialActivityService.update(req.params.id, req.body); res.json({ success: true }); }
+  try {
+    const p = createSchema.safeParse(req.body);
+    if (!p.success) throw new AppError(p.error.errors[0].message, 400);
+    await socialActivityService.update(req.params.id, p.data); 
+    res.json({ success: true }); 
+  }
   catch (e) { next(e); }
 });
 
 router.delete('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
   try { await socialActivityService.delete(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
+});
+
+router.post('/generate-single-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pdfBuffer = await generateSingleActivityPdf(req.body);
+    const fileName = `etkinlik-onay.pdf`;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      'Content-Length': String(pdfBuffer.length),
+    });
+    res.send(pdfBuffer);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/generate-all-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pdfBuffer = await generateAllActivitiesPdf(req.body);
+    const fileName = `ek7a-plani.pdf`;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      'Content-Length': String(pdfBuffer.length),
+    });
+    res.send(pdfBuffer);
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;

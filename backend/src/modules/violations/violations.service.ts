@@ -53,8 +53,13 @@ export class ViolationsService {
     // 3. Öğrenci eşleştirme
     const { matched, unmatched } = await matchStudents(lines);
 
-    // 4. Upload kaydı oluştur
     const vDate = data.violationDate ? new Date(data.violationDate) : new Date();
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    const academicYear = settings?.academicYear || '2025-2026';
+
+    const uniqueMatches = Array.from(new Map(matched.map(m => [m.studentId, m])).values());
+
+    // 4 & 5. Upload kaydı ve DailyViolation kayıtlarını TRANSACTION ile tek seferde oluştur
     const upload = await prisma.violationUpload.create({
       data: {
         type: data.type as any,
@@ -63,40 +68,33 @@ export class ViolationsService {
         ocrRawText: rawText,
         uploadedBy: data.uploadedBy || 'Okul Yönetimi',
         violationDate: vDate,
+        records: {
+          create: uniqueMatches.map(m => ({
+            studentId: m.studentId,
+            violationDate: vDate,
+            matchedBy: m.matchedBy,
+            isConfirmed: false,
+            className: m.className,
+            academicYear: academicYear
+          }))
+        }
       },
+      include: {
+        records: {
+          include: { student: { select: { fullName: true, className: true, schoolNumber: true } } }
+        }
+      }
     });
 
-    // 5. Eşleşen öğrenciler için DailyViolation kayıtları oluştur
-    const createdRecords = [];
-    for (const m of matched) {
-      try {
-        const record = await prisma.dailyViolation.create({
-          data: {
-            studentId: m.studentId,
-            uploadId: upload.id,
-            type: data.type as any,
-            violationDate: vDate,
-            matchedBy: m.matchedBy,  // SCHOOL_NUMBER | NAME_EXACT | NAME_FUZZY
-            isConfirmed: false,  // Admin onayı bekleyecek
-          },
-          include: {
-            student: {
-              select: { fullName: true, className: true, schoolNumber: true },
-            },
-          },
-        });
-        createdRecords.push({
-          ...record,
-          matchedText: m.matchedText,
-          matchedBy: m.matchedBy,
-          confidence: m.confidence,
-        });
-      } catch (error: any) {
-        // Duplicate hatasını yut (aynı öğrenci aynı upload'da)
-        if (error.code === 'P2002') continue;
-        throw error;
-      }
-    }
+    const createdRecords = upload.records.map((r) => {
+      const matchDetails = uniqueMatches.find(m => m.studentId === r.studentId);
+      return {
+        ...r,
+        matchedText: matchDetails?.matchedText || '',
+        matchedBy: r.matchedBy,
+        confidence: matchDetails?.confidence || 100,
+      };
+    });
 
     // 6. Geçmiş ihlal say - tekrar edenleri bul
     const studentIds = createdRecords.map((r) => r.studentId);
@@ -193,15 +191,19 @@ export class ViolationsService {
       throw new AppError('Öğrenci bulunamadı.', 404);
     }
 
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    const academicYear = settings?.academicYear || '2025-2026';
+
     try {
       const record = await prisma.dailyViolation.create({
         data: {
           studentId: data.studentId,
           uploadId: data.uploadId,
-          type: data.type as any,
           violationDate: data.violationDate ? new Date(data.violationDate) : upload.violationDate,
           matchedBy: 'MANUAL',
           isConfirmed: false,
+          className: student.className,
+          academicYear: academicYear,
         },
         include: {
           student: { select: { fullName: true, className: true, schoolNumber: true } },
@@ -212,7 +214,7 @@ export class ViolationsService {
       const prevCount = await prisma.dailyViolation.count({
         where: {
           studentId: data.studentId,
-          type: data.type as any,
+          upload: { type: data.type as any },
           isConfirmed: true,
           deletedAt: null,
         },
@@ -250,6 +252,7 @@ export class ViolationsService {
       prisma.violationUpload.findMany({
         skip,
         take: limit,
+        where: { deletedAt: null },
         orderBy: { violationDate: 'desc' },
         include: {
           _count: { select: { records: { where: { deletedAt: null } } } },
@@ -262,7 +265,7 @@ export class ViolationsService {
           },
         },
       }),
-      prisma.violationUpload.count(),
+      prisma.violationUpload.count({ where: { deletedAt: null } }),
     ]);
 
     return {
@@ -335,7 +338,7 @@ export class ViolationsService {
     weekStart.setDate(weekStart.getDate() - 6);
 
     const [totalUploads, totalViolations, confirmedViolations, todayCount, weekCount] = await Promise.all([
-      prisma.violationUpload.count(),
+      prisma.violationUpload.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { isConfirmed: true, deletedAt: null } }),
       prisma.dailyViolation.count({ where: { violationDate: { gte: todayStart }, deletedAt: null } }),
@@ -402,7 +405,7 @@ export class ViolationsService {
     const confirmedViolations = violations.filter((v) => v.isConfirmed);
     const violationsByType: Record<string, number> = {};
     for (const v of confirmedViolations) {
-      violationsByType[v.type] = (violationsByType[v.type] || 0) + 1;
+      violationsByType[v.upload.type] = (violationsByType[v.upload.type] || 0) + 1;
     }
 
     // Mevcut uyarıların davranış kodları
@@ -458,8 +461,11 @@ export class ViolationsService {
       data: { deletedAt: new Date() }
     });
 
-    // Sonra upload kaydını sil
-    await prisma.violationUpload.delete({ where: { id: uploadId } });
+    // Sonra upload kaydını sil (Soft Delete)
+    await prisma.violationUpload.update({ 
+      where: { id: uploadId },
+      data: { deletedAt: new Date() }
+    });
 
     // Fotoğraf dosyasını sil (varsa)
     if (upload.imagePath) {
@@ -504,49 +510,48 @@ export class ViolationsService {
 
     const { matched, unmatched } = matchResult;
 
-    // 4. Upload kaydı oluştur (fotoğrafsız, sadece metin bazlı)
     const vDate = data.violationDate ? new Date(data.violationDate) : new Date();
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    const academicYear = settings?.academicYear || '2025-2026';
+
+    const uniqueMatches = Array.from(new Map(matched.map(m => [m.studentId, m])).values());
+
+    // 4 & 5. Upload kaydı ve DailyViolation kayıtlarını TRANSACTION ile tek seferde oluştur
     const upload = await prisma.violationUpload.create({
       data: {
         type: data.type as any,
         description: data.description || 'Manuel giriş',
-        imagePath: '',   // Fotoğraf yok
+        imagePath: '',
         ocrRawText: data.text,
         uploadedBy: data.uploadedBy || 'Okul Yönetimi',
         violationDate: vDate,
-      },
-    });
-
-    // 5. Eşleşen öğrenciler için DailyViolation kayıtları oluştur
-    const createdRecords = [];
-    for (const m of matched) {
-      try {
-        const record = await prisma.dailyViolation.create({
-          data: {
+        records: {
+          create: uniqueMatches.map(m => ({
             studentId: m.studentId,
-            uploadId: upload.id,
-            type: data.type as any,
             violationDate: vDate,
             matchedBy: 'MANUAL',
             isConfirmed: false,
-          },
-          include: {
-            student: {
-              select: { fullName: true, className: true, schoolNumber: true },
-            },
-          },
-        });
-        createdRecords.push({
-          ...record,
-          matchedText: m.matchedText,
-          matchedBy: m.matchedBy,
-          confidence: m.confidence,
-        });
-      } catch (error: any) {
-        if (error.code === 'P2002') continue;
-        throw error;
+            className: m.className,
+            academicYear: academicYear
+          }))
+        }
+      },
+      include: {
+        records: {
+          include: { student: { select: { fullName: true, className: true, schoolNumber: true } } }
+        }
       }
-    }
+    });
+
+    const createdRecords = upload.records.map((r) => {
+      const matchDetails = uniqueMatches.find(m => m.studentId === r.studentId);
+      return {
+        ...r,
+        matchedText: matchDetails?.matchedText || '',
+        matchedBy: 'MANUAL',
+        confidence: matchDetails?.confidence || 100,
+      };
+    });
 
     // 6. Geçmiş ihlal say
     const studentIds = createdRecords.map((r) => r.studentId);

@@ -1,0 +1,72 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger workflow when a new tag like v1.0.0 is pushed
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Install Backend Dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+        working-directory: backend
+        env:
+          DATABASE_URL: file:./ci.db
+
+      - name: Build Backend
+        run: npm run build
+        working-directory: backend
+        env:
+          DATABASE_URL: file:./ci.db
+          JWT_SECRET: dummy-secret-for-build-process
+
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Buraya projeyi build ederken şifreleme/imzalama için girdiğiniz Private Key ortam değişkenleri verilmeli
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: app-v__VERSION__ # the action automatically replaces __VERSION__ with the app version
+          releaseName: 'OkulDesk v__VERSION__'
+          releaseBody: 'Yeni bir OkulDesk sürümü yayınlandı! Lütfen uygulamayı açarak güncelleyin.'
+          releaseDraft: true # Taslak olarak yayınlar, kontrol edip "Publish" diyebilirsiniz.
+          prerelease: false
+          args: ${{ matrix.args }}

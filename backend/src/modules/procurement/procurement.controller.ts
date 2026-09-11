@@ -1,211 +1,63 @@
 import { Request, Response } from 'express';
-import prisma from '../shared/utils/prisma';
-import { v4 as uuidv4 } from 'uuid';
+import { procurementService } from './procurement.service';
+import { asyncHandler } from '../shared/middleware/asyncHandler';
 
 export const procurementController = {
   // Liste Getir
-  getAll: async (req: Request, res: Response) => {
-    try {
-      const list = await prisma.$queryRaw`
-        SELECT 
-          p.*,
-          (SELECT COUNT(*) FROM "ProcurementItem" WHERE "procurementId" = p."id") as itemCount,
-          (SELECT COUNT(DISTINCT "supplierId") FROM "ProcurementOffer" WHERE "procurementId" = p."id") as supplierCount
-        FROM "Procurement" p
-        ORDER BY p."createdAt" DESC
-      `;
-      res.json({ success: true, data: list });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  },
+  getAll: asyncHandler(async (req: Request, res: Response) => {
+    const list = await procurementService.getAll();
+    // Frontend itemCount ve supplierCount alanlarını bekliyor.
+    // _count nesnesini flat hale getirelim.
+    const formattedList = list.map(item => ({
+      ...item,
+      itemCount: item._count?.items || 0,
+      supplierCount: item._count?.offers || 0 // Not: Gerçekte supplier distinct count'u istiyor olabilir, frontend basit bir rakam için bunu yeterli bulabilir.
+    }));
+    res.json({ success: true, data: formattedList });
+  }),
 
   // Tekil Detay Getir (Item'lar ve Offer'lar dahil)
-  getById: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      
-      const procurement = await prisma.procurement.findUnique({
-        where: { id },
-        include: {
-          commissionMembersList: true,
-        }
-      });
-      
-      if (!procurement) {
-        return res.status(404).json({ success: false, message: 'Bulunamadı' });
-      }
-
-      const items: any = await prisma.$queryRaw`SELECT * FROM "ProcurementItem" WHERE "procurementId" = ${id}`;
-      
-      const offers: any = await prisma.$queryRaw`
-        SELECT o.*, s."name" as supplierName, s."taxNumber"
-        FROM "ProcurementOffer" o
-        LEFT JOIN "Supplier" s ON s."id" = o."supplierId"
-        WHERE o."procurementId" = ${id}
-      `;
-
-      res.json({ 
-        success: true, 
-        data: {
-          ...procurement,
-          commissionMembers: procurement.commissionMembersList,
-          items,
-          offers
-        }
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+  getById: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const procurement = await procurementService.getById(id);
+    
+    if (!procurement) {
+      return res.status(404).json({ success: false, message: 'Bulunamadı' });
     }
-  },
+
+    // Frontend, flat bir obje içinde arrayleri bekliyor.
+    res.json({ 
+      success: true, 
+      data: {
+        ...procurement,
+        commissionMembers: procurement.commissionMembersList,
+        items: procurement.items,
+        offers: procurement.offers.map(o => ({
+          ...o,
+          supplierName: o.supplier?.name,
+          taxNumber: o.supplier?.taxNumber
+        }))
+      }
+    });
+  }),
 
   // Yeni Doğrudan Temin
-  create: async (req: Request, res: Response) => {
-    try {
-      const { title, date, academicYear, procedureType, status, commissionMembers, items, offers } = req.body;
-      const procurementId = uuidv4();
-
-      let estimatedCost = 0;
-      if (items && Array.isArray(items)) {
-         estimatedCost = items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.estimatedUnitPrice || 0)), 0);
-      }
-
-      const type = procedureType || '22/d';
-      const stat = status || 'ONAY_BEKLIYOR';
-
-      await prisma.procurement.create({
-        data: {
-          id: procurementId,
-          title,
-          date,
-          procedureType: type,
-          status: stat,
-          academicYear,
-          estimatedCost,
-          commissionMembersList: {
-             create: Array.isArray(commissionMembers) ? commissionMembers.map((m: any) => ({
-                 fullName: typeof m === 'string' ? m : (m.name || m.fullName),
-                 role: typeof m === 'string' ? 'Üye' : (m.role || 'Üye')
-             })) : []
-          }
-        }
-      });
-
-      // Kalemler ve Teklifler Ekleme
-      const itemMap = new Map<string, string>(); // Temp ID'den Gerçek ID'ye
-      
-      if (items && items.length > 0) {
-        for (const item of items) {
-          const realItemId = uuidv4();
-          itemMap.set(item.id || item.tempId, realItemId);
-          await prisma.$executeRaw`
-            INSERT INTO "ProcurementItem" ("id", "procurementId", "name", "quantity", "unit", "estimatedUnitPrice")
-            VALUES (${realItemId}, ${procurementId}, ${item.name}, ${Number(item.quantity)}, ${item.unit || 'Adet'}, ${Number(item.estimatedUnitPrice || 0)})
-          `;
-        }
-      }
-
-      if (offers && offers.length > 0) {
-        for (const offer of offers) {
-          const mappedItemId = itemMap.get(offer.itemId || offer.tempItemId) || offer.itemId;
-          if (mappedItemId) {
-            const offerId = uuidv4();
-            await prisma.$executeRaw`
-              INSERT INTO "ProcurementOffer" ("id", "procurementId", "itemId", "supplierId", "offeredPrice", "isWinner")
-              VALUES (${offerId}, ${procurementId}, ${mappedItemId}, ${offer.supplierId}, ${Number(offer.offeredPrice)}, ${offer.isWinner ? 1 : 0})
-            `;
-          }
-        }
-      }
-
-      res.json({ success: true, message: 'Doğrudan Temin başarıyla oluşturuldu.', data: { id: procurementId } });
-    } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  },
+  create: asyncHandler(async (req: Request, res: Response) => {
+    const result = await procurementService.create(req.body);
+    res.json({ success: true, message: 'Doğrudan Temin başarıyla oluşturuldu.', data: { id: result.id } });
+  }),
 
   // Güncelleme
-  update: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { title, date, procedureType, status, academicYear, commissionMembers, items, offers } = req.body;
-
-      let estimatedCost = 0;
-      if (items && Array.isArray(items)) {
-         estimatedCost = items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.estimatedUnitPrice || 0)), 0);
-      }
-
-      const type = procedureType || '22/d';
-      const stat = status || 'ONAY_BEKLIYOR';
-
-      await prisma.procurement.update({
-        where: { id },
-        data: {
-          title,
-          date,
-          procedureType: type,
-          status: stat,
-          academicYear,
-          estimatedCost,
-          commissionMembersList: {
-             deleteMany: {},
-             create: Array.isArray(commissionMembers) ? commissionMembers.map((m: any) => ({
-                 fullName: typeof m === 'string' ? m : (m.name || m.fullName),
-                 role: typeof m === 'string' ? 'Üye' : (m.role || 'Üye')
-             })) : []
-          }
-        }
-      });
-
-      // Eskileri Sil (Cascade silinebilirdi ama executeRaw kullanıyoruz diye manuel siliyoruz)
-      await prisma.$executeRaw`DELETE FROM "ProcurementOffer" WHERE "procurementId" = ${id}`;
-      await prisma.$executeRaw`DELETE FROM "ProcurementItem" WHERE "procurementId" = ${id}`;
-
-      // Kalemler ve Teklifleri Yeniden Ekle
-      const itemMap = new Map<string, string>(); 
-      
-      if (items && items.length > 0) {
-        for (const item of items) {
-          const realItemId = uuidv4();
-          itemMap.set(item.id || item.tempId, realItemId);
-          await prisma.$executeRaw`
-            INSERT INTO "ProcurementItem" ("id", "procurementId", "name", "quantity", "unit", "estimatedUnitPrice")
-            VALUES (${realItemId}, ${id}, ${item.name}, ${Number(item.quantity)}, ${item.unit || 'Adet'}, ${Number(item.estimatedUnitPrice || 0)})
-          `;
-        }
-      }
-
-      if (offers && offers.length > 0) {
-        for (const offer of offers) {
-          const mappedItemId = itemMap.get(offer.itemId || offer.tempItemId) || offer.itemId;
-          if (mappedItemId) {
-            const offerId = uuidv4();
-            await prisma.$executeRaw`
-              INSERT INTO "ProcurementOffer" ("id", "procurementId", "itemId", "supplierId", "offeredPrice", "isWinner")
-              VALUES (${offerId}, ${id}, ${mappedItemId}, ${offer.supplierId}, ${Number(offer.offeredPrice)}, ${offer.isWinner ? 1 : 0})
-            `;
-          }
-        }
-      }
-
-      res.json({ success: true, message: 'Doğrudan Temin başarıyla güncellendi.' });
-    } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ success: false, error: error.message });
-    }
-  },
+  update: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await procurementService.update(id, req.body);
+    res.json({ success: true, message: 'Doğrudan Temin başarıyla güncellendi.' });
+  }),
 
   // Silme
-  delete: async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      await prisma.$executeRaw`DELETE FROM "ProcurementOffer" WHERE "procurementId" = ${id}`;
-      await prisma.$executeRaw`DELETE FROM "ProcurementItem" WHERE "procurementId" = ${id}`;
-      await prisma.$executeRaw`DELETE FROM "Procurement" WHERE "id" = ${id}`;
-      res.json({ success: true, message: 'Silindi' });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  }
+  delete: asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await procurementService.delete(id);
+    res.json({ success: true, message: 'Silindi' });
+  })
 };

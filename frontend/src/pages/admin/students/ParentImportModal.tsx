@@ -71,7 +71,7 @@ export function ParentImportModal({
           ref={parentFileRef}
           type="file"
           accept=".xlsx,.xls"
-          className="hidden"
+          className="hidden w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
           onChange={(e) => {
             if (e.target.files?.[0]) handleParentFileSelect(e.target.files[0]);
           }}
@@ -92,10 +92,10 @@ export function ParentImportModal({
               <table className="min-w-full divide-y divide-gray-200 text-xs">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Öğrenci</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600">Durum</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Veli 1</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Veli 2</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Durum</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veli 1</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veli 2</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">

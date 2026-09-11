@@ -3,7 +3,7 @@ import prisma from '../shared/utils/prisma';
 class BoardMeetingService {
   async getAll(academicYear: string) {
     return prisma.boardMeeting.findMany({
-      where: { academicYear },
+      where: { academicYear, deletedAt: null },
       orderBy: { date: 'desc' }
     });
   }
@@ -11,7 +11,7 @@ class BoardMeetingService {
   async getById(id: string) {
     return prisma.boardMeeting.findUnique({
       where: { id }
-    });
+    }).then(res => res?.deletedAt ? null : res);
   }
 
   async create(data: any) {
@@ -25,7 +25,7 @@ class BoardMeetingService {
   }
 
   async delete(id: string) {
-    return prisma.boardMeeting.delete({ where: { id } });
+    return prisma.boardMeeting.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   // ── Gündem Maddeleri ── (Eski endpointleri bozmamak için tutuldu)

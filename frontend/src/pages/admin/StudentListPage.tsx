@@ -64,49 +64,81 @@ export default function StudentListPage() {
   const [newError, setNewError] = useState('');
 
   // Tab state
+  const [classes, setClasses] = useState<{name: string, count: number}[]>([]);
   const [activeClass, setActiveClass] = useState<string>('');
 
   // Bulk delete state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Derive sorted class names and grouped data
-  const grouped: Record<string, Student[]> = {};
-  students.forEach((s) => {
-    if (!grouped[s.className]) grouped[s.className] = [];
-    grouped[s.className].push(s);
-  });
+  const displayClasses = search 
+    ? Array.from(new Set(students.map(s => s.className)))
+        .map(name => ({ name, count: students.filter(s => s.className === name).length }))
+        .sort((a, b) => {
+          const parse = (cls: string) => {
+            const isA = cls.toUpperCase().startsWith('A-') || cls.toUpperCase().startsWith('A ');
+            const stripped = isA ? cls.substring(2).trim() : cls;
+            const parts = stripped.split(/[/\s-]+/);
+            const grade = parseInt(parts[0], 10) || 99;
+            const section = (parts[1] || '').toUpperCase();
+            return { isA, grade, section };
+          };
+          const pa = parse(a.name), pb = parse(b.name);
+          if (pa.isA !== pb.isA) return pa.isA ? 1 : -1;
+          if (pa.grade !== pb.grade) return pa.grade - pb.grade;
+          return pa.section.localeCompare(pb.section, 'tr', { numeric: true });
+        })
+    : classes;
 
-  const sortedClassNames = Object.keys(grouped).sort((a, b) => {
-    const parse = (cls: string) => {
-      const parts = cls.split(/[/\s-]+/);
-      const grade = parseInt(parts[0], 10) || 99;
-      const section = (parts[1] || '').toUpperCase();
-      return { grade, section };
-    };
-    const pa = parse(a), pb = parse(b);
-    if (pa.grade !== pb.grade) return pa.grade - pb.grade;
-    return pa.section.localeCompare(pb.section, 'tr');
-  });
+  let filteredStudents = students;
+  if (search) {
+    const hasActiveClassInResults = displayClasses.some(c => c.name === activeClass);
+    if (hasActiveClassInResults) {
+      filteredStudents = students.filter(s => s.className === activeClass);
+    }
+  }
 
-  const effectiveClass = activeClass && grouped[activeClass] ? activeClass : sortedClassNames[0] || '';
-  const filteredStudents = (grouped[effectiveClass] || []).sort((a, b) =>
+  filteredStudents = filteredStudents.sort((a, b) =>
     a.schoolNumber.localeCompare(b.schoolNumber, undefined, { numeric: true })
   );
 
+  const fetchClasses = async () => {
+    try {
+      const res = await api.get('/students/classes');
+      const classList = res.data.data || [];
+      setClasses(classList);
+      if (classList.length > 0 && !activeClass) {
+        setActiveClass(classList[0].name);
+      }
+    } catch (err) {
+      console.error('Failed to load classes', err);
+    }
+  };
+
   useEffect(() => {
-    loadStudents();
-  }, [page, search]);
+    fetchClasses();
+  }, []);
+
+  useEffect(() => {
+    if (activeClass || search) {
+      loadStudents();
+    }
+  }, [activeClass, search, page]);
 
   const loadStudents = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: page.toString(), limit: '500' });
-      if (search) params.set('search', search);
+      if (search) {
+        params.set('search', search);
+      } else if (activeClass) {
+        params.set('className', activeClass);
+      }
 
       const res = await api.get(`/students?${params}`);
       setStudents(res.data.data.students);
       setPagination(res.data.data.pagination);
+      await fetchClasses();
     } catch (error) {
       console.error('Failed to load students:', error);
     } finally {
@@ -166,6 +198,22 @@ export default function StudentListPage() {
       toast('Toplu silme başarısız oldu.');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!await confirm('TÜM ÖĞRENCİLERİ (ve onlara bağlı devamsızlık/not vb. kayıtları) SİLMEK istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+    try {
+      await api.delete('/students/bulk/delete-all');
+      toast.success('Tüm öğrenciler silindi.');
+      setSelectedIds(new Set());
+      setPage(1);
+      setActiveClass('');
+      loadStudents();
+      const res = await api.get('/students/classes');
+      setClasses(res.data.data || []);
+    } catch (error) {
+      toast.error('Silme işlemi başarısız oldu.');
     }
   };
 
@@ -426,9 +474,16 @@ export default function StudentListPage() {
       <PageHeader
         title="Öğrenciler"
         description="Öğrenci listesini yönetin ve veli bilgilerini güncelleyin"
-        icon={<Users size={28} className="text-indigo-600" />}
+        icon={<Users size={28} />}
         actions={
           <>
+            <Button 
+              onClick={handleDeleteAll}
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 size={16} /> Tümünü Sil
+            </Button>
             <Button 
               onClick={() => { resetParentModal(); setShowParentModal(true); }}
               variant="outline"
@@ -451,7 +506,7 @@ export default function StudentListPage() {
         }
       />
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Search & Tabs */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
           <div className="max-w-md mb-4">
@@ -464,31 +519,72 @@ export default function StudentListPage() {
             />
           </div>
 
-          {!loading && sortedClassNames.length > 0 && (
-            <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 px-1 pt-1 -mx-1 -mt-1">
-              {sortedClassNames.map((cls) => (
-                <Button
-                  key={cls}
-                  variant={effectiveClass === cls ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => { setActiveClass(cls); setSelectedIds(new Set()); }}
-                  className="rounded-full shrink-0"
-                >
-                  {cls}
-                  <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${effectiveClass === cls ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
-                    {grouped[cls].length}
-                  </span>
-                </Button>
-              ))}
+          {!loading && displayClasses.length > 0 && (
+            <div className="space-y-2 pb-2 px-1 pt-1 -mx-1 -mt-1">
+              {/* Normal Sınıflar */}
+              <div className="flex flex-wrap gap-2 overflow-x-auto">
+                {displayClasses.filter(c => !(c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A '))).map((cls) => {
+                  const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
+
+                  return (
+                    <Button
+                      key={cls.name}
+                      variant={isHighlighted ? 'primary' : 'outline'}
+                      size="sm"
+                      onClick={() => { 
+                        setActiveClass(cls.name); 
+                        setSelectedIds(new Set()); 
+                        setPage(1); 
+                      }}
+                      className="rounded-full shrink-0"
+                    >
+                      {cls.name}
+                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                        {cls.count}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {/* A- Sınıfları */}
+              {displayClasses.some(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')) && (
+                <div className="flex flex-wrap gap-2 overflow-x-auto pt-2 border-t border-gray-100">
+                  {displayClasses.filter(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')).map((cls) => {
+                    const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
+
+                    return (
+                      <Button
+                        key={cls.name}
+                        variant={isHighlighted ? 'primary' : 'outline'}
+                        size="sm"
+                        onClick={() => { 
+                          setActiveClass(cls.name); 
+                          setSelectedIds(new Set()); 
+                          setPage(1); 
+                        }}
+                        className="rounded-full shrink-0"
+                      >
+                        {cls.name}
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                          {cls.count}
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Action Bar (Delete / Summary) */}
-        {!loading && sortedClassNames.length > 0 && (
+        {!loading && displayClasses.length > 0 && (
           <div className="flex justify-between items-center px-6 py-3 bg-indigo-50/50 border-b border-indigo-100/50 text-sm">
             <div className="font-medium text-gray-700">
-              <span className="text-indigo-700 font-bold mr-2">Sınıf {effectiveClass}</span> 
+              <span className="text-indigo-700 font-bold mr-2">
+                {search ? (displayClasses.some(c => c.name === activeClass) ? `Arama: "${search}" (${activeClass})` : `Arama: "${search}" (Tümü)`) : `Sınıf ${activeClass}`}
+              </span> 
               ({filteredStudents.length} öğrenci)
               
               {selectedIds.size > 0 && (
@@ -521,27 +617,6 @@ export default function StudentListPage() {
           emptyMessage="Bu sınıfta öğrenci bulunamadı veya hiç öğrenci kaydı yok."
           rowClassName={(s) => selectedIds.has(s.id) ? 'bg-indigo-50/30' : ''}
         />
-
-        {/* Pagination */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-3">
-            <Button 
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-              variant="outline"
-            >
-              Geri
-            </Button>
-            <span className="text-sm text-gray-600 font-medium">Sayfa {page} / {pagination.totalPages}</span>
-            <Button 
-              disabled={page === pagination.totalPages}
-              onClick={() => setPage(page + 1)}
-              variant="outline"
-            >
-              İleri
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* ─── MODALS ─── */}

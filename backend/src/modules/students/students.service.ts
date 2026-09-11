@@ -21,7 +21,7 @@ export class StudentsService {
     };
   }
 
-  async getAll(page = 1, limit = 20, search?: string, status?: string) {
+  async getAll(page = 1, limit = 20, search?: string, status?: string, className?: string) {
     const skip = (page - 1) * limit;
     const where: any = {};
     if (search) {
@@ -35,6 +35,7 @@ export class StudentsService {
         { className: { contains: sLower } }, { className: { contains: sUpper } }, { className: { contains: sTitle } },
       ];
     }
+    if (className) where.className = className;
     if (status !== 'ALL') where.status = status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
     const allStudents = await prisma.student.findMany({
@@ -111,6 +112,12 @@ export class StudentsService {
     return { message: `${result.count} öğrenci başarıyla pasife alındı.`, deletedCount: result.count };
   }
 
+  async deleteAll(userId: string) {
+    const result = await prisma.student.deleteMany({});
+    await AuditService.log(userId, 'DELETE_ALL_STUDENTS', 'Student', 'All', {});
+    return { message: `Tüm öğrenciler başarıyla silindi. (${result.count} kayıt)`, deletedCount: result.count };
+  }
+
   async assignParent(studentId: string, parentId: string) {
     const student = await prisma.student.findUnique({ where: { id: studentId } });
     if (!student) throw new AppError('Öğrenci bulunamadı.', 404);
@@ -161,6 +168,32 @@ export class StudentsService {
     if (student.parents.length === 0) throw new AppError('Bu veli öğrenciye bağlı değil.', 400);
     const updated = await prisma.student.update({ where: { id: studentId }, data: { parents: { disconnect: { id: parentId } } }, include: { parents: { include: { contacts: { where: { isPrimary: true } } } } } });
     return StudentsService.mapStudentParents(updated);
+  }
+
+  async getClasses() {
+    const classes = await prisma.student.groupBy({
+      by: ['className'],
+      where: { status: 'ACTIVE' },
+      _count: { id: true }
+    });
+    
+    return classes
+      .filter(c => c.className)
+      .map(c => ({ name: c.className, count: c._count.id }))
+      .sort((a, b) => {
+        const parse = (cls: string) => {
+          const isA = cls.toUpperCase().startsWith('A-') || cls.toUpperCase().startsWith('A ');
+          const stripped = isA ? cls.substring(2).trim() : cls;
+          const parts = stripped.split(/[/\s-]+/);
+          const grade = parseInt(parts[0], 10) || 99;
+          const section = (parts[1] || '').toUpperCase();
+          return { isA, grade, section };
+        };
+        const pa = parse(a.name), pb = parse(b.name);
+        if (pa.isA !== pb.isA) return pa.isA ? 1 : -1;
+        if (pa.grade !== pb.grade) return pa.grade - pb.grade;
+        return pa.section.localeCompare(pb.section, 'tr', { numeric: true });
+      });
   }
 }
 

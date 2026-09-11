@@ -98,7 +98,7 @@ export function StudentNewModal({
           {newParents.map((p, idx) => (
             <div
               key={idx}
-              className="flex items-end gap-3 p-3 bg-white border rounded-lg mb-3 shadow-sm"
+              className="flex items-end p-3 mb-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
             >
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-700 mb-1">

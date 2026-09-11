@@ -4,7 +4,7 @@ import api from '../../services/api';
 import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { ActionModal } from '../../components/ui/ActionModal';
-import { Users, Plus, Pencil, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
 
@@ -13,7 +13,7 @@ export type StaffRole = 'KURUM_PERSONELI' | 'MUDUR_YARDIMCISI' | 'REHBER_OGRETME
 interface StaffMember {
   id: string;
   name: string;
-  role: StaffRole;
+  title: StaffRole;
   className?: string | null;
   clubName?: string | null;
   tcKimlikNo?: string | null;
@@ -41,7 +41,7 @@ const ROLE_ICONS: Record<StaffRole, React.ReactNode> = {
 };
 
 const emptyForm = { 
-  name: '', role: 'KURUM_PERSONELI' as StaffRole, className: '',
+  name: '', title: 'KURUM_PERSONELI' as StaffRole, className: '',
   tcKimlikNo: '', brans: '', kurumSicilNo: '', emekliSicilNo: '', unvan: '', gorev: ''
 };
 
@@ -58,6 +58,7 @@ export default function StaffPage() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState('');
+  const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
   
   // Bulk Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -70,9 +71,11 @@ export default function StaffPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchStaff = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/staff');
+      const res = await api.get(viewMode === 'active' ? '/staff' : '/staff/deleted');
       setStaff(res.data.data.staff);
+      setSelectedIds(new Set());
     } catch {
       toast.error('Personel listesi yüklenemedi.');
     } finally {
@@ -80,7 +83,7 @@ export default function StaffPage() {
     }
   };
 
-  useEffect(() => { fetchStaff(); }, []);
+  useEffect(() => { fetchStaff(); }, [viewMode]);
 
   const openAdd = () => {
     setEditTarget(null);
@@ -93,7 +96,7 @@ export default function StaffPage() {
     setEditTarget(s);
     setForm({ 
       name: s.name, 
-      role: s.role, 
+      title: s.title, 
       className: s.className || '',
       tcKimlikNo: s.tcKimlikNo || '',
       brans: s.brans || '',
@@ -115,7 +118,7 @@ export default function StaffPage() {
     try {
       const payload = {
         name: form.name.trim(),
-        role: form.role,
+        title: form.title,
         className: form.className?.trim() || undefined,
         tcKimlikNo: form.tcKimlikNo || undefined,
         brans: form.brans || undefined,
@@ -164,12 +167,34 @@ export default function StaffPage() {
     try {
       await api.post('/staff/bulk-delete', { ids: Array.from(selectedIds) });
       toast.success(`${selectedIds.size} personel başarıyla silindi.`);
-      setSelectedIds(new Set());
       fetchStaff();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Toplu silme başarısız.');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    if (!await confirm('Bu personeli geri yüklemek istediğinize emin misiniz?')) return;
+    try {
+      await api.put(`/staff/${id}/restore`);
+      toast.success('Personel başarıyla geri yüklendi.');
+      fetchStaff();
+    } catch (err: any) {
+      toast.error('Geri alma işlemi başarısız.');
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    if (selectedIds.size === 0) return;
+    if (!await confirm(`Seçili ${selectedIds.size} personeli geri yüklemek istediğinize emin misiniz?`)) return;
+    try {
+      await api.post('/staff/bulk-restore', { ids: Array.from(selectedIds) });
+      toast.success(`${selectedIds.size} personel başarıyla geri yüklendi.`);
+      fetchStaff();
+    } catch (err: any) {
+      toast.error('Toplu geri alma başarısız.');
     }
   };
 
@@ -342,21 +367,27 @@ export default function StaffPage() {
       <PageHeader
         title="Merkezi Personel Havuzu"
         description="Okuldaki tüm öğretmen, idareci ve personelleri tek bir merkezden yönetin."
-        icon={<Users size={28} className="text-indigo-600" />}
+        icon={<Users size={28} />}
         actions={
           <>
             <input
               type="file"
               accept=".xls,.xlsx"
               ref={fileInputRef}
-              className="hidden"
+              className="hidden w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
               onChange={handleFileUpload}
             />
             
-            {selectedIds.size > 0 && (
+            {selectedIds.size > 0 && viewMode === 'active' && (
               <Button variant="danger" onClick={handleBulkDelete} disabled={bulkDeleting} className="px-3 py-2 flex items-center gap-2" title="Seçilenleri Sil">
                 <Trash2 size={18} />
                 {bulkDeleting ? 'Siliniyor...' : `Seçilenleri Sil (${selectedIds.size})`}
+              </Button>
+            )}
+
+            {selectedIds.size > 0 && viewMode === 'deleted' && (
+              <Button variant="outline" onClick={handleBulkRestore} className="px-3 py-2 flex items-center gap-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50" title="Seçilenleri Geri Al">
+                {`Seçilenleri Geri Yükle (${selectedIds.size})`}
               </Button>
             )}
 
@@ -379,9 +410,13 @@ export default function StaffPage() {
       
 
       {/* TÜM PERSONEL LİSTESİ (Tablo Görünümü) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex border-b border-slate-200">
+          <button onClick={() => setViewMode('active')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${viewMode === 'active' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Aktif Personeller</button>
+          <button onClick={() => setViewMode('deleted')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${viewMode === 'deleted' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Silinmiş Personeller (Çöp Kutusu)</button>
+        </div>
         <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Personel Listesi</h2>
+          <h2 className="font-semibold text-gray-800">{viewMode === 'active' ? 'Personel Listesi' : 'Silinmiş Personeller'}</h2>
           <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm">
             Toplam {staff.length} Kişi
           </span>
@@ -390,7 +425,7 @@ export default function StaffPage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-white text-gray-500 font-medium border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 w-12 text-center">
+                <th className="w-12 text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
                   <input 
                     type="checkbox" 
                     checked={staff.length > 0 && selectedIds.size === staff.length}
@@ -398,11 +433,11 @@ export default function StaffPage() {
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </th>
-                <th className="px-6 py-4">Ad Soyad</th>
-                <th className="px-6 py-4 hidden md:table-cell">Unvan & Görev</th>
-                <th className="px-6 py-4 hidden lg:table-cell">Branş</th>
-                <th className="px-6 py-4">Sınıf / Kulüp</th>
-                <th className="px-6 py-4 text-right">İşlemler</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Ad Soyad</th>
+                <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Unvan & Görev</th>
+                <th className="hidden lg:table-cell text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branş</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf / Kulüp</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlemler</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -451,13 +486,23 @@ export default function StaffPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-3 text-right whitespace-nowrap">
-                      <Button variant="ghost" onClick={() => openEdit(s)} className="text-blue-600 hover:text-blue-900 px-2 py-1 transition-colors inline-flex">
-                        <Pencil size={18} />
-                      </Button>
-                      <Button variant="ghost" onClick={() => handleDelete(s.id)} disabled={deleteId === s.id} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors inline-flex disabled:opacity-50 ml-1">
-                        <Trash2 size={18} />
-                      </Button>
+                    <td className="px-6 py-3">
+                      <div className="flex justify-end gap-2">
+                        {viewMode === 'active' ? (
+                          <>
+                            <Button variant="ghost" onClick={() => openEdit(s)} className="text-blue-600 hover:text-blue-900 px-2 py-1 transition-colors" title="Düzenle">
+                              <Edit size={20} />
+                            </Button>
+                            <Button variant="ghost" onClick={() => handleDelete(s.id)} disabled={deleteId === s.id} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors disabled:opacity-50" title="Sil">
+                              <Trash2 size={20} />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button variant="outline" onClick={() => handleRestore(s.id)} className="text-indigo-600 border-indigo-600 hover:bg-indigo-50 px-2 py-1 text-xs transition-colors" title="Geri Al">
+                            Geri Al
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -498,8 +543,8 @@ export default function StaffPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sistem Rolü</label>
               <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value as StaffRole })}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value as StaffRole })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="KURUM_PERSONELI">Kurum Personeli (Havuz)</option>
@@ -508,7 +553,7 @@ export default function StaffPage() {
                 <option value="SINIF_REHBER_OGRETMEN">Sınıf Rehber Öğretmeni</option>
               </select>
             </div>
-            {form.role === 'SINIF_REHBER_OGRETMEN' && (
+            {form.title === 'SINIF_REHBER_OGRETMEN' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Olduğu Sınıf</label>
                 <input
@@ -573,12 +618,12 @@ export default function StaffPage() {
             <table className="min-w-full text-left text-sm text-gray-600">
               <thead className="bg-slate-100 text-slate-700 sticky top-0 border-b border-gray-200 shadow-sm z-10">
                 <tr>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">Ad Soyad</th>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">TC No</th>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">Unvan</th>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">Görev</th>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">Branş</th>
-                  <th className="px-4 py-2 whitespace-nowrap font-semibold">Kurum Sicil</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Ad Soyad</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">TC No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Unvan</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görev</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branş</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Kurum Sicil</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

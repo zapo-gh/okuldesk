@@ -33,22 +33,22 @@ export function AbsenteeismTable({
       <table className="min-w-full divide-y divide-gray-100">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-left tracking-wider">
+            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Öğrenci
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-left tracking-wider">
+            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Sınıf
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-center tracking-wider">
+            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Uyarı No
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-left tracking-wider">
+            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Durum
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-left tracking-wider">
+            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Tarih
             </th>
-            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right tracking-wider">
+            <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               İşlemler
             </th>
           </tr>

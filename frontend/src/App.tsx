@@ -39,6 +39,10 @@ const HolidayPage = React.lazy(() => import('./pages/admin/modules/HolidayPage')
 const AttendanceSheetPage = React.lazy(() => import('./pages/admin/modules/AttendanceSheetPage'));
 const SupplierPage = React.lazy(() => import('./pages/admin/modules/SupplierPage'));
 const ProcurementPage = React.lazy(() => import('./pages/admin/modules/ProcurementPage'));
+const InvoiceTrackingPage = React.lazy(() => import('./pages/admin/modules/InvoiceTrackingPage'));
+const ParentLeavePage = React.lazy(() => import('./pages/admin/modules/ParentLeavePage'));
+const TimetablePage = React.lazy(() => import('./pages/admin/modules/TimetablePage'));
+const CoverAssignmentPage = React.lazy(() => import('./pages/admin/modules/CoverAssignmentPage'));
 
 const PageLoader = () => <div className="flex h-full w-full items-center justify-center min-h-[300px]"><div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent opacity-70" /></div>;
 
@@ -106,7 +110,10 @@ function App() {
       <Route path="parent-notification" element={<ParentNotificationPage />} />
       <Route path="teblig" element={<TebligPage />} />
       <Route path="matbu-evraklar" element={<MatbuEvraklarPage />} />
+      <Route path="parent-leave" element={<ParentLeavePage />} />
       <Route path="duty-schedule" element={<DutySchedulePage />} />
+      <Route path="timetable" element={<TimetablePage />} />
+      <Route path="cover-assignments" element={<CoverAssignmentPage />} />
       <Route path="board-meeting" element={<BoardMeetingPage />} />
       <Route path="commission" element={<CommissionPage />} />
       <Route path="annual-plan" element={<AnnualPlanPage />} />
@@ -123,6 +130,7 @@ function App() {
       <Route path="attendance-sheet" element={<AttendanceSheetPage />} />
       <Route path="supplier" element={<SupplierPage />} />
       <Route path="procurement" element={<ProcurementPage />} />
+      <Route path="invoice-tracking" element={<InvoiceTrackingPage />} />
       <Route path="audit-logs" element={<AuditLogPage />} />
       <Route path="settings" element={<SettingsPage />} />
     </Route>

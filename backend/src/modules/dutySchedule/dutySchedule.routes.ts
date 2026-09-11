@@ -25,5 +25,16 @@ router.get('/stats', (req, res, next) => dutyScheduleController.getMonthlyStats(
 
 // Auto Distribute
 router.post('/auto-distribute', (req, res, next) => dutyScheduleController.autoDistribute(req, res, next));
+router.post('/auto-distribute-range', (req, res, next) => dutyScheduleController.autoDistributeRange(req, res, next));
+
+// Cover Assignments
+router.get('/absences',            (req, res, next) => dutyScheduleController.getAbsencesForDate(req, res, next));
+router.get('/absences/today',      (req, res, next) => dutyScheduleController.getAbsencesForDate(req, res, next)); // backward compat
+router.post('/absences',           (req, res, next) => dutyScheduleController.saveAbsence(req, res, next));
+router.delete('/absences/:id',     (req, res, next) => dutyScheduleController.deleteAbsence(req, res, next));
+router.get('/covers/suggest',      (req, res, next) => dutyScheduleController.suggestCovers(req, res, next));
+router.get('/covers',              (req, res, next) => dutyScheduleController.getCoversForDate(req, res, next));
+router.post('/covers',             (req, res, next) => dutyScheduleController.saveCovers(req, res, next));
+router.delete('/covers/:id',       (req, res, next) => dutyScheduleController.deleteCover(req, res, next));
 
 export default router;

@@ -12,6 +12,8 @@ class ParentNotificationService {
     meetingDate?: Date;
     absenceData?: { excusedDays?: string; unexcusedDays?: string; totalDays?: string };
     overrideParentName?: string;
+    overrideCounselorName?: string;
+    overrideViceDirectorName?: string;
   }): Promise<string> {
     // Öğrenci bilgilerini çek (velilerle birlikte)
     const student = await prisma.student.findUnique({
@@ -33,15 +35,15 @@ class ParentNotificationService {
     // Personeli çek
     const [classTeacherRow, counselorRow, viceDirectorRow] = await Promise.all([
       prisma.staff.findFirst({
-        where: { role: 'SINIF_REHBER_OGRETMEN', className: student.className, isActive: true },
+        where: { title: 'SINIF_REHBER_OGRETMEN', className: student.className, isActive: true },
       }),
-      prisma.staff.findFirst({
-        where: { role: 'REHBER_OGRETMEN', isActive: true },
-      }),
-      prisma.staff.findFirst({
-        where: { role: 'MUDUR_YARDIMCISI', isActive: true },
+      !params.overrideCounselorName ? prisma.staff.findFirst({
+        where: { title: 'REHBER_OGRETMEN', isActive: true },
+      }) : Promise.resolve(null),
+      !params.overrideViceDirectorName ? prisma.staff.findFirst({
+        where: { title: 'MUDUR_YARDIMCISI', isActive: true },
         orderBy: { createdAt: 'asc' },
-      }),
+      }) : Promise.resolve(null),
     ]);
 
     const data: ParentNotificationData = {
@@ -57,8 +59,8 @@ class ParentNotificationService {
       absenceData: params.absenceData,
       staff: {
         classTeacher:    classTeacherRow?.name,
-        schoolCounselor: counselorRow?.name,
-        viceDirector:    viceDirectorRow?.name,
+        schoolCounselor: params.overrideCounselorName || counselorRow?.name,
+        viceDirector:    params.overrideViceDirectorName || viceDirectorRow?.name,
       },
     };
 

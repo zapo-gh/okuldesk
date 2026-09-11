@@ -4,10 +4,9 @@ import api from '../../../services/api';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { ActionModal } from '../../../components/ui/ActionModal';
-import { UsersRound, Plus, Trash2, Search, Printer, FileText } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
-import { GuidanceReportPrintTemplate } from './print/GuidanceReportPrintTemplate';
+import { UsersRound, Plus, Trash2, Search, Printer, FileText, Loader2 } from 'lucide-react';
 import { useSettings } from '../../../context/SettingsContext';
+import { printPdfBlob } from '../../../utils/printPdf';
 import { Button } from '../../../components/ui/Button';
 
 export type StaffRole = 'KURUM_PERSONELI' | 'MUDUR_YARDIMCISI' | 'REHBER_OGRETMEN' | 'SINIF_REHBER_OGRETMEN';
@@ -40,16 +39,26 @@ export default function ClassTeachersPage() {
   const [reportStaff, setReportStaff] = useState<StaffMember | null>(null);
   const [printMode, setPrintMode] = useState<'none'|'single'|'all'>('none');
 
-  const handlePrintAll = () => {
-    setPrintMode('all');
-    setTimeout(() => window.print(), 100);
-  };
+  const [generatingAllPdf, setGeneratingAllPdf] = useState(false);
+  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
 
-  const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: 'Sinif_Rehberlik_Raporu'
-  });
+  const handlePrintAll = async () => {
+    try {
+      setGeneratingAllPdf(true);
+      const payload = {
+        academicYear: settings?.academicYear,
+        schoolName: settings?.schoolName,
+        principalName: settings?.principalName,
+        staff: classTeachers
+      };
+      const res = await api.post('/staff/generate-class-teachers-list-pdf', payload, { responseType: 'blob' });
+      printPdfBlob(res.data);
+    } catch (err: any) {
+      toast.error('Liste PDF üretilirken hata oluştu.');
+    } finally {
+      setGeneratingAllPdf(false);
+    }
+  };
 
   const openPrintModal = (staff: StaffMember) => {
     setReportStaff(staff);
@@ -58,17 +67,24 @@ export default function ClassTeachersPage() {
       staffName: staff.name,
       month: 'Eylül', 
       activities: '',
-      academicYear: settings?.academicYear || ''
+      academicYear: settings?.academicYear || '',
+      schoolName: settings?.schoolName || '',
+      principalName: settings?.principalName || ''
     });
     setPrintModalOpen(true);
   };
 
-  const triggerPrint = () => {
-    setPrintMode('single');
-    setPrintModalOpen(false);
-    setTimeout(() => {
-      handlePrint();
-    }, 100);
+  const triggerPrint = async () => {
+    try {
+      setPrintModalOpen(false);
+      setGeneratingReportId(reportStaff?.id || null);
+      const res = await api.post('/staff/generate-guidance-report-pdf', reportData, { responseType: 'blob' });
+      printPdfBlob(res.data);
+    } catch (err: any) {
+      toast.error('Aylık rapor PDF üretilirken hata oluştu.');
+    } finally {
+      setGeneratingReportId(null);
+    }
   };
 
   // Arama / Filtre
@@ -181,11 +197,11 @@ export default function ClassTeachersPage() {
       <PageHeader
         title="Sınıf Rehber Öğretmenleri"
         description="Sınıflara rehber öğretmen atamalarını Merkezi Personel Havuzundan yapın."
-        icon={<UsersRound size={28} className="text-indigo-600" />}
+        icon={<UsersRound size={28} />}
         actions={
           <div className="flex gap-2">
-            <Button onClick={handlePrintAll} variant="outline" className="text-slate-700">
-              <Printer className="w-5 h-5 mr-2" />
+            <Button onClick={handlePrintAll} variant="outline" className="text-slate-700" disabled={generatingAllPdf}>
+              {generatingAllPdf ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Printer className="w-5 h-5 mr-2" />}
               <span>Dağılım Çizelgesi Yazdır</span>
             </Button>
             <Button onClick={() => setShowModal(true)} variant="primary">
@@ -198,7 +214,7 @@ export default function ClassTeachersPage() {
 
       
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden print:hidden">
+      <div className="print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="font-semibold text-gray-800">Atanmış Sınıflar ve Öğretmenler</h2>
           <div className="relative">
@@ -220,7 +236,7 @@ export default function ClassTeachersPage() {
             </div>
           ) : (
             classTeachers.map((s) => (
-              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group border border-gray-200 rounded-lg bg-white shadow-sm">
+              <div key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <span className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-bold min-w-[3.5rem] text-center shrink-0">
                     {s.className}
@@ -231,8 +247,14 @@ export default function ClassTeachersPage() {
                   </div>
                 </div>
                 <div className="flex space-x-1 shrink-0 ml-2">
-                  <Button variant="ghost" onClick={() => openPrintModal(s)} className="text-indigo-600 hover:bg-indigo-50 px-2 py-1 transition-colors" title="Aylık Rehberlik Raporu Yazdır">
-                    <Printer size={18} />
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => openPrintModal(s)} 
+                    disabled={generatingReportId === s.id}
+                    className="text-indigo-600 hover:bg-indigo-50 px-2 py-1 transition-colors" 
+                    title="Aylık Rehberlik Raporu Yazdır"
+                  >
+                    {generatingReportId === s.id ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
                   </Button>
                   <Button variant="ghost" onClick={() => handleRemoveRole(s)} className="text-red-600 hover:bg-red-50 px-2 py-1 transition-colors" title="Görevi İptal Et (Havuza Geri Döner)">
                     <Trash2 size={18} />
@@ -339,72 +361,6 @@ export default function ClassTeachersPage() {
         </div>
       </ActionModal>
 
-      <div className="hidden">
-        <GuidanceReportPrintTemplate ref={printRef} data={reportStaff ? reportData : null} />
-      </div>
-
-      {/* YAZDIRMA (PRINT) ALANI - TOPLU SINIF REHBER ÖĞRETMENLERİ DAĞILIM ÇİZELGESİ */}
-      {printMode === 'all' && (
-        <div className="hidden print:block font-serif bg-white text-black" style={{ maxWidth: '100%', boxSizing: 'border-box' }}>
-          <style>{`
-            @media print {
-              @page { size: A4 portrait; margin: 15mm; }
-              body { -webkit-print-color-adjust: exact; margin: 0; padding: 0; line-height: 1.4; font-size: 13px; }
-            }
-            .class-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            .class-table th, .class-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: left; }
-            .class-table th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
-          `}</style>
-          
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '5px' }}>{settings?.academicYear || '2024-2025'} EĞİTİM ÖĞRETİM YILI</h3>
-            <h2 style={{ fontWeight: 'bold', fontSize: '16px' }}>{settings?.schoolName || '... LİSESİ'}<br/>SINIF/ŞUBE REHBER ÖĞRETMENLERİ DAĞILIM ÇİZELGESİ</h2>
-          </div>
-
-          <table className="class-table">
-            <thead>
-              <tr>
-                <th style={{ width: '10%' }}>SIRA</th>
-                <th style={{ width: '25%' }}>SINIF / ŞUBE ADI</th>
-                <th style={{ width: '40%' }}>SINIF REHBER ÖĞRETMENİ</th>
-                <th style={{ width: '25%' }}>BRANŞI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allStaff.filter(s => s.role === 'SINIF_REHBER_OGRETMEN' || s.className).length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: '20px', textAlign: 'center' }}>Kayıtlı sınıf rehber öğretmeni bulunmamaktadır.</td>
-                </tr>
-              ) : (
-                allStaff
-                  .filter(s => s.role === 'SINIF_REHBER_OGRETMEN' || s.className)
-                  .sort((a, b) => {
-                    const numA = parseInt(a.className?.match(/^(\d+)/)?.[1] || '999', 10);
-                    const numB = parseInt(b.className?.match(/^(\d+)/)?.[1] || '999', 10);
-                    if (numA !== numB) return numA - numB;
-                    return (a.className || '').localeCompare(b.className || '');
-                  })
-                  .map((s, idx) => (
-                  <tr key={s.id}>
-                    <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{s.className}</td>
-                    <td>{s.name}</td>
-                    <td>{s.brans || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '50px', paddingRight: '50px' }}>
-             <div style={{ textAlign: 'center' }}>
-                <p>UYGUNDUR</p>
-                <p>.../.../20...</p>
-                <p className="font-bold">{settings?.principalName || 'Okul Müdürü'}</p>
-             </div>
-          </div>
-        </div>
-      )}
     
       {confirmModal}
     </div>

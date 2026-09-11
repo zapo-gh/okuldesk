@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { Button } from './Button';
 
 interface ActionModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ActionModalProps {
   width?: 'md' | 'lg' | 'xl' | 'full';
   submitDisabled?: boolean;
   hideSubmit?: boolean;
+  hideFooter?: boolean;
 }
 
 export function ActionModal({
@@ -25,6 +27,7 @@ export function ActionModal({
   width = 'md',
   submitDisabled = false,
   hideSubmit = false,
+  hideFooter = false,
 }: ActionModalProps) {
   
   // ESC ile kapatma
@@ -91,21 +94,21 @@ export function ActionModal({
             </div>
             {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl">
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
             >
               {cancelText}
-            </button>
+            </Button>
             {!hideSubmit && (
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={submitDisabled}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitText}
-              </button>
+              </Button>
             )}
           </div>
           </form>
@@ -115,15 +118,17 @@ export function ActionModal({
               {children}
             </div>
             {/* Modal Footer (No Form) */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end shrink-0">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Kapat
-              </button>
-            </div>
+            {!hideFooter && (
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                >
+                  Kapat
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

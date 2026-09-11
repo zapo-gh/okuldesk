@@ -332,7 +332,7 @@ export default function CommissionPage() {
               
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                       <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Komisyon Adı</label>
@@ -372,7 +372,7 @@ export default function CommissionPage() {
                      </Button>
                   </div>
                   {formData.roles.map((item: any, idx: number) => (
-                    <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4 relative group">
+                    <div key={item.id} className="p-4 flex items-center space-x-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                       
                       <div className="flex-1">
                         <label className="block text-xs font-medium text-slate-500 mb-1">Görev Adı</label>
@@ -408,7 +408,7 @@ export default function CommissionPage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Görevlendirme Onayı</h3>
@@ -479,10 +479,10 @@ export default function CommissionPage() {
             <table className="w-full border-collapse text-sm">
                <thead>
                  <tr>
-                    <th className="border border-black py-2 px-4 bg-gray-100 w-16">S.No</th>
-                    <th className="border border-black py-2 px-4 bg-gray-100">Görevi</th>
-                    <th className="border border-black py-2 px-4 bg-gray-100">Adı Soyadı</th>
-                    <th className="border border-black py-2 px-4 bg-gray-100 w-32">İmza</th>
+                    <th className="w-16 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.No</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görevi</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
+                    <th className="w-32 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İmza</th>
                  </tr>
                </thead>
                <tbody>
@@ -554,10 +554,10 @@ export default function CommissionPage() {
               <table className="w-full border-collapse text-sm">
                  <thead>
                    <tr>
-                      <th className="border border-black py-2 px-4 bg-gray-100 w-16">S.No</th>
-                      <th className="border border-black py-2 px-4 bg-gray-100 w-1/3">Görevi</th>
-                      <th className="border border-black py-2 px-4 bg-gray-100 w-1/3">Adı Soyadı</th>
-                      <th className="border border-black py-2 px-4 bg-gray-100">İmza</th>
+                      <th className="w-16 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.No</th>
+                      <th className="w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görevi</th>
+                      <th className="w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İmza</th>
                    </tr>
                  </thead>
                  <tbody>

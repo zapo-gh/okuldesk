@@ -102,11 +102,11 @@ export const TravelAllowancePrintTemplate = forwardRef<HTMLDivElement, TravelAll
         <table className="w-full text-sm border border-black border-collapse mb-6 text-center">
           <thead className="bg-gray-100">
             <tr>
-              <th className="border border-black p-2">Adı Soyadı</th>
-              <th className="border border-black p-2">Yakınlık</th>
-              <th className="border border-black p-2">Yevmiye (TL)</th>
-              <th className="border border-black p-2">Yol Gideri (TL)</th>
-              <th className="border border-black p-2">Toplam (TL)</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yakınlık</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yevmiye (TL)</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yol Gideri (TL)</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Toplam (TL)</th>
             </tr>
           </thead>
           <tbody>

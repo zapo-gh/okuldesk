@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import api from '../../../services/api';
-import { FileText, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, PlusCircle, Calendar } from 'lucide-react';
-import { useReactToPrint } from 'react-to-print';
-import { BoardMeetingPrintTemplate } from './print/BoardMeetingPrintTemplate';
+import { FileText, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, PlusCircle, Calendar, AlertTriangle, ShieldCheck } from 'lucide-react';
+
+import { printPdfBlob } from '../../../utils/printPdf';
 import { Button } from '../../../components/ui/Button';
 import { useConfirm } from '../../../hooks/useConfirm';
 
@@ -20,6 +20,7 @@ export default function BoardMeetingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'info'|'agenda'|'attendees'|'print'>('info');
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const [formData, setFormData] = useState<any>({
     title: '',
@@ -28,8 +29,10 @@ export default function BoardMeetingPage() {
     location: 'Öğretmenler Odası',
     status: 'PLANLANDI',
     agendaItems: [],
-    attendees: []
+    attendees: [],
+    isgSorumlusuId: ''
   });
+
 
   const AGENDA_TEMPLATES = [
     {
@@ -42,6 +45,8 @@ export default function BoardMeetingPage() {
         { id: crypto.randomUUID(), topic: "Personel ve öğrenci kılık kıyafetiyle ilgili hususlar.", decision: "" },
         { id: crypto.randomUUID(), topic: "İstenen başarı düzeyine ulaşamayan öğrencilerin yetiştirilmesi için yapılacak çalışmalar.", decision: "" },
         { id: crypto.randomUUID(), topic: "Zümre toplantıları ve yıllık planların değerlendirilmesi.", decision: "" },
+        // 6331 SK İSG ZORUNLU GÜNDEM MADDESi
+        { id: '__ISG_MANDATORY__', topic: "İş Sağlığı ve Güvenliği (İSG): İSG sorumlusu öğretmen belirlenmesi, acil durum/tahliye planı hatırlatılması, eğitim yılı İSG görevleri dağılımı.", decision: "", isMandatory: true },
         { id: crypto.randomUUID(), topic: "Dilek ve temenniler, kapanış.", decision: "" },
       ]
     },
@@ -126,7 +131,8 @@ export default function BoardMeetingPage() {
         meetingNumber: 1, 
         extraData: JSON.stringify({
           agendaItems: formData.agendaItems,
-          attendees: formData.attendees || []
+          attendees: formData.attendees || [],
+          isgSorumlusuId: formData.isgSorumlusuId || null
         })
       };
 
@@ -178,7 +184,7 @@ export default function BoardMeetingPage() {
     setFormData({
       ...formData,
       title: template.name,
-      agendaItems: template.items.map(item => ({ ...item, id: crypto.randomUUID() }))
+      agendaItems: template.items.map(item => ({ ...item, id: item.id === '__ISG_MANDATORY__' ? '__ISG_MANDATORY__' : crypto.randomUUID() }))
     });
     toast.success(`${template.name} şablonu uygulandı.`);
   };
@@ -193,7 +199,8 @@ export default function BoardMeetingPage() {
       location: meeting.location || '',
       status: meeting.status || 'PLANLANDI',
       agendaItems: meeting.extra?.agendaItems || [],
-      attendees: meeting.extra?.attendees || []
+      attendees: meeting.extra?.attendees || [],
+      isgSorumlusuId: meeting.extra?.isgSorumlusuId || ''
     });
     setIsModalOpen(true);
   };
@@ -213,17 +220,33 @@ export default function BoardMeetingPage() {
   };
 
   const removeAgendaItem = (id: string) => {
+    if (id === '__ISG_MANDATORY__') {
+      toast.error('İSG gündem maddesi 6331 sayılı Kanun gereğince zorunludur ve silinemez.');
+      return;
+    }
     setFormData({
       ...formData,
       agendaItems: formData.agendaItems.filter((item: any) => item.id !== id)
     });
   };
 
-  const printRef = useRef<HTMLDivElement>(null);
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: 'Toplanti_Tutanagi'
-  });
+  const handlePrint = async () => {
+    try {
+      setGeneratingPdf(true);
+      const payload = {
+        meeting: formData,
+        staffList: staffList,
+        schoolName: settings?.schoolName,
+        principalName: settings?.principalName
+      };
+      const res = await api.post('/board-meeting/generate-pdf', payload, { responseType: 'blob' });
+      printPdfBlob(res.data);
+    } catch (err: any) {
+      toast.error('Toplantı tutanağı PDF üretilirken hata oluştu.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   const columns: Column<any>[] = [
     { header: 'Toplantı Adı', accessor: 'title', render: (row: any) => <span className="font-semibold">{row.title || row.type}</span> },
@@ -319,7 +342,7 @@ export default function BoardMeetingPage() {
               
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
                       <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Toplantı Türü / Adı</label>
@@ -357,6 +380,31 @@ export default function BoardMeetingPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* İSG Sorumlusu Alanı — 6331 SK */}
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2 border-b border-green-200 pb-2">
+                      <ShieldCheck size={16} className="text-green-600" />
+                      <h4 className="font-semibold text-sm text-green-800">İş Sağlığı ve Güvenliği (İSG) — 6331 SK</h4>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">İSG Sorumlusu Öğretmen</label>
+                      <select
+                        value={formData.isgSorumlusuId || ''}
+                        onChange={e => setFormData({...formData, isgSorumlusuId: e.target.value})}
+                        className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
+                      >
+                        <option value="">— Seçiniz —</option>
+                        {staffList.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name} {s.unvan ? `(${s.unvan})` : ''}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-green-700 mt-1">
+                        6331 sayılı İSG Kanunu gereğince sene başı toplantısında İSG sorumlusu belirlenmesi zorunludur.
+                        Seçilen kişi tutanak çıktısında görünecektir.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -369,16 +417,33 @@ export default function BoardMeetingPage() {
                      </Button>
                   </div>
                   {formData.agendaItems.map((item: any, idx: number) => (
-                    <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col space-y-3 relative group">
+                    <div key={item.id} className={`p-4 rounded-xl border shadow-sm flex flex-col space-y-3 relative group ${
+                      item.isMandatory ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'
+                    }`}>
                       <div className="flex justify-between items-center mb-1">
-                        <h4 className="font-semibold text-slate-800">Madde {idx + 1}</h4>
-                        <Button onClick={() => removeAgendaItem(item.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <X className="w-5 h-5" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {item.isMandatory && <ShieldCheck size={15} className="text-green-600 shrink-0" />}
+                          <h4 className={`font-semibold ${item.isMandatory ? 'text-green-800' : 'text-slate-800'}`}>
+                            Madde {idx + 1}
+                            {item.isMandatory && <span className="ml-2 text-xs font-normal text-green-600 bg-green-100 border border-green-200 px-1.5 py-0.5 rounded-full">Zorunlu — 6331 SK</span>}
+                          </h4>
+                        </div>
+                        {!item.isMandatory && (
+                          <Button onClick={() => removeAgendaItem(item.id)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="w-5 h-5" />
+                          </Button>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Gündem Konusu</label>
-                        <input type="text" value={item.topic} onChange={(e) => updateAgendaItem(item.id, 'topic', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Örn: Açılış ve yoklama" />
+                        <input
+                          type="text"
+                          value={item.topic}
+                          readOnly={!!item.isMandatory}
+                          onChange={(e) => !item.isMandatory && updateAgendaItem(item.id, 'topic', e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-lg text-sm ${item.isMandatory ? 'bg-green-50 border-green-200 text-green-800 cursor-not-allowed' : ''}`}
+                          placeholder="Örn: Açılış ve yoklama"
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">Alınan Karar / Görüşülenler</label>
@@ -386,6 +451,7 @@ export default function BoardMeetingPage() {
                       </div>
                     </div>
                   ))}
+
                   {formData.agendaItems.length === 0 && (
                     <div className="text-center py-10 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500">
                       Henüz gündem maddesi eklenmedi.
@@ -437,14 +503,14 @@ export default function BoardMeetingPage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Kurul Toplantı Tutanağı</h3>
                        <p className="text-sm text-slate-500 mt-1">Gündem maddeleri ve kararları içeren resmi formatta belge.</p>
                      </div>
-                      <Button variant="primary" onClick={handlePrint} className="w-full justify-center">
-                        <Printer className="w-4 h-4" />
+                      <Button variant="primary" onClick={handlePrint} disabled={generatingPdf} className="w-full justify-center">
+                        {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />}
                         <span>Yazdır</span>
                       </Button>
                   </div>
@@ -458,8 +524,8 @@ export default function BoardMeetingPage() {
                 İptal Et
               </Button>
               {editingId && (
-                <Button variant="outline" onClick={handlePrint} className="text-slate-700">
-                  <Printer className="w-5 h-5" />
+                <Button variant="outline" onClick={handlePrint} disabled={generatingPdf} className="text-slate-700">
+                  {generatingPdf ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Printer className="w-5 h-5 mr-2" />}
                   <span>Yazdır</span>
                 </Button>
               )}
@@ -473,10 +539,7 @@ export default function BoardMeetingPage() {
         </div>
       )}
 
-      {/* GİZLİ YAZDIRMA ŞABLONU */}
-      <div className="hidden">
-         <BoardMeetingPrintTemplate ref={printRef} meeting={formData} staffList={staffList} />
-      </div>
+
 
     
       {confirmModal}

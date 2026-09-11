@@ -235,11 +235,11 @@ export default function OrderLetterPage() {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 border-b">
                       <tr>
-                        <th className="px-4 py-2">Mal/Hizmet Cinsi</th>
-                        <th className="px-4 py-2 w-24">Miktar</th>
-                        <th className="px-4 py-2 w-28">Birim</th>
-                        <th className="px-4 py-2 w-32">Birim Fiyat</th>
-                        <th className="px-4 py-2 w-16"></th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Mal/Hizmet Cinsi</th>
+                        <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Miktar</th>
+                        <th className="w-28 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Birim</th>
+                        <th className="w-32 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Birim Fiyat</th>
+                        <th className="w-16 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -269,9 +269,9 @@ export default function OrderLetterPage() {
 
             </div>
 
-            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end space-x-3 shrink-0">
-              <Button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">İptal</Button>
-              <Button onClick={handleSave} variant="primary">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl">
+              <Button variant="outline" onClick={() => setIsModalOpen(false)}>İptal</Button>
+              <Button variant="primary" onClick={handleSave}>
                 <Save className="w-5 h-5" />
                 <span>Kaydet</span>
               </Button>

@@ -17,23 +17,34 @@ class StaffService {
   async getAll(role?: string) {
     const where: Prisma.StaffWhereInput = { isActive: true, deletedAt: null };
     if (role && VALID_ROLES.includes(role as StaffRole)) {
-      where.role = role as StaffRole;
+      where.title = role as StaffRole;
     }
     return prisma.staff.findMany({
       where,
-      orderBy: [{ role: 'asc' }, { name: 'asc' }],
+      orderBy: [{ title: 'asc' }, { name: 'asc' }],
     });
   }
 
   async getByClass(className: string) {
     return prisma.staff.findFirst({
-      where: { role: 'SINIF_REHBER_OGRETMEN', className, isActive: true, deletedAt: null },
+      where: { title: 'SINIF_REHBER_OGRETMEN', className, isActive: true, deletedAt: null },
+    });
+  }
+
+  async getDeleted(role?: string) {
+    const where: Prisma.StaffWhereInput = { deletedAt: { not: null } };
+    if (role && VALID_ROLES.includes(role as StaffRole)) {
+      where.title = role as StaffRole;
+    }
+    return prisma.staff.findMany({
+      where,
+      orderBy: [{ title: 'asc' }, { name: 'asc' }],
     });
   }
 
   async create(data: { 
     name: string; 
-    role: StaffRole; 
+    title: StaffRole; 
     className?: string;
     tcKimlikNo?: string;
     brans?: string;
@@ -43,17 +54,17 @@ class StaffService {
     gorev?: string;
     extraData?: string;
   }) {
-    if (!VALID_ROLES.includes(data.role)) {
+    if (!VALID_ROLES.includes(data.title)) {
       throw new AppError('Geçersiz personel rolü.', 400);
     }
-    if (data.role === 'SINIF_REHBER_OGRETMEN' && !data.className?.trim()) {
+    if (data.title === 'SINIF_REHBER_OGRETMEN' && !data.className?.trim()) {
       throw new AppError('Sınıf rehber öğretmeni için sınıf adı zorunludur.', 400);
     }
     return prisma.staff.create({
       data: {
         name: data.name.trim(),
-        role: data.role,
-        className: data.role === 'SINIF_REHBER_OGRETMEN' ? data.className!.trim() : null,
+        title: data.title,
+        className: data.title === 'SINIF_REHBER_OGRETMEN' ? data.className!.trim() : null,
         tcKimlikNo: data.tcKimlikNo,
         brans: data.brans,
         kurumSicilNo: data.kurumSicilNo,
@@ -70,7 +81,7 @@ class StaffService {
     
     const data = staffList.map(s => ({
       name: (s.name || '').trim(),
-      role: s.role || 'KURUM_PERSONELI',
+      title: s.title || 'KURUM_PERSONELI',
       className: s.className || null,
       tcKimlikNo: s.tcKimlikNo || null,
       brans: s.brans || null,
@@ -91,6 +102,7 @@ class StaffService {
 
   async update(id: string, data: { 
     name?: string; 
+    title?: StaffRole;
     className?: string; 
     isActive?: boolean;
     tcKimlikNo?: string;
@@ -108,6 +120,7 @@ class StaffService {
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name.trim() }),
+        ...(data.title !== undefined && { title: data.title }),
         ...(data.className !== undefined && { className: data.className?.trim() || null }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.tcKimlikNo !== undefined && { tcKimlikNo: data.tcKimlikNo }),
@@ -132,6 +145,21 @@ class StaffService {
     const result = await prisma.staff.updateMany({
       where: { id: { in: ids }, deletedAt: null },
       data: { deletedAt: new Date(), isActive: false }
+    });
+    return { count: result.count };
+  }
+
+  async restore(id: string) {
+    const staff = await prisma.staff.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!staff) throw new AppError('Silinmiş personel bulunamadı.', 404);
+    await prisma.staff.update({ where: { id }, data: { deletedAt: null, isActive: true } });
+  }
+
+  async bulkRestore(ids: string[]) {
+    if (!ids || ids.length === 0) return { count: 0 };
+    const result = await prisma.staff.updateMany({
+      where: { id: { in: ids }, deletedAt: { not: null } },
+      data: { deletedAt: null, isActive: true }
     });
     return { count: result.count };
   }

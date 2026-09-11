@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { dutyScheduleService } from './dutySchedule.service';
+import { coverAssignmentService } from './services/coverAssignment.service';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 
 export class DutyScheduleController {
@@ -89,10 +90,83 @@ export class DutyScheduleController {
   // ── Auto Distribute ──
   async autoDistribute(req: Request, res: Response, next: NextFunction) {
     try {
-      const { year, month, academicYear, overwriteExisting, targetWeekNum } = req.body;
+      const { year, month, academicYear, overwriteExisting, targetWeekNum, dutyStartDate } = req.body;
       if (!year || !month || !academicYear) throw new AppError('year, month ve academicYear zorunludur.', 400);
-      const result = await dutyScheduleService.autoDistribute({ year, month, academicYear, overwriteExisting: !!overwriteExisting, targetWeekNum });
+      const result = await dutyScheduleService.autoDistribute({
+        year, month, academicYear,
+        overwriteExisting: !!overwriteExisting,
+        targetWeekNum,
+        dutyStartDate: dutyStartDate || undefined
+      });
       res.json({ success: true, data: result });
+    } catch (e) { next(e); }
+  }
+
+  async autoDistributeRange(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate, academicYear, overwriteExisting } = req.body;
+      if (!startDate || !endDate || !academicYear) throw new AppError('startDate, endDate ve academicYear zorunludur.', 400);
+      const result = await dutyScheduleService.autoDistributeRange({ startDate, endDate, academicYear, overwriteExisting: !!overwriteExisting });
+      res.json({ success: true, data: result });
+    } catch (e) { next(e); }
+  }
+
+  // ── Cover Assignments (Boş Ders Doldurma) ──
+  async getAbsencesForDate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date, academicYear } = req.query;
+      if (!date || !academicYear) throw new AppError('date ve academicYear zorunludur.', 400);
+      res.json({ success: true, data: await coverAssignmentService.getAbsencesForDate(new Date(date as string), academicYear as string) });
+    } catch (e) { next(e); }
+  }
+
+  async saveAbsence(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { staffId, academicYear, startDate, endDate, reason } = req.body;
+      if (!staffId || !academicYear || !startDate || !endDate) throw new AppError('Zorunlu alanlar eksik.', 400);
+      res.status(201).json({ success: true, data: await coverAssignmentService.saveAbsence({ staffId, academicYear, startDate, endDate, reason }) });
+    } catch (e) { next(e); }
+  }
+
+  async deleteAbsence(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id) throw new AppError('ID zorunludur.', 400);
+      await coverAssignmentService.deleteAbsence(id);
+      res.json({ success: true, message: 'İzin kaydı silindi.' });
+    } catch (e) { next(e); }
+  }
+
+  async suggestCovers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date, academicYear } = req.query;
+      if (!date || !academicYear) throw new AppError('date ve academicYear zorunludur.', 400);
+      res.json({ success: true, data: await coverAssignmentService.suggestCovers(date as string, academicYear as string) });
+    } catch (e) { next(e); }
+  }
+
+  async getCoversForDate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date, academicYear } = req.query;
+      if (!date || !academicYear) throw new AppError('date ve academicYear zorunludur.', 400);
+      res.json({ success: true, data: await coverAssignmentService.getCoversForDate(new Date(date as string), academicYear as string) });
+    } catch (e) { next(e); }
+  }
+
+  async saveCovers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date, academicYear, covers } = req.body;
+      if (!date || !academicYear || !Array.isArray(covers)) throw new AppError('Zorunlu alanlar eksik.', 400);
+      res.status(201).json({ success: true, data: await coverAssignmentService.saveCovers({ date, academicYear, covers }) });
+    } catch (e) { next(e); }
+  }
+
+  async deleteCover(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id) throw new AppError('ID zorunludur.', 400);
+      await coverAssignmentService.deleteCover(id);
+      res.json({ success: true, message: 'Görevlendirme silindi.' });
     } catch (e) { next(e); }
   }
 }

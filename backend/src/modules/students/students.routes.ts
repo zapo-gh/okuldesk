@@ -34,12 +34,14 @@ const excelMimes = [
 
 router.post('/import-excel', uploadLimiter, excelUpload.single('file'), validateMagicBytes(excelMimes), studentsController.importExcel);
 router.post('/import-parents', uploadLimiter, excelUpload.single('file'), validateMagicBytes(excelMimes), studentsController.importParents);
+router.get('/classes', studentsController.getClasses);
 router.get('/360/:id', studentsController.get360);
 router.get('/', studentsController.getAll);
 router.get('/:id', studentsController.getById);
 router.post('/', studentsController.create);
 router.put('/:id', studentsController.update);
 router.post('/bulk-delete', studentsController.bulkDelete);
+router.delete('/bulk/delete-all', studentsController.deleteAll);
 router.delete('/:id', studentsController.delete);
 router.post('/:id/parents', studentsController.addParent);
 router.post('/:id/assign-parent', studentsController.assignParent);

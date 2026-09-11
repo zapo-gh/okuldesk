@@ -16,6 +16,11 @@ interface Staff {
   name: string;
 }
 
+interface Club {
+  id: string;
+  name: string;
+}
+
 interface CommemorativeDay {
   id: string;
   name: string;
@@ -25,6 +30,8 @@ interface CommemorativeDay {
   description?: string;
   assignedStaffId?: string;
   assignedStaffName?: string;
+  assignedClubId?: string;
+  assignedClubName?: string;
   status: string;
 }
 
@@ -32,48 +39,67 @@ export default function CommemorativeDaysPage() {
   const { confirm, confirmModal } = useConfirm();
   const [days, setDays] = useState<CommemorativeDay[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [clubList, setClubList] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'info'|'print'>('info');
   const [form, setForm] = useState<Partial<CommemorativeDay>>({});
   const [printMode, setPrintMode] = useState<'none'|'single'|'all'>('none');
+  const [enableStaffSelection, setEnableStaffSelection] = useState(false);
 
   const { settings } = useSettings();
   const academicYear = settings?.academicYear || '2024-2025';
 
   const DEFAULT_MEB_DAYS = [
-    { name: 'İlköğretim Haftası', date: 'Eylül ayının 3. haftası', desc: 'Eğitim öğretim yılının başlangıcı kutlamaları' },
-    { name: '15 Temmuz Demokrasi ve Millî Birlik Günü', date: 'Eylül ayının 2. haftası', desc: 'Demokrasi bilincinin geliştirilmesi' },
-    { name: '29 Ekim Cumhuriyet Bayramı', date: '29 Ekim', desc: 'Cumhuriyetin ilanı kutlamaları' },
-    { name: 'Kızılay Haftası', date: '29 Ekim - 4 Kasım', desc: 'Yardımlaşma ve dayanışma bilinci' },
-    { name: '10 Kasım Atatürk\'ü Anma Günü', date: '10 Kasım', desc: 'Atatürk\'ü anma programı' },
-    { name: '24 Kasım Öğretmenler Günü', date: '24 Kasım', desc: 'Öğretmenler günü kutlama programı' },
-    { name: 'İnsan Hakları ve Demokrasi Haftası', date: '10 Aralık gününü içine alan hafta', desc: 'İnsan hakları bilincinin geliştirilmesi' },
-    { name: 'Tutum, Yatırım ve Türk Malları Haftası', date: '12-18 Aralık', desc: 'Yerli malı kullanımı teşviki' },
-    { name: 'Sivil Savunma Günü', date: '28 Şubat', desc: 'Afet bilinci eğitimi' },
-    { name: 'Yeşilay Haftası', date: 'Mart ayının ilk haftası', desc: 'Bağımlılıkla mücadele' },
-    { name: '12 Mart İstiklâl Marşı\'nın Kabulü', date: '12 Mart', desc: 'Mehmet Akif Ersoy\'u anma' },
-    { name: '18 Mart Çanakkale Zaferi', date: '18 Mart', desc: 'Şehitleri anma günü' },
-    { name: 'Orman Haftası', date: '21-26 Mart', desc: 'Çevre ve doğa bilinci' },
-    { name: '23 Nisan Ulusal Egemenlik ve Çocuk Bayramı', date: '23 Nisan', desc: 'Çocuk bayramı kutlamaları' },
-    { name: '19 Mayıs Atatürk\'ü Anma, Gençlik ve Spor Bayramı', date: '19 Mayıs', desc: 'Gençlik haftası kutlamaları' }
+    { name: 'İlköğretim Haftası', startMonth: 9, startDay: 15, endMonth: 9, endDay: 21, desc: 'Eğitim öğretim yılının başlangıcı kutlamaları' },
+    { name: '15 Temmuz Demokrasi ve Millî Birlik Günü', startMonth: 9, startDay: 15, endMonth: 9, endDay: 15, desc: 'Demokrasi bilincinin geliştirilmesi' }, // Usually celebrated around the start of school
+    { name: '29 Ekim Cumhuriyet Bayramı', startMonth: 10, startDay: 29, endMonth: 10, endDay: 29, desc: 'Cumhuriyetin ilanı kutlamaları' },
+    { name: 'Kızılay Haftası', startMonth: 10, startDay: 29, endMonth: 11, endDay: 4, desc: 'Yardımlaşma ve dayanışma bilinci' },
+    { name: '10 Kasım Atatürk\'ü Anma Günü', startMonth: 11, startDay: 10, endMonth: 11, endDay: 10, desc: 'Atatürk\'ü anma programı' },
+    { name: '24 Kasım Öğretmenler Günü', startMonth: 11, startDay: 24, endMonth: 11, endDay: 24, desc: 'Öğretmenler günü kutlama programı' },
+    { name: 'İnsan Hakları ve Demokrasi Haftası', startMonth: 12, startDay: 10, endMonth: 12, endDay: 16, desc: 'İnsan hakları bilincinin geliştirilmesi' },
+    { name: 'Tutum, Yatırım ve Türk Malları Haftası', startMonth: 12, startDay: 12, endMonth: 12, endDay: 18, desc: 'Yerli malı kullanımı teşviki' },
+    { name: 'Sivil Savunma Günü', startMonth: 2, startDay: 28, endMonth: 2, endDay: 28, desc: 'Afet bilinci eğitimi' },
+    { name: 'Yeşilay Haftası', startMonth: 3, startDay: 1, endMonth: 3, endDay: 7, desc: 'Bağımlılıkla mücadele' },
+    { name: '12 Mart İstiklâl Marşı\'nın Kabulü', startMonth: 3, startDay: 12, endMonth: 3, endDay: 12, desc: 'Mehmet Akif Ersoy\'u anma' },
+    { name: '18 Mart Çanakkale Zaferi', startMonth: 3, startDay: 18, endMonth: 3, endDay: 18, desc: 'Şehitleri anma günü' },
+    { name: 'Orman Haftası', startMonth: 3, startDay: 21, endMonth: 3, endDay: 26, desc: 'Çevre ve doğa bilinci' },
+    { name: '23 Nisan Ulusal Egemenlik ve Çocuk Bayramı', startMonth: 4, startDay: 23, endMonth: 4, endDay: 23, desc: 'Çocuk bayramı kutlamaları' },
+    { name: '19 Mayıs Atatürk\'ü Anma, Gençlik ve Spor Bayramı', startMonth: 5, startDay: 19, endMonth: 5, endDay: 19, desc: 'Gençlik haftası kutlamaları' }
   ];
 
   const loadDefaults = async () => {
-    if (!await confirm('Önemli Belirli Gün ve Haftalar (MEB) sisteme otomatik eklenecektir. Onaylıyor musunuz?')) return;
+    // Check for duplicates
+    const hasExisting = days.some(d => DEFAULT_MEB_DAYS.some(meb => meb.name === d.name));
+    
+    if (hasExisting) {
+      if (!await confirm('Sistemde bu şablonlardan bazıları zaten ekli görünüyor. Tekrar eklerseniz mükerrer kayıtlar oluşacaktır. Yine de devam etmek istiyor musunuz?')) return;
+    } else {
+      if (!await confirm('Önemli Belirli Gün ve Haftalar (MEB) sisteme otomatik eklenecektir. Onaylıyor musunuz?')) return;
+    }
     
     setLoading(true);
     try {
-      const yearStr = new Date().getFullYear().toString();
+      const parts = academicYear.split('-');
+      const startYear = parseInt(parts[0]) || new Date().getFullYear();
+      const endYear = parseInt(parts[1]) || startYear + 1;
+
       for (const day of DEFAULT_MEB_DAYS) {
+        // Aylar Eylul (9) ile Aralık (12) arasındaysa akademik yılın ilk yılıdır, aksi halde ikinci yılıdır.
+        const sYear = day.startMonth >= 8 ? startYear : endYear;
+        const eYear = day.endMonth >= 8 ? startYear : endYear;
+
+        const sDate = `${sYear}-${String(day.startMonth).padStart(2, '0')}-${String(day.startDay).padStart(2, '0')}`;
+        const eDate = `${eYear}-${String(day.endMonth).padStart(2, '0')}-${String(day.endDay).padStart(2, '0')}`;
+
         await api.post('/commemorative-days', {
           name: day.name,
           academicYear,
           status: 'BEKLIYOR',
           description: day.desc,
-          startDate: `${yearStr}-09-15`, 
-          endDate: `${yearStr}-09-15`
+          startDate: sDate, 
+          endDate: eDate
         });
       }
       toast.success('Şablon listesi başarıyla eklendi.');
@@ -93,12 +119,14 @@ export default function CommemorativeDaysPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [daysRes, staffRes] = await Promise.all([
+      const [daysRes, staffRes, clubsRes] = await Promise.all([
         api.get(`/commemorative-days?academicYear=${academicYear}`),
-        api.get('/staff')
+        api.get('/staff'),
+        api.get(`/student-club?academicYear=${academicYear}`)
       ]);
       setDays(daysRes.data.data || []);
       setStaffList(staffRes.data.data?.staff || []);
+      setClubList(clubsRes.data.data || []);
     } catch {
       toast('Veriler yüklenemedi');
     } finally {
@@ -151,12 +179,14 @@ export default function CommemorativeDaysPage() {
       endDate: new Date().toISOString().split('T')[0],
       assignedStaffId: '', assignedStaffName: ''
     });
+    setEnableStaffSelection(false);
     setIsModalOpen(true);
   };
 
   const openEditModal = (d: CommemorativeDay) => {
     setActiveTab('info');
     setForm(d);
+    setEnableStaffSelection(!!d.assignedStaffId);
     setIsModalOpen(true);
   };
 
@@ -193,8 +223,15 @@ export default function CommemorativeDaysPage() {
       )
     },
     {
-      header: 'Görevli Öğretmen',
-      render: (d) => <span className="font-medium text-slate-700">{d.assignedStaffName || '-'}</span>
+      header: 'Görevli Kulüp / Öğretmen',
+      render: (d) => {
+        const club = d.assignedClubName ? <span className="text-indigo-600 font-semibold">{d.assignedClubName}</span> : null;
+        const staff = d.assignedStaffName ? <span>{d.assignedStaffName}</span> : null;
+        if (club && staff) return <div className="text-sm">{club} <br/><span className="text-xs text-slate-500">({staff})</span></div>;
+        if (club) return club;
+        if (staff) return staff;
+        return <span className="font-medium text-slate-400">-</span>;
+      }
     },
     {
       header: 'Durum',
@@ -294,7 +331,7 @@ export default function CommemorativeDaysPage() {
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
               {activeTab === 'info' && (
                 <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="p-6 space-y-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Gün / Hafta Adı</label>
@@ -313,15 +350,42 @@ export default function CommemorativeDaysPage() {
                         <input type="date" value={form.endDate?.split('T')[0] || ''} onChange={e => setForm({...form, endDate: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Sorumlu / Görevli Öğretmen</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Sorumlu / Görevli Kulüp (Öncelikli)</label>
                         <select 
+                          value={form.assignedClubId || ''} 
+                          onChange={(e) => {
+                            const clubId = e.target.value;
+                            const clubObj = clubList.find(c => c.id === clubId);
+                            setForm({...form, assignedClubId: clubId, assignedClubName: clubObj ? clubObj.name : ''});
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">-- Kulüp Seçiniz --</option>
+                          {clubList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={enableStaffSelection}
+                            onChange={(e) => {
+                              setEnableStaffSelection(e.target.checked);
+                              if (!e.target.checked) setForm({...form, assignedStaffId: '', assignedStaffName: ''});
+                            }}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          Sorumlu / Görevli Öğretmen Ata (Ek Seçenek)
+                        </label>
+                        <select 
+                          disabled={!enableStaffSelection}
                           value={form.assignedStaffId || ''} 
                           onChange={(e) => {
                             const staffId = e.target.value;
                             const staffObj = staffList.find(s => s.id === staffId);
                             setForm({...form, assignedStaffId: staffId, assignedStaffName: staffObj ? staffObj.name : ''});
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400"
                         >
                           <option value="">-- Öğretmen Seçiniz --</option>
                           {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -343,7 +407,7 @@ export default function CommemorativeDaysPage() {
 
               {activeTab === 'print' && (
                 <div className="flex flex-col items-center space-y-4 pt-10">
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center max-w-sm w-full space-y-4 hover:border-indigo-300">
+                  <div className="p-6 text-center max-w-sm w-full space-y-4 hover:border-indigo-300 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                      <Printer className="w-12 h-12 text-indigo-500 mx-auto" />
                      <div>
                        <h3 className="font-bold text-slate-800">Görevlendirme Yazısı</h3>

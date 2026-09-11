@@ -87,7 +87,7 @@ export default function AttendanceSheetPage() {
         onAction={handlePrint}
       />
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4 print:hidden">
+      <div className="p-4 flex flex-col print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-gray-700 mb-1">Belge Konusu / Özeti</label>
@@ -192,31 +192,59 @@ export default function AttendanceSheetPage() {
       {loading ? (
         <div className="p-8 text-center text-gray-500 animate-pulse">Yükleniyor...</div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto p-4">
+        <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <table className="w-full border-collapse border border-gray-300">
             <thead>
               <tr className="bg-gray-50">
-                <th className="border border-gray-300 p-2 text-center w-12">S.N</th>
-                <th className="border border-gray-300 p-2 text-left w-1/3">Adı Soyadı</th>
-                <th className="border border-gray-300 p-2 text-left w-1/3">Branşı</th>
-                <th className="border border-gray-300 p-2 text-center w-1/4">İmza</th>
+                <th className="text-center w-12 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.N</th>
+                <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
+                <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branşı</th>
+                <th className="text-center w-1/4 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İmza</th>
               </tr>
             </thead>
             <tbody>
-              {staff
-                .filter(person => selectedUnvans.includes(person.unvan || 'Belirtilmemiş'))
-                .map((person, index) => {
-                const unvanStr = person.brans || '-';
+              {(() => {
+                const getManagementRank = (person: Staff) => {
+                  const text = ((person.unvan || '') + ' ' + (person.gorev || '') + ' ' + (person.role || '')).toLowerCase();
+                  if (text.includes('başyardımcı') || (text.includes('müdür') && text.includes('baş'))) return 1; // Müdür Başyardımcısı
+                  if (text.includes('müdür') && text.includes('yardımcı')) return 2; // Müdür Yardımcısı
+                  return 3; // Diğer
+                };
 
-                return (
-                  <tr key={person.id} className="hover:bg-gray-50/50">
-                    <td className="border border-gray-300 p-1.5 text-center font-medium">{index + 1}</td>
-                    <td className="border border-gray-300 p-1.5 font-semibold">{person.name}</td>
-                    <td className="border border-gray-300 p-1.5 text-gray-800">{unvanStr}</td>
-                    <td className="border border-gray-300 p-1.5 h-10"></td>
-                  </tr>
-                );
-              })}
+                const displayStaff = staff
+                  .filter(person => {
+                    const rank = getManagementRank(person);
+                    // İdareciler filtreye takılmadan hep listelensin
+                    if (rank < 3) return true;
+                    return selectedUnvans.includes(person.unvan || 'Belirtilmemiş');
+                  })
+                  .sort((a, b) => {
+                    const rankA = getManagementRank(a);
+                    const rankB = getManagementRank(b);
+                    if (rankA !== rankB) return rankA - rankB;
+                    return a.name.localeCompare(b.name, 'tr');
+                  });
+
+                return displayStaff.map((person, index) => {
+                  let unvanStr = person.brans || '-';
+                  const rank = getManagementRank(person);
+                  
+                  if (rank === 1) {
+                    unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Başyardımcısı';
+                  } else if (rank === 2) {
+                    unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Yardımcısı';
+                  }
+
+                  return (
+                    <tr key={person.id} className="hover:bg-gray-50/50">
+                      <td className="border border-gray-300 p-1.5 text-center font-medium">{index + 1}</td>
+                      <td className="border border-gray-300 p-1.5 font-semibold">{person.name}</td>
+                      <td className="border border-gray-300 p-1.5 text-gray-800">{unvanStr}</td>
+                      <td className="border border-gray-300 p-1.5 h-10"></td>
+                    </tr>
+                  );
+                });
+              })()}
               {staff.filter(person => selectedUnvans.includes(person.unvan || 'Belirtilmemiş')).length === 0 && (
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-gray-500">

@@ -39,6 +39,9 @@ import procurementRoutes from './modules/procurement/procurement.routes';
 import supplierRoutes from './modules/supplier/supplier.routes';
 import orderLetterRoutes from './modules/orderLetter/orderLetter.routes';
 import auditRoutes from './modules/audit/audit.routes';
+import invoiceRoutes from './modules/invoice/invoice.routes';
+import studentLeaveRoutes from './modules/student-leave/student-leave.routes';
+import timetableRoutes from './modules/timetable/timetable.routes';
 
 const app = express();
 const uploadsDir = path.resolve(config.upload.dir);
@@ -102,6 +105,9 @@ app.use('/api/procurement', procurementRoutes);
 app.use('/api/supplier', supplierRoutes);
 app.use('/api/order-letter', orderLetterRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/invoice', invoiceRoutes);
+app.use('/api/student-leave', studentLeaveRoutes);
+app.use('/api/timetable', timetableRoutes);
 
 const frontendDist = path.resolve(__dirname, 'public');
 if (fs.existsSync(frontendDist)) {
@@ -112,5 +118,6 @@ if (fs.existsSync(frontendDist)) {
   });
 }
 
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.use(errorHandler);
 export default app;

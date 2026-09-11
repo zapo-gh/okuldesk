@@ -27,7 +27,8 @@ export class StudentsController {
       const limit = Math.max(1, Math.min(1000, parseInt(req.query.limit as string) || 20));
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      const result = await studentsService.getAll(page, limit, search, status);
+      const className = req.query.className as string | undefined;
+      const result = await studentsService.getAll(page, limit, search, status, className);
       res.json({ success: true, data: result });
     } catch (error) { next(error); }
   }
@@ -39,6 +40,11 @@ export class StudentsController {
 
   async get360(req: Request, res: Response, next: NextFunction) {
     try { res.json({ success: true, data: await student360Service.getById(req.params.id) }); }
+    catch (error) { next(error); }
+  }
+
+  async getClasses(req: Request, res: Response, next: NextFunction) {
+    try { res.json({ success: true, data: await studentsService.getClasses() }); }
     catch (error) { next(error); }
   }
 
@@ -70,6 +76,12 @@ export class StudentsController {
       const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (!ids.every((id: unknown) => typeof id === 'string' && uuidRe.test(id))) throw new AppError('Geçersiz öğrenci ID formatı.', 400);
       res.json({ success: true, data: await studentsService.bulkDelete(ids, req.user!.userId) });
+    } catch (error) { next(error); }
+  }
+
+  async deleteAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.json({ success: true, data: await studentsService.deleteAll(req.user!.userId) });
     } catch (error) { next(error); }
   }
 

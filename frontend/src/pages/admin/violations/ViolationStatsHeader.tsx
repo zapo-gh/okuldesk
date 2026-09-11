@@ -10,14 +10,14 @@ interface Props {
  */
 export function ViolationStatsHeader({ stats }: Props) {
   return (
-    <div className="flex gap-4">
-      <div className="text-center px-4 py-1 bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="text-xl font-bold text-gray-800">{stats?.todayCount ?? "—"}</div>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Bugün</div>
+    <div className="flex gap-2">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/20 bg-white/10 text-white backdrop-blur-sm shadow-sm">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-white/70">Bugün:</span>
+        <span className="text-sm font-bold">{stats?.todayCount ?? "—"}</span>
       </div>
-      <div className="text-center px-4 py-1 bg-red-50 border border-red-100 rounded-lg shadow-sm">
-        <div className="text-xl font-bold text-red-600">{stats?.confirmedViolations ?? "—"}</div>
-        <div className="text-[10px] text-red-500 uppercase tracking-wider font-semibold">Toplam Onaylı</div>
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-400/40 bg-red-500/20 text-white backdrop-blur-sm shadow-sm">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-red-200">Onaylı:</span>
+        <span className="text-sm font-bold">{stats?.confirmedViolations ?? "—"}</span>
       </div>
     </div>
   );

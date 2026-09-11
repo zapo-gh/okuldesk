@@ -14,7 +14,6 @@ export async function getViolationSource(req: Request, res: Response, next: Next
       select: {
         id: true,
         studentId: true,
-        type: true,
         violationDate: true,
         isConfirmed: true,
         matchedBy: true,

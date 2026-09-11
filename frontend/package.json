@@ -10,10 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-updater": "^2.11.0",
     "@types/jszip": "^3.4.0",
     "axios": "^1.6.7",
     "framer-motion": "^12.42.2",
@@ -24,12 +26,14 @@
     "pdf-lib": "^1.17.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.87.0",
     "react-hot-toast": "^2.6.0",
     "react-pdf": "^7.7.1",
     "react-router-dom": "^6.22.3",
     "react-to-print": "^3.3.0",
     "recharts": "^3.10.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

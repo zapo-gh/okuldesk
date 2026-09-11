@@ -7,7 +7,7 @@ import { requestContext } from '../utils/asyncLocalStorage';
 
 export interface JwtPayload {
   userId: string;
-  role: 'ADMIN' | 'PARENT';
+  role: string;
   mustChangePassword?: boolean;
 }
 

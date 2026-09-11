@@ -58,7 +58,7 @@ export default function AuditLogPage() {
       <PageHeader
         title="Sistem İzlenebilirliği (Audit Logs)"
         description="Sistemdeki tüm kritik veri değiştirme, silme ve oluşturma işlemlerinin dökümü."
-        icon={<Activity size={28} className="text-gray-700" />}
+        icon={<Activity size={28} />}
         actions={
           <Button
             onClick={fetchLogs}
@@ -70,7 +70,7 @@ export default function AuditLogPage() {
         }
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-220px)]">
+      <div className="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4 bg-gray-50/50">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -94,14 +94,14 @@ export default function AuditLogPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
               </div>
             ) : filteredLogs.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+              <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <Activity size={48} className="mx-auto text-gray-300 mb-3" />
                 <h3 className="text-gray-900 font-medium">Kayıt bulunamadı</h3>
                 <p className="text-gray-500 text-sm mt-1">Arama kriterlerine uygun işlem logu yok.</p>
               </div>
             ) : (
               filteredLogs.map((log) => (
-                <div key={log.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div key={log.id} className="p-5 hover:shadow-md bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <div className="flex items-center gap-3">
                       <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${getActionColor(log.action)}`}>

@@ -30,7 +30,12 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, 
 });
 
 router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
-  try { await commemorativeDaysService.update(req.params.id, req.body); res.json({ success: true }); }
+  try {
+    const p = createSchema.safeParse(req.body);
+    if (!p.success) throw new AppError(p.error.errors[0].message, 400);
+    await commemorativeDaysService.update(req.params.id, p.data); 
+    res.json({ success: true }); 
+  }
   catch (e) { next(e); }
 });
 

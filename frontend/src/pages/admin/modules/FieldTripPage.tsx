@@ -303,7 +303,7 @@ export default function FieldTripPage() {
                   <label className="block text-sm font-medium text-gray-700">Görevli Öğretmenler</label>
                   <div className="flex gap-2">
                     <select
-                      className="mt-1 block flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
                       onChange={(e) => {
                         if(e.target.value) {
                           const current = formData.gorevliOgretmenler;
@@ -354,7 +354,7 @@ export default function FieldTripPage() {
                       {isStudentDropdownOpen && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setIsStudentDropdownOpen(false)}></div>
-                          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                          <div className="w-full mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             {studentList
                               .filter(s => 
                                 s.fullName.toLowerCase().includes(studentSearch.toLowerCase()) || 

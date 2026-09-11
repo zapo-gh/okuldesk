@@ -29,6 +29,12 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEQjgyQzJDRDY2RUFFN0IKUldSN3JtN1dMQ3k0blFxdklsVitWNERtTnlFOVpnWkVVbFBrcE1zVklBSUxYQng5VWFLaEhmTWEK",
+      "endpoints": [
+        "https://github.com/zapo-gh/okuldesk/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {

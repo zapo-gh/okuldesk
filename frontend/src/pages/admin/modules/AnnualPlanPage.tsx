@@ -214,7 +214,7 @@ export default function AnnualPlanPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Planlanan Ay</label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
                 value={form.month || 9}
                 onChange={e => setForm({ ...form, month: parseInt(e.target.value) })}
               >
@@ -224,7 +224,7 @@ export default function AnnualPlanPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
                 value={form.category || 'IDARI'}
                 onChange={e => setForm({ ...form, category: e.target.value })}
               >
@@ -238,7 +238,7 @@ export default function AnnualPlanPage() {
             <input
               type="text"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
               value={form.title || ''}
               onChange={e => setForm({ ...form, title: e.target.value })}
             />
@@ -248,7 +248,7 @@ export default function AnnualPlanPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama (Opsiyonel)</label>
             <textarea
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
               value={form.description || ''}
               onChange={e => setForm({ ...form, description: e.target.value })}
             />
@@ -258,7 +258,7 @@ export default function AnnualPlanPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Sıralama (Ay içindeki sıra)</label>
             <input
               type="number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
               value={form.sortOrder || 1}
               onChange={e => setForm({ ...form, sortOrder: parseInt(e.target.value) })}
             />

@@ -14,10 +14,22 @@ interface DutySchedulePrintTemplateProps {
   stations: any[];
   staffList: any[];
   assignments: any[];
+  staffConfigs?: any[];
   monthName?: string;
   year?: number;
   workDays?: WorkDay[];
 }
+
+const EXEMPTION_LABELS: Record<string, string> = {
+  HAMILE: 'Hamile (24. Hafta+)',
+  DOGUM_SONRASI: 'Doğum Sonrası (Analık İzni+1 Yıl)',
+  HIZMET_YILI_KADIN: '20+ Yıl Hizmet (Kadın)',
+  HIZMET_YILI_ERKEK: '25+ Yıl Hizmet (Erkek)',
+  ENGELLI: 'Engelli Öğretmen',
+  ENGELLI_BAKIM: 'Engelli Birey/Çocuk Bakımı',
+  OZEL_EGITIM: 'Özel Eğitim Sınıfı Öğretmeni',
+  DIGER: 'Diğer',
+};
 
 const DAYS = [
   { val: 1, label: 'Pazartesi' },
@@ -28,7 +40,7 @@ const DAYS = [
 ];
 
 export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedulePrintTemplateProps>(
-  ({ stations, staffList, assignments, monthName = 'Aylık', year, workDays = [] }, ref) => {
+  ({ stations, staffList, assignments, staffConfigs = [], monthName = 'Aylık', year, workDays = [] }, ref) => {
     const { settings } = useSettings();
 
     const getStaffName = (stationId: string, dayOfWeek: number, weekNum: number) => {
@@ -44,7 +56,10 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
       if (!weeks[d.weekNum]) weeks[d.weekNum] = [];
       weeks[d.weekNum].push(d);
     });
-    const weekList = weeks.filter(Boolean);
+    const weekList = weeks.filter(Boolean).filter(week => {
+      // Sadece en az bir atama içeren haftaları tut
+      return assignments.some(a => a.weekNumber === week[0].weekNum);
+    });
 
     // Eski mod (workDays yok)
     const legacyMode = workDays.length === 0;
@@ -67,9 +82,9 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
           <table className="w-full border-collapse border border-black text-xs text-center">
             <thead>
               <tr className="bg-gray-100">
-                <th className="border border-black p-2 w-36 uppercase">Nöbet Yeri</th>
+                <th className="w-36 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Nöbet Yeri</th>
                 {DAYS.map(d => (
-                  <th key={d.val} className="border border-black p-2 uppercase">{d.label}</th>
+                  <th key={d.val} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">{d.label}</th>
                 ))}
               </tr>
             </thead>
@@ -105,11 +120,11 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
               <table className="w-full border-collapse border border-black text-xs text-center">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="border border-black p-1.5 w-36 uppercase text-left pl-2">Nöbet Yeri</th>
+                    <th className="w-36 text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Nöbet Yeri</th>
                     {DAYS.map(day => {
                       const d = week.find(w => w.dayOfWeek === day.val);
                       return (
-                        <th key={`header-${day.val}`} className="border border-black p-1.5 uppercase">
+                        <th key={day.val} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
                           <div>{day.label}</div>
                           <div className="font-bold text-gray-700">{d ? d.dayNum : '-'}</div>
                         </th>
@@ -146,18 +161,17 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
             <thead>
               <tr className="bg-gray-50">
                 {DAYS.map(day => (
-                  <th key={`admin-header-${day.val}`} className="border border-black p-1.5 uppercase w-1/5">{day.label}</th>
+                  <th key={day.val} className="w-1/5 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">{day.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
                 {DAYS.map(day => {
-                  const adminAssignments = assignments.filter(a => a.dayOfWeek === day.val);
-                  const adminNames = Array.from(new Set(adminAssignments.map(a => {
-                    const s = staffList.find(staff => staff.id === a.staffId);
-                    if (s && !s.gorev?.toLowerCase().includes('öğretmen')) return s.name;
-                    return null;
+                  const adminConfigs = staffConfigs.filter(c => c.isAdmin && c.isFixedDay && c.fixedDayOfWeek === day.val);
+                  const adminNames = Array.from(new Set(adminConfigs.map(c => {
+                    const s = staffList.find(staff => staff.id === c.staffId);
+                    return s ? s.name : null;
                   }).filter(Boolean)));
                   
                   return (
@@ -180,6 +194,46 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
             3. Nöbet mahallerinde öğrencilerin güvenliğini sağlamak, teneffüslerde öğrencileri bahçeye yönlendirmek esastır.
           </p>
         </div>
+
+        {/* Muaf Personel Listesi — MEB Mevzuatı */}
+        {(() => {
+          const exemptStaff = staffConfigs
+            .filter(c => c.isExempt)
+            .map(c => ({
+              ...c,
+              name: staffList.find(s => s.id === c.staffId)?.name || c.staffId,
+            }))
+            .filter(c => c.name);
+          if (exemptStaff.length === 0) return null;
+          return (
+            <div className="mt-4 border border-gray-300 rounded p-3 text-xs">
+              <p className="font-bold text-xs uppercase mb-2">Nöbet Muaf Personel Listesi</p>
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Personel</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Muafiyet Gerekçesi</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Bitiş Tarihi</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Not</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exemptStaff.map((c, i) => (
+                    <tr key={c.staffId} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border border-gray-300 p-1 font-semibold">{c.name}</td>
+                      <td className="border border-gray-300 p-1">{EXEMPTION_LABELS[c.exemptionReason] || c.exemptionReason || '—'}</td>
+                      <td className="border border-gray-300 p-1">{c.exemptionEndDate || '—'}</td>
+                      <td className="border border-gray-300 p-1">{c.exemptionNote || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-1 text-gray-500" style={{fontSize:'9px'}}>
+                * MEB Ortaoğretim Kurumları Yönetmeliği gereğince nöbet muafiyeti tanınmıştır.
+              </p>
+            </div>
+          );
+        })()}
 
         {/* İmza */}
         <table className="w-full text-center border-none mt-6">

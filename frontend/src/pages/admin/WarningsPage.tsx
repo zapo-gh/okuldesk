@@ -397,12 +397,12 @@ export default function WarningsPage() {
       <PageHeader
         title="Yazılı Uyarılar"
         description="Öğrencilere verilen yazılı uyarı (tutanak) belgelerini yönetin"
-        icon={<AlertTriangle size={28} className="text-indigo-600" />}
+        icon={<AlertTriangle size={28} />}
         actionText="Yeni Uyarı"
         onAction={() => setShowCreateModal(true)}
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -462,7 +462,7 @@ export default function WarningsPage() {
               className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
             />
             {showStudentDropdown && studentSearch && (
-              <div className="absolute top-full left-0 right-0 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1">
+              <div className="mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 {filteredStudents.length === 0 ? (
                   <div className="p-3 text-gray-500 text-sm text-center">Öğrenci bulunamadı</div>
                 ) : (
@@ -484,43 +484,44 @@ export default function WarningsPage() {
             )}
           </div>
 
-          <div>
+          <div className="relative" style={{ zIndex: isBehaviorDropdownOpen ? 50 : 1 }}>
             <label className="block text-sm font-medium text-gray-700 mb-1">2. Davranış Seçin</label>
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsBehaviorDropdownOpen(!isBehaviorDropdownOpen);
-                  if (!isBehaviorDropdownOpen) setBehaviorSearchTerm('');
-                }}
-                className="w-full p-2.5 border border-gray-300 rounded-lg text-left text-sm bg-white focus:ring-2 focus:ring-indigo-500 flex justify-between items-center"
-              >
-                <span className="truncate pr-4">
-                  {selectedBehaviorCode 
-                    ? allBehaviors.find(b => b.code === selectedBehaviorCode)?.text || "Davranış seçin..."
-                    : "Davranış seçin..."}
-                </span>
-                <ChevronDown size={16} className="text-gray-500 shrink-0" />
-              </button>
+              {isBehaviorDropdownOpen ? (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Madde no veya davranış ara..."
+                    value={behaviorSearchTerm}
+                    onChange={e => setBehaviorSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-8 p-2.5 border border-indigo-500 ring-2 ring-indigo-500/20 rounded-lg text-sm bg-white outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBehaviorDropdownOpen(true);
+                    setBehaviorSearchTerm('');
+                  }}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-left text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 flex justify-between items-center"
+                >
+                  <span className="truncate pr-4">
+                    {selectedBehaviorCode 
+                      ? allBehaviors.find(b => b.code === selectedBehaviorCode)?.text || "Davranış seçin..."
+                      : "Davranış seçin..."}
+                  </span>
+                  <ChevronDown size={16} className="text-gray-500 shrink-0" />
+                </button>
+              )}
 
               {isBehaviorDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsBehaviorDropdownOpen(false)}></div>
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl flex flex-col top-full left-0 ring-1 ring-black ring-opacity-5">
-                    <div className="p-2 border-b border-gray-100 bg-gray-50/80 backdrop-blur-sm rounded-t-lg">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Madde no veya davranış ara..."
-                          value={behaviorSearchTerm}
-                          onChange={e => setBehaviorSearchTerm(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 border outline-none"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    </div>
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden">
+
                     <div className="max-h-[250px] overflow-y-auto p-1">
                       {(() => {
                         const searchLower = behaviorSearchTerm.toLowerCase();

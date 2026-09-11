@@ -77,12 +77,12 @@ export const OrderLetterPrintTemplate = forwardRef<HTMLDivElement, OrderLetterPr
           <table className="nk-table">
             <thead>
               <tr>
-                <th className="w-12">S.No</th>
+                <th className="w-12 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.No</th>
                 <th>Mal/Hizmetin Cinsi</th>
-                <th className="w-20">Miktarı</th>
-                <th className="w-24">Birimi</th>
-                <th className="w-24">Birim Fiyatı</th>
-                <th className="w-32">Tutarı (TL)</th>
+                <th className="w-20 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Miktarı</th>
+                <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Birimi</th>
+                <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Birim Fiyatı</th>
+                <th className="w-32 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Tutarı (TL)</th>
               </tr>
             </thead>
             <tbody>

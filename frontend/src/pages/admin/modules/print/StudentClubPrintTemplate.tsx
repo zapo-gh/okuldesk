@@ -45,7 +45,7 @@ export const StudentClubPrintTemplate = forwardRef<HTMLDivElement, StudentClubPr
           <table className="nk-table">
             <thead>
               <tr>
-                <th className="w-1/4">Aylar / Dönem</th>
+                <th className="w-1/4 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Aylar / Dönem</th>
                 <th>Faaliyet Konusu</th>
               </tr>
             </thead>
@@ -68,11 +68,11 @@ export const StudentClubPrintTemplate = forwardRef<HTMLDivElement, StudentClubPr
           <table className="nk-table">
             <thead>
               <tr>
-                <th className="w-12">S.No</th>
-                <th className="w-24">Sınıfı</th>
-                <th className="w-24">Okul No</th>
+                <th className="w-12 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.No</th>
+                <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıfı</th>
+                <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Okul No</th>
                 <th>Adı Soyadı</th>
-                <th className="w-24">Görevi</th>
+                <th className="w-24 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görevi</th>
               </tr>
             </thead>
             <tbody>

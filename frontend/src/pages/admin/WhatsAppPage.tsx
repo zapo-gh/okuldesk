@@ -81,7 +81,7 @@ export default function WhatsAppPage() {
       <PageHeader
         title="WhatsApp Entegrasyonu"
         description="Okul WhatsApp hesabını bağlayarak velilere otomatik PDF belge ve metin mesajı gönderin."
-        icon={<MessageCircle size={28} className="text-emerald-600" />}
+        icon={<MessageCircle size={28} />}
       />
 
       {/* Durum Kartı */}
@@ -122,7 +122,7 @@ export default function WhatsAppPage() {
         {/* Sol Kolon: Bilgi ve Talimatlar */}
         <div className="space-y-6">
           {waState.status === 'disconnected' && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-5 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   <Info size={20} className="text-indigo-600" /> Nasıl Çalışır?
@@ -145,7 +145,7 @@ export default function WhatsAppPage() {
           )}
 
           {waState.status === 'connected' && (
-            <div className="bg-white rounded-xl border border-green-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-5 border-b border-green-100 bg-green-50">
                 <h3 className="font-bold text-green-900 flex items-center gap-2">
                   <CheckCircle2 size={20} className="text-green-600" /> Bağlantı Aktif
@@ -176,7 +176,7 @@ export default function WhatsAppPage() {
 
         {/* Sağ Kolon: QR Kod (Sadece bekleniyorsa gösterilir) */}
         {waState.status === 'qr' && waState.qrBase64 && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
+          <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-full mb-4">
               <QrCode size={32} />
             </div>
@@ -185,7 +185,7 @@ export default function WhatsAppPage() {
               Telefonunuzda WhatsApp'ı açın <br/> 
               <strong className="text-gray-700">Ayarlar → Bağlı Cihazlar → Cihaz Bağla</strong>
             </p>
-            <div className="p-2 bg-white border-2 border-gray-100 rounded-xl shadow-sm">
+            <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <img 
                 className="w-64 h-64 object-contain" 
                 src={waState.qrBase64}

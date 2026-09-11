@@ -50,7 +50,7 @@ export function StudentEditModal({
             type="text"
             value={editForm.schoolNumber}
             disabled
-            className="w-full p-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
           />
         </div>
 
@@ -95,7 +95,7 @@ export function StudentEditModal({
           {editParents.map((p, idx) => (
             <div
               key={p.id}
-              className="flex items-end gap-3 p-3 bg-white border rounded-lg mb-3 shadow-sm"
+              className="flex items-end p-3 mb-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
             >
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-700 mb-1">

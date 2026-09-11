@@ -137,13 +137,13 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-gray-900/60 transition-opacity print:hidden" onClick={() => setIsOpen(false)}>
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-2xl bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
           <Search className="w-5 h-5 text-slate-400 mr-3" />
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 bg-transparent border-none outline-none text-lg text-slate-800 placeholder-slate-400"
+            className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
             placeholder="Öğrenci, okul no, sınıf veya modül arayın..."
             value={query}
             onChange={e => setQuery(e.target.value)}

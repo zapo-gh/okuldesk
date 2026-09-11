@@ -89,7 +89,8 @@ export function generateTebligPdf(data: TebligData): Promise<Buffer> {
     doc.text('MİLLÎ EĞİTİM BAKANLIĞI', ML, curY, { width: CW, align: 'center' });
     curY = doc.y + 1;
     doc.font('B').fontSize(11).fillColor(BLACK);
-    doc.text(data.schoolName || 'Okul Müdürlüğü', ML, curY, { width: CW, align: 'center' });
+    const schoolText = (data.schoolName || 'Okul Müdürlüğü').toLocaleUpperCase('tr-TR');
+    doc.text(schoolText, ML, curY, { width: CW, align: 'center' });
     curY = doc.y + 10;
 
     // ── TITLE ─────────────────────────────────────────────────────────────

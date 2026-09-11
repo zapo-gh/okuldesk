@@ -6,7 +6,10 @@ import { AppError } from '../shared/middleware/errorHandler.middleware';
 
 export class AuthService {
   async login(username: string, password: string, rememberMe = false) {
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: { staff: true, parent: true }
+    });
 
     if (!user) {
       throw new AppError('Geçersiz kullanıcı adı veya şifre.', 401);
@@ -31,6 +34,10 @@ export class AuthService {
         username: user.username,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
+        staffId: user.staff?.id || null,
+        staffName: user.staff?.name || null,
+        staffTitle: user.staff?.title || null,
+        parentId: user.parent?.id || null,
       },
     };
   }
@@ -44,6 +51,8 @@ export class AuthService {
         role: true,
         mustChangePassword: true,
         createdAt: true,
+        staff: true,
+        parent: true,
       },
     });
 
