@@ -527,22 +527,25 @@ export default function StudentListPage() {
                   const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
 
                   return (
-                    <Button
+                    <button
                       key={cls.name}
-                      variant={isHighlighted ? 'primary' : 'outline'}
-                      size="sm"
-                      onClick={() => { 
-                        setActiveClass(cls.name); 
-                        setSelectedIds(new Set()); 
-                        setPage(1); 
+                      type="button"
+                      onClick={() => {
+                        setActiveClass(cls.name);
+                        setSelectedIds(new Set());
+                        setPage(1);
                       }}
-                      className="rounded-full shrink-0"
+                      className={`inline-flex h-8 items-center rounded-full shrink-0 border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 ${
+                        isHighlighted
+                          ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50'
+                      }`}
                     >
                       {cls.name}
-                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full border leading-none ${isHighlighted ? 'bg-white/20 text-white border-white/30' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
                         {cls.count}
                       </span>
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
@@ -554,22 +557,25 @@ export default function StudentListPage() {
                     const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
 
                     return (
-                      <Button
+                      <button
                         key={cls.name}
-                        variant={isHighlighted ? 'primary' : 'outline'}
-                        size="sm"
-                        onClick={() => { 
-                          setActiveClass(cls.name); 
-                          setSelectedIds(new Set()); 
-                          setPage(1); 
+                        type="button"
+                        onClick={() => {
+                          setActiveClass(cls.name);
+                          setSelectedIds(new Set());
+                          setPage(1);
                         }}
-                        className="rounded-full shrink-0"
+                        className={`inline-flex h-8 items-center rounded-full shrink-0 border px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 ${
+                          isHighlighted
+                            ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50'
+                        }`}
                       >
                         {cls.name}
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full border leading-none ${isHighlighted ? 'bg-white/20 text-white border-white/30' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
                           {cls.count}
                         </span>
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
