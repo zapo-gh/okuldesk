@@ -10,6 +10,7 @@ const updateSchema = z.object({
   schoolName: z.string().max(200).optional(),
   principalName: z.string().max(100).optional(),
   academicYear: z.string().max(50).optional(),
+  lessonPeriodsJson: z.string().optional(),
   waTemplate1: z.string().optional(),
   waTemplate2: z.string().optional(),
   waTemplate3: z.string().optional(),

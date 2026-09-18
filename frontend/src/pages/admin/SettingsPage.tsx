@@ -13,6 +13,31 @@ export default function SettingsPage() {
   const { refreshSettings } = useSettings();
   const { confirm, confirmModal } = useConfirm();
 
+  const emptyLessonPeriods = () => Array.from({ length: 10 }, () => '');
+  const parseLessonPeriodsJson = (value?: string) => {
+    const periods = emptyLessonPeriods();
+    if (!value) return periods;
+
+    try {
+      const parsed = JSON.parse(value) as Record<string, string>;
+      for (let index = 0; index < periods.length; index++) {
+        periods[index] = parsed[String(index + 1)] || '';
+      }
+    } catch {
+      return periods;
+    }
+
+    return periods;
+  };
+
+  const stringifyLessonPeriods = (periods: string[]) => JSON.stringify(
+    Object.fromEntries(
+      periods
+        .map((time, index) => [String(index + 1), time.trim()])
+        .filter(([, time]) => Boolean(time)),
+    ),
+  );
+
   // ── Restore Backup ──
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -21,6 +46,7 @@ export default function SettingsPage() {
   const [schoolName,    setSchoolName]    = useState('');
   const [principalName, setPrincipalName] = useState('');
   const [academicYear,  setAcademicYear]  = useState('2025-2026');
+  const [lessonPeriods, setLessonPeriods] = useState<string[]>(emptyLessonPeriods);
   const [schoolSaving,  setSchoolSaving]  = useState(false);
 
   // ── WhatsApp şablonları ──
@@ -47,6 +73,7 @@ export default function SettingsPage() {
       setSchoolName(d.schoolName || '');
       setPrincipalName(d.principalName || '');
       setAcademicYear(d.academicYear || '2025-2026');
+      setLessonPeriods(parseLessonPeriodsJson(d.lessonPeriodsJson));
       setWaTemplates([d.waTemplate1 || '', d.waTemplate2 || '', d.waTemplate3 || '']);
       setWaTemplatesEdit([d.waTemplate1 || '', d.waTemplate2 || '', d.waTemplate3 || '']);
     } catch {
@@ -58,7 +85,12 @@ export default function SettingsPage() {
     e.preventDefault();
     setSchoolSaving(true);
     try {
-      await api.put('/settings', { schoolName, principalName, academicYear });
+      await api.put('/settings', {
+        schoolName,
+        principalName,
+        academicYear,
+        lessonPeriodsJson: stringifyLessonPeriods(lessonPeriods),
+      });
       toast.success('Kurum bilgileri güncellendi.');
       refreshSettings();
     } catch { 
@@ -149,8 +181,8 @@ export default function SettingsPage() {
         description="Okul bilgileri, mesaj şablonları ve hesap güvenliğini yönetin."
         icon={<Settings size={28} />}
         actions={
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 w-full lg:w-auto lg:items-end">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
             <Button 
               variant="outline"
               onClick={async () => {
@@ -175,7 +207,7 @@ export default function SettingsPage() {
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={isRestoring}
-              className="gap-2 border-amber-300 text-amber-50 hover:bg-amber-500/20"
+              className="gap-2 border-amber-300 text-amber-50 hover:bg-amber-500/20 w-full sm:w-auto justify-center"
             >
               {isRestoring ? <span className="animate-spin text-lg">⚙️</span> : <UploadCloud size={18} />}
               Yedeği Geri Yükle
@@ -191,7 +223,7 @@ export default function SettingsPage() {
           
           <Button
             variant="outline"
-            className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 mt-2"
+            className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 mt-2 w-full sm:w-auto justify-center"
             onClick={async () => {
               try {
                 const { check } = await import('@tauri-apps/plugin-updater');
@@ -256,6 +288,28 @@ export default function SettingsPage() {
                   <input type="text" value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: 2025-2026" />
                 </div>
               </div>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Ders Saatleri</label>
+                    <p className="text-xs text-slate-500 mt-1">Ders programı grid'inde başlık altında gösterilecek saat aralıklarını girin. Boş bırakılan saatler yalnızca numara ile gösterilir.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {lessonPeriods.map((time, index) => (
+                    <div key={index} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <span className="w-14 text-sm font-semibold text-slate-700">{index + 1}. Ders</span>
+                      <input
+                        type="text"
+                        value={time}
+                        onChange={(e) => setLessonPeriods((prev) => prev.map((item, itemIndex) => itemIndex === index ? e.target.value : item))}
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                        placeholder="08:30-09:10"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="flex justify-end pt-2">
                 <Button type="submit" disabled={schoolSaving} variant="primary">
                   {schoolSaving ? 'Kaydediliyor...' : 'Kaydet'}
@@ -316,7 +370,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="p-6">
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800 mb-6 flex gap-3">
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800 mb-6 flex gap-3 flex-col sm:flex-row">
             <Info className="shrink-0 text-blue-500 mt-0.5" size={18}/>
             <div>
               <p className="mb-2 font-medium">Boş bırakılan şablonlar için sistemin varsayılan metni kullanılır. Mesajlarınızda aşağıdaki yer tutucuları kullanabilirsiniz:</p>
@@ -335,7 +389,7 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[1, 2, 3].map((n, i) => (
                   <div key={n} className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700 flex items-center justify-between">
+                    <label className="block text-sm font-bold text-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                       <span>{n}. Uyarı Mesajı</span>
                       <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded">(boş = varsayılan)</span>
                     </label>

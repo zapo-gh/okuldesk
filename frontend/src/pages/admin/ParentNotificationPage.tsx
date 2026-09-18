@@ -228,8 +228,8 @@ export default function ParentNotificationPage() {
                 )}
               </div>
             ) : (
-              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-4">
+              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-4 min-w-0">
                   <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-sm">
                     {selectedStudent.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
@@ -241,7 +241,7 @@ export default function ParentNotificationPage() {
                 <Button 
                   variant="ghost"
                   onClick={() => { setSelectedStudent(null); setSearchQuery(''); }}
-                  className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
+                  className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-lg hover:bg-indigo-100 transition-colors shadow-sm w-full sm:w-auto justify-center"
                 >
                   Değiştir
                 </Button>
@@ -344,7 +344,7 @@ export default function ParentNotificationPage() {
               3. Veli Bilgisi ve Sonuç
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-end">
+            <div className="grid grid-cols-1 gap-6 items-end">
               <div>
                 <div 
                   onClick={() => setIncludeParent(p => !p)}
@@ -404,7 +404,7 @@ export default function ParentNotificationPage() {
               </div>
 
               {/* İdareci & Rehber Öğretmen Seçimi */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Rehber Öğretmen</label>
                   <select
@@ -447,7 +447,7 @@ export default function ParentNotificationPage() {
             </div>
             
             {/* Alt Bilgi */}
-            <div className="mt-6 flex items-center justify-between text-xs text-gray-500 font-medium">
+            <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-gray-500 font-medium">
               <div className="flex items-center gap-1.5"><Info size={14}/> Sınıf Rehber Öğretmeni öğrencinin sınıfından otomatik olarak bulunur.</div>
               <div>Gizlilik & KVKK Uyumlu</div>
             </div>

@@ -10,7 +10,7 @@ class SettingsService {
 
     if (!settings) {
       settings = await prisma.schoolSettings.create({
-        data: { id: SINGLETON_ID, schoolName: '', principalName: '', academicYear: '2025-2026' },
+        data: { id: SINGLETON_ID, schoolName: '', principalName: '', academicYear: '2025-2026', lessonPeriodsJson: '{}' },
       });
     }
 
@@ -18,6 +18,7 @@ class SettingsService {
       schoolName: settings.schoolName,
       principalName: settings.principalName,
       academicYear: settings.academicYear ?? '2025-2026',
+      lessonPeriodsJson: settings.lessonPeriodsJson ?? '{}',
       waTemplate1: settings.waTemplate1 ?? '',
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',
@@ -32,6 +33,7 @@ class SettingsService {
     schoolName?: string;
     principalName?: string;
     academicYear?: string;
+    lessonPeriodsJson?: string;
     waTemplate1?: string;
     waTemplate2?: string;
     waTemplate3?: string;
@@ -47,6 +49,7 @@ class SettingsService {
         schoolName: data.schoolName ?? '',
         principalName: data.principalName ?? '',
         academicYear: data.academicYear ?? '2025-2026',
+        lessonPeriodsJson: data.lessonPeriodsJson ?? '{}',
         waTemplate1: data.waTemplate1 ?? '',
         waTemplate2: data.waTemplate2 ?? '',
         waTemplate3: data.waTemplate3 ?? '',
@@ -58,6 +61,7 @@ class SettingsService {
         ...(data.schoolName !== undefined && { schoolName: data.schoolName }),
         ...(data.principalName !== undefined && { principalName: data.principalName }),
         ...(data.academicYear !== undefined && { academicYear: data.academicYear }),
+        ...(data.lessonPeriodsJson !== undefined && { lessonPeriodsJson: data.lessonPeriodsJson }),
         ...(data.waTemplate1 !== undefined && { waTemplate1: data.waTemplate1 }),
         ...(data.waTemplate2 !== undefined && { waTemplate2: data.waTemplate2 }),
         ...(data.waTemplate3 !== undefined && { waTemplate3: data.waTemplate3 }),
@@ -74,6 +78,7 @@ class SettingsService {
       schoolName: settings.schoolName,
       principalName: settings.principalName,
       academicYear: settings.academicYear ?? '2025-2026',
+      lessonPeriodsJson: settings.lessonPeriodsJson ?? '{}',
       waTemplate1: settings.waTemplate1 ?? '',
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',

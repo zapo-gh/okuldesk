@@ -342,12 +342,12 @@ export default function TebligPage() {
 
       {/* Geçmiş Belgeler Tablosu */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-8">
-        <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+        <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><History size={20} /></div>
             Geçmiş Tebliğ Belgeleri
           </h2>
-          <Button variant="outline" size="sm" onClick={fetchData} leftIcon={<Loader2 size={16} className={loadingDocs ? 'animate-spin' : ''} />}>
+          <Button variant="outline" size="sm" onClick={fetchData} leftIcon={<Loader2 size={16} className={loadingDocs ? 'animate-spin' : ''} />} className="w-full lg:w-auto justify-center">
             Yenile
           </Button>
         </div>

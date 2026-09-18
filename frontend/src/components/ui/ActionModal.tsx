@@ -54,10 +54,10 @@ export function ActionModal({
   if (!isOpen) return null;
 
   const widthClass = {
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-2xl',
-    full: 'max-w-5xl'
+    md: 'w-full max-w-md',
+    lg: 'w-full max-w-lg',
+    xl: 'w-full max-w-2xl',
+    full: 'w-[calc(100vw-2rem)] max-w-[1600px] sm:w-[calc(100vw-3rem)]'
   }[width];
 
   return (
@@ -71,7 +71,7 @@ export function ActionModal({
 
       {/* Modal Dialog */}
       <div 
-        className={`relative w-full ${widthClass} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-100 opacity-100 animate-in fade-in zoom-in duration-200`}
+        className={`relative ${widthClass} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] overflow-hidden transform transition-all scale-100 opacity-100 animate-in fade-in zoom-in duration-200`}
         role="dialog"
         aria-modal="true"
       >
@@ -89,7 +89,7 @@ export function ActionModal({
         {/* Modal Body & Form */}
         {onSubmit ? (
           <form onSubmit={onSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <div className="px-6 py-4 overflow-y-auto flex-1 bg-gray-50/30">
+            <div className="px-6 py-4 overflow-auto flex-1 bg-gray-50/30">
               {children}
             </div>
             {/* Modal Footer */}
@@ -114,7 +114,7 @@ export function ActionModal({
           </form>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="px-6 py-4 overflow-y-auto flex-1 bg-gray-50/30">
+            <div className="px-6 py-4 overflow-auto flex-1 bg-gray-50/30">
               {children}
             </div>
             {/* Modal Footer (No Form) */}

@@ -141,7 +141,7 @@ export default function ParentLeavePage() {
         icon={<FileSignature size={28} />}
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-3xl">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 w-full max-w-6xl mx-auto">
         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
           <FileSignature className="text-indigo-600" size={20} /> İzin Belgesi Formu
         </h2>

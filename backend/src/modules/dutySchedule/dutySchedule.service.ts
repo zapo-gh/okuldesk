@@ -678,6 +678,168 @@ class DutyScheduleService {
     }
     return days;
   }
+
+  // ── Excel Upload ──
+  async uploadExcel(buffer: Buffer, academicYear: string) {
+    const xlsx = await import('xlsx');
+    const workbook = xlsx.read(buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data: any[][] = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+    
+    let stationsRowIdx = -1;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] && data[i].length > 0 && typeof data[i][0] === 'string' && data[i][0].trim().toLowerCase() === 'pazartesi') {
+        stationsRowIdx = i - 1;
+        break;
+      }
+    }
+    
+    if (stationsRowIdx === -1 || stationsRowIdx < 0) {
+      throw new AppError('Excel formatı geçersiz: Nöbet yerleri ve günlerin bulunduğu satırlar tespit edilemedi.', 400);
+    }
+    
+    const stationsRow = data[stationsRowIdx];
+    const stationNames: { index: number, name: string }[] = [];
+    for (let i = 1; i < stationsRow.length; i++) {
+      if (stationsRow[i] && typeof stationsRow[i] === 'string' && stationsRow[i].trim()) {
+        stationNames.push({ index: i, name: stationsRow[i].trim() });
+      }
+    }
+    
+    const dayMap: Record<string, number> = {
+      'pazartesi': 1, 'salı': 2, 'çarşamba': 3, 'perşembe': 4, 'cuma': 5
+    };
+    
+    const allStaff = await prisma.staff.findMany({ select: { id: true, name: true } });
+    const sortedStaff = [...allStaff].sort((a, b) => b.name.length - a.name.length);
+    
+    const warnings: string[] = [];
+    const parsedAssignments: { dayIndex: number, stIndex: number, staffIds: string[] }[] = [];
+    const stationCapacities = new Map<number, number>();
+    for (const st of stationNames) { stationCapacities.set(st.index, 1); }
+    
+    // Parse the data and calculate capacities
+    for (let i = stationsRowIdx + 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row || !row[0]) continue;
+      const dayStr = typeof row[0] === 'string' ? row[0].toLowerCase().trim() : '';
+      const dayIndex = dayMap[dayStr];
+      if (!dayIndex) continue; // Not a day row
+      
+      for (const st of stationNames) {
+        const cellContent = row[st.index];
+        if (typeof cellContent === 'string' && cellContent.trim()) {
+          const foundStaffIds = new Set<string>();
+          let remainingText = cellContent.toLocaleLowerCase('tr-TR');
+          
+          for (const staff of sortedStaff) {
+            const staffNameLower = staff.name.toLocaleLowerCase('tr-TR');
+            if (remainingText.includes(staffNameLower)) {
+              foundStaffIds.add(staff.id);
+              remainingText = remainingText.replace(staffNameLower, '');
+            }
+          }
+          
+          const leftover = remainingText.replace(/[\s\n\-\.]/g, '');
+          if (foundStaffIds.size === 0) {
+            warnings.push(`${dayStr.toUpperCase()} - ${st.name} hücresindeki "${cellContent}" personellerle eşleştirilemedi.`);
+          } else if (leftover.length > 5) {
+            warnings.push(`${dayStr.toUpperCase()} - ${st.name} hücresinde tam eşleşmeyen kısımlar olabilir: "${cellContent}"`);
+          }
+          
+          if (foundStaffIds.size > stationCapacities.get(st.index)!) {
+            stationCapacities.set(st.index, foundStaffIds.size);
+          }
+          
+          parsedAssignments.push({ dayIndex, stIndex: st.index, staffIds: Array.from(foundStaffIds) });
+        }
+      }
+    }
+    
+    // Fetch settings for dates and rotation
+    const settings = await prisma.schoolSettings.findFirst();
+    const parts = academicYear.split('-');
+    const dutyStartDate = settings?.dutyStartDate ? new Date(settings.dutyStartDate) : new Date(`${parts[0]}-09-01`);
+    const rotationFreq = settings?.dutyRotationFreq || 'weekly';
+    const numWeeksToFill = rotationFreq === 'biweekly' ? 2 : rotationFreq === 'fourweekly' ? 4 : rotationFreq === 'monthly' ? 4 : 1;
+    
+    // Calculate target weeks
+    const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+    const allAcademicWeeks: { year: number; month: number; weekNum: number; days: any[] }[] = [];
+    for (const m of academicMonths) {
+      const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
+      const days = this._getWorkDays(y, m);
+      const weekNums = [...new Set(days.map(d => d.weekNum))].sort((a, b) => a - b);
+      for (const wn of weekNums) {
+        allAcademicWeeks.push({ year: y, month: m, weekNum: wn, days: days.filter(d => d.weekNum === wn) });
+      }
+    }
+    
+    let startIdx = 0;
+    for (let i = 0; i < allAcademicWeeks.length; i++) {
+      const w = allAcademicWeeks[i];
+      if (w.days.some(d => d.date.getTime() >= dutyStartDate.getTime())) {
+        startIdx = i;
+        break;
+      }
+    }
+    const targetWeeks = allAcademicWeeks.slice(startIdx, startIdx + numWeeksToFill);
+    let assignmentsToCreate: any[] = [];
+    
+    await prisma.$transaction(async (tx) => {
+      // Deactivate all active stations (to hide them, but keep history)
+      await tx.dutyStation.updateMany({
+        where: { isActive: true },
+        data: { isActive: false, sortOrder: 999 }
+      });
+      
+      const newStationsMap = new Map<number, string>();
+      for (const st of stationNames) {
+        let station = await tx.dutyStation.findFirst({ where: { name: st.name } });
+        const cap = stationCapacities.get(st.index)!;
+        if (station) {
+          station = await tx.dutyStation.update({ where: { id: station.id }, data: { isActive: true, sortOrder: st.index, capacity: cap } });
+        } else {
+          station = await tx.dutyStation.create({ data: { name: st.name, isActive: true, sortOrder: st.index, capacity: cap } });
+        }
+        newStationsMap.set(st.index, station.id);
+      }
+      
+      // Delete existing assignments for the target weeks to replace them fresh
+      for (const tw of targetWeeks) {
+        await tx.dutyAssignment.deleteMany({
+          where: { academicYear, year: tw.year, month: tw.month, weekNumber: tw.weekNum }
+        });
+        
+        for (const pa of parsedAssignments) {
+           for (const sId of pa.staffIds) {
+             assignmentsToCreate.push({
+               staffId: sId,
+               stationId: newStationsMap.get(pa.stIndex)!,
+               dayOfWeek: pa.dayIndex,
+               weekNumber: tw.weekNum,
+               academicYear,
+               year: tw.year,
+               month: tw.month
+             });
+           }
+        }
+      }
+      
+      if (assignmentsToCreate.length > 0) {
+        await tx.dutyAssignment.createMany({
+          data: assignmentsToCreate
+        });
+      }
+    });
+    
+    return {
+      message: `Nöbet çizelgesi yüklendi. Nöbet başlangıç tarihi (${dutyStartDate.toLocaleDateString('tr-TR')}) baz alınarak ${numWeeksToFill} haftalık başlangıç rotasyonu dolduruldu.`,
+      stationsCount: stationNames.length,
+      assignmentsCount: assignmentsToCreate.length,
+      warnings
+    };
+  }
 }
 
 export const dutyScheduleService = new DutyScheduleService();

@@ -85,23 +85,24 @@ export default function WhatsAppPage() {
       />
 
       {/* Durum Kartı */}
-      <div className={`rounded-xl border ${currentTheme.border} ${currentTheme.bg} p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm transition-colors duration-300`}>
-        <div className="flex items-center gap-4">
+      <div className={`rounded-xl border ${currentTheme.border} ${currentTheme.bg} p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm transition-colors duration-300`}>
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className="p-3 bg-white rounded-full shadow-sm">
             {currentTheme.icon}
           </div>
-          <div>
-            <div className={`text-xl font-bold ${currentTheme.text}`}>{STATUS_LABELS[waState.status]}</div>
+          <div className="min-w-0">
+            <div className={`text-lg sm:text-xl font-bold ${currentTheme.text}`}>{STATUS_LABELS[waState.status]}</div>
             {waState.error && <div className="text-red-500 text-sm mt-1 font-semibold flex items-center gap-1"><AlertTriangle size={14}/> {waState.error}</div>}
           </div>
         </div>
         
-        <div>
+        <div className="w-full md:w-auto">
           {(waState.status === 'disconnected') && (
             <Button 
               variant="primary"
               onClick={handleConnect}
               disabled={actionLoading}
+              className="w-full md:w-auto justify-center"
             >
               {actionLoading ? <><Loader2 size={18} className="animate-spin"/> Başlatılıyor...</> : <><Link size={18}/> Bağlan</>}
             </Button>
@@ -111,6 +112,7 @@ export default function WhatsAppPage() {
               variant="danger"
               onClick={handleDisconnect}
               disabled={actionLoading}
+              className="w-full md:w-auto justify-center"
             >
               {actionLoading ? <><Loader2 size={18} className="animate-spin"/> Bekleyin...</> : <><Unlink size={18}/> İptal / Kapat</>}
             </Button>
@@ -159,7 +161,7 @@ export default function WhatsAppPage() {
                   </span>
                   butonunu kullanarak velilere otomatik mesaj gönderebilirsiniz.
                 </p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
                     <div className="font-bold text-gray-900 text-xs uppercase mb-1">Devamsızlık Mektupları</div>
                     <div className="text-gray-500 text-xs">Mektup PDF dosyası olarak belge halinde gönderilir.</div>
@@ -176,7 +178,7 @@ export default function WhatsAppPage() {
 
         {/* Sağ Kolon: QR Kod (Sadece bekleniyorsa gösterilir) */}
         {waState.status === 'qr' && waState.qrBase64 && (
-          <div className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="flex flex-col items-center justify-center p-5 sm:p-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-3 bg-blue-50 text-blue-600 rounded-full mb-4">
               <QrCode size={32} />
             </div>
@@ -185,9 +187,9 @@ export default function WhatsAppPage() {
               Telefonunuzda WhatsApp'ı açın <br/> 
               <strong className="text-gray-700">Ayarlar → Bağlı Cihazlar → Cihaz Bağla</strong>
             </p>
-            <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full max-w-[280px]">
               <img 
-                className="w-64 h-64 object-contain" 
+                className="w-full h-auto object-contain" 
                 src={waState.qrBase64}
                 alt="WhatsApp QR Kodu"
               />

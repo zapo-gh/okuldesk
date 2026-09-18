@@ -404,7 +404,7 @@ export default function WarningsPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="relative max-w-md">
+          <div className="relative max-w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
@@ -424,10 +424,10 @@ export default function WarningsPage() {
         />
 
         {pagination && pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-3">
-            <Button disabled={page <= 1} onClick={() => setPage(p => p - 1)} variant="outline">Geri</Button>
-            <span className="text-sm text-gray-600 font-medium">Sayfa {page} / {pagination.totalPages}</span>
-            <Button disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)} variant="outline">İleri</Button>
+          <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <Button disabled={page <= 1} onClick={() => setPage(p => p - 1)} variant="outline" className="w-full sm:w-auto">Geri</Button>
+            <span className="text-sm text-gray-600 font-medium text-center">Sayfa {page} / {pagination.totalPages}</span>
+            <Button disabled={page >= pagination.totalPages} onClick={() => setPage(p => p + 1)} variant="outline" className="w-full sm:w-auto">İleri</Button>
           </div>
         )}
       </div>
@@ -569,7 +569,7 @@ export default function WarningsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">3. Sınıf Rehber Öğretmeni</label>
               {classTeachers.length > 0 ? (
@@ -629,7 +629,7 @@ export default function WarningsPage() {
       >
         {selectedRecord && (
           <div className="space-y-4 text-sm text-gray-700">
-            <div className="grid grid-cols-[120px_1fr] gap-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-y-3 gap-x-3">
               <strong className="text-gray-900">Öğrenci:</strong>
               <div>{selectedRecord.student.fullName}</div>
               
@@ -663,7 +663,7 @@ export default function WarningsPage() {
               <div className="mt-2">{selectedRecord.issuedBy}</div>
             </div>
 
-            <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-gray-100">
+            <div className="flex flex-col sm:flex-row gap-2 justify-end mt-6 pt-4 border-t border-gray-100">
               {waConnected && (
                 <Button 
                   onClick={() => { setShowDetailModal(false); handleWaPreviewOpen(selectedRecord); }}

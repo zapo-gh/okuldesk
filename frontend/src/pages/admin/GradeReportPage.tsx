@@ -252,11 +252,11 @@ export default function GradeReportPage() {
         description="Not listesi yükleyin — 4 veya daha fazla zayıfı olan öğrenciler için veli bildirim formu oluşturun."
         icon={<LineChart size={28} />}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
             <Button 
               onClick={() => activePanel === 'reports' ? setActivePanel('none') : handleLoadReports}
               disabled={loadingList}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePanel === 'reports' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full sm:w-auto ${activePanel === 'reports' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
             >
               <ClipboardList size={18} />
               {activePanel === 'reports' ? 'Analize Dön' : 'Kayıtlı Raporlar'}
@@ -266,7 +266,7 @@ export default function GradeReportPage() {
             </Button>
             <Button 
               onClick={() => { activePanel === 'archived' ? setActivePanel('none') : handleLoadArchived(); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePanel === 'archived' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full sm:w-auto ${activePanel === 'archived' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
             >
               <Archive size={18} />
               {activePanel === 'archived' ? 'Arşivi Kapat' : 'Arşiv'}
@@ -331,7 +331,7 @@ export default function GradeReportPage() {
       {/* ── Raporlar paneli ── */}
       {activePanel === 'reports' && reports && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ClipboardList size={20} /></div>
               Kayıtlı Raporlar
@@ -342,8 +342,8 @@ export default function GradeReportPage() {
           {reports.length === 0 ? (
             <div className="p-12 text-center text-gray-500 text-sm">Henüz kayıtlı rapor bulunmuyor.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
+            <div className="overflow-x-auto touch-pan-x">
+              <table className="min-w-max w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
@@ -362,8 +362,8 @@ export default function GradeReportPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r._count.students}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <Button onClick={() => handleLoadReport(r.id)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Görüntüle"><Eye size={18}/></Button>
                           <Button onClick={() => handleDeleteReport(r.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Sil"><Trash2 size={18}/></Button>
                         </div>
@@ -380,7 +380,7 @@ export default function GradeReportPage() {
       {/* ── Arşiv paneli ── */}
       {activePanel === 'archived' && archivedReports && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-amber-100 bg-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
               <div className="p-2 text-amber-600 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><Archive size={20} /></div>
               Arşivlenmiş Raporlar
@@ -391,8 +391,8 @@ export default function GradeReportPage() {
           {archivedReports.length === 0 ? (
             <div className="p-12 text-center text-gray-500 text-sm">Arşivlenmiş rapor bulunmuyor.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
+            <div className="overflow-x-auto touch-pan-x">
+              <table className="min-w-max w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
@@ -411,8 +411,8 @@ export default function GradeReportPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r._count.students}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <Button variant="ghost" onClick={() => handleLoadReport(r.id)} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors" title="Sil"><Eye size={18}/></Button>
                           <Button onClick={async () => {
                             if (!await confirm('Bu arşiv raporunu kalıcı olarak silmek istiyor musunuz?')) return;
@@ -435,7 +435,7 @@ export default function GradeReportPage() {
       {/* ── Analiz sonuçları ── */}
       {result && activePanel === 'none' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="p-4 sm:p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h2 className="text-xl font-bold text-gray-900">Analiz Sonuçları</h2>
@@ -455,7 +455,7 @@ export default function GradeReportPage() {
               </p>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3 w-full md:w-auto md:justify-end">
               <Button onClick={() => { setResult(null); setGenResults([]); setSelectedIds(new Set()); }} variant="outline">
                 Yeni Analiz
               </Button>
@@ -466,14 +466,14 @@ export default function GradeReportPage() {
           </div>
 
           {result.students.some(s => !s.matched) && (
-            <div className="bg-red-50 px-6 py-3 border-b border-red-100 flex items-center gap-4 text-red-800 text-sm">
+            <div className="bg-red-50 px-4 sm:px-6 py-3 border-b border-red-100 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-red-800 text-sm">
               <AlertTriangle size={18} className="text-red-600" />
               <span><strong>Uyarı:</strong> Veritabanında eşleştirilemeyen {result.students.filter(s => !s.matched).length} öğrenci var. Öğrencilerin yanındaki "Eşleştir" butonuna tıklayarak manuel eşleştirme yapabilirsiniz.</span>
             </div>
           )}
 
           {someSelected && (
-            <div className="bg-blue-50 px-6 py-3 border-b border-blue-100 flex items-center gap-4 animate-in fade-in">
+            <div className="bg-blue-50 px-4 sm:px-6 py-3 border-b border-blue-100 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 animate-in fade-in">
               <span className="text-sm font-bold text-blue-800">✓ {selectedIds.size} öğrenci seçildi</span>
               {selectedHavePdfs && (
                 <Button
@@ -490,7 +490,7 @@ export default function GradeReportPage() {
           )}
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
+            <table className="min-w-max w-full divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-center w-12 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>
@@ -561,7 +561,7 @@ export default function GradeReportPage() {
           </div>
           
           {genResults.length > 0 && (
-            <div className={`p-4 flex items-center gap-3 border-t ${successCount === genResults.length ? 'bg-green-50 border-green-100 text-green-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
+            <div className={`p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-t ${successCount === genResults.length ? 'bg-green-50 border-green-100 text-green-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
               <div className="p-1.5 rounded-full bg-white shadow-sm shrink-0">
                 {successCount === genResults.length ? <Check size={20} className="text-green-600"/> : <AlertTriangle size={20} className="text-amber-600"/>}
               </div>

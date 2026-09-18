@@ -567,7 +567,7 @@ export default function StaffPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">T.C. Kimlik No</label>
               <input type="text" value={form.tcKimlikNo} onChange={e => setForm({...form, tcKimlikNo: e.target.value})} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" />
@@ -614,27 +614,27 @@ export default function StaffPage() {
             </p>
           </div>
 
-          <div className="max-h-[500px] overflow-y-auto border border-gray-200 rounded-lg">
-            <table className="min-w-full text-left text-sm text-gray-600">
+          <div className="max-h-[500px] overflow-y-auto overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="min-w-max w-full text-left text-sm text-gray-600">
               <thead className="bg-slate-100 text-slate-700 sticky top-0 border-b border-gray-200 shadow-sm z-10">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Ad Soyad</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">TC No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Unvan</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Görev</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branş</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Kurum Sicil</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Ad Soyad</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">TC No</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Unvan</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Görev</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Branş</th>
+                  <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Kurum Sicil</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {importData.map((d, i) => (
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{d.name}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{d.tcKimlikNo}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{d.unvan}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{d.gorev}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{d.brans}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{d.kurumSicilNo}</td>
+                    <td className="px-3 sm:px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{d.name}</td>
+                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{d.tcKimlikNo}</td>
+                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{d.unvan}</td>
+                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{d.gorev}</td>
+                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{d.brans}</td>
+                    <td className="px-3 sm:px-4 py-2 whitespace-nowrap">{d.kurumSicilNo}</td>
                   </tr>
                 ))}
                 {importData.length === 0 && (

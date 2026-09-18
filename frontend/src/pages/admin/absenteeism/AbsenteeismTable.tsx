@@ -29,26 +29,26 @@ export function AbsenteeismTable({
   const sent = records.filter((r) => r.waSentAt);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-100">
+    <div className="overflow-x-auto touch-pan-x">
+      <table className="min-w-max w-full divide-y divide-gray-100">
         <thead className="bg-gray-50">
           <tr>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               Öğrenci
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               Sınıf
             </th>
-            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-center px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               Uyarı No
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               Durum
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               Tarih
             </th>
-            <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-right px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">
               İşlemler
             </th>
           </tr>
@@ -56,7 +56,7 @@ export function AbsenteeismTable({
         <tbody className="divide-y divide-gray-100 bg-white">
           {records.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-sm">
+              <td colSpan={6} className="px-4 sm:px-6 py-12 text-center text-gray-500 text-sm">
                 {listSearch ? "Arama sonucu bulunamadı." : "Henüz devamsızlık mektubu yüklenmemiş."}
               </td>
             </tr>
@@ -67,7 +67,7 @@ export function AbsenteeismTable({
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-2 bg-amber-50/50 border-y border-amber-100 text-amber-800 text-xs font-bold uppercase tracking-wider"
+                      className="px-4 sm:px-6 py-2 bg-amber-50/50 border-y border-amber-100 text-amber-800 text-xs font-bold uppercase tracking-wider whitespace-nowrap"
                     >
                       📨 Gönderilmeyi Bekleyenler ({unsent.length})
                     </td>
@@ -108,7 +108,7 @@ export function AbsenteeismTable({
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-2 bg-green-50/50 border-y border-green-100 text-green-800 text-xs font-bold uppercase tracking-wider mt-4"
+                      className="px-4 sm:px-6 py-2 bg-green-50/50 border-y border-green-100 text-green-800 text-xs font-bold uppercase tracking-wider whitespace-nowrap mt-4"
                     >
                       ✅ Başarıyla Gönderilenler ({sent.length})
                     </td>
@@ -155,7 +155,7 @@ const RecordRow = ({
 }: any) => {
   return (
     <tr className="hover:bg-gray-50/50 transition">
-      <td className="px-6 py-4">
+      <td className="px-3 sm:px-6 py-4">
         <div className="font-bold text-gray-900 flex items-center gap-2">
           {r.student.fullName}
           {r.isBep && (
@@ -166,8 +166,8 @@ const RecordRow = ({
         </div>
         <div className="text-xs text-gray-500 font-medium">{r.student.schoolNumber}</div>
       </td>
-      <td className="px-6 py-4 text-sm font-medium text-gray-700">{r.student.className}</td>
-      <td className="px-6 py-4 text-center">
+      <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-700 whitespace-nowrap">{r.student.className}</td>
+      <td className="px-3 sm:px-6 py-4 text-center">
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border
           ${
@@ -182,16 +182,16 @@ const RecordRow = ({
           {r.warningNumber}. Uyarı
         </span>
       </td>
-      <td className="px-6 py-4">
+      <td className="px-3 sm:px-6 py-4">
         {r.waSentAt ? (
           <StatusBadge status="ACTIVE" customText="Gönderildi" />
         ) : (
           <StatusBadge status="PENDING" customText="Gönderilmedi" />
         )}
       </td>
-      <td className="px-6 py-4 text-xs text-gray-500 font-medium">{formatDate(r.createdAt)}</td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex justify-end gap-2">
+      <td className="px-3 sm:px-6 py-4 text-xs text-gray-500 font-medium whitespace-nowrap">{formatDate(r.createdAt)}</td>
+      <td className="px-3 sm:px-6 py-4 text-right">
+        <div className="flex flex-wrap justify-end gap-2">
           {waConnected && (
             <Button variant="ghost" onClick={onPreview} disabled={waSendLoading === r.id || !!r.waSentAt} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors" title="Veliye Gönder">
               {waSendLoading === r.id ? (

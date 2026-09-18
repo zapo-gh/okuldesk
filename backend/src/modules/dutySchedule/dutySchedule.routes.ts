@@ -2,7 +2,20 @@ import { Router } from 'express';
 import { dutyScheduleController } from './dutySchedule.controller';
 import { authMiddleware } from '../shared/middleware/auth.middleware';
 
+import multer from 'multer';
+
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.originalname.match(/\.(xlsx|xls)$/i)) {
+      return cb(new Error('Sadece Excel (.xlsx, .xls) dosyaları kabul edilir.') as any);
+    }
+    cb(null, true);
+  }
+});
 
 router.use(authMiddleware);
 
@@ -11,6 +24,9 @@ router.get('/stations', (req, res, next) => dutyScheduleController.getStations(r
 router.post('/stations', (req, res, next) => dutyScheduleController.createStation(req, res, next));
 router.put('/stations/:id', (req, res, next) => dutyScheduleController.updateStation(req, res, next));
 router.delete('/stations/:id', (req, res, next) => dutyScheduleController.deleteStation(req, res, next));
+
+// Upload Excel
+router.post('/upload-excel', upload.single('file'), (req, res, next) => dutyScheduleController.uploadExcel(req, res, next));
 
 // Assignments
 router.get('/assignments', (req, res, next) => dutyScheduleController.getAssignments(req, res, next));
@@ -29,7 +45,7 @@ router.post('/auto-distribute-range', (req, res, next) => dutyScheduleController
 
 // Cover Assignments
 router.get('/absences',            (req, res, next) => dutyScheduleController.getAbsencesForDate(req, res, next));
-router.get('/absences/today',      (req, res, next) => dutyScheduleController.getAbsencesForDate(req, res, next)); // backward compat
+
 router.post('/absences',           (req, res, next) => dutyScheduleController.saveAbsence(req, res, next));
 router.delete('/absences/:id',     (req, res, next) => dutyScheduleController.deleteAbsence(req, res, next));
 router.get('/covers/suggest',      (req, res, next) => dutyScheduleController.suggestCovers(req, res, next));

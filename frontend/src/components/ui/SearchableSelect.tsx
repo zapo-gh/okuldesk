@@ -19,25 +19,35 @@ export function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder = 'Seçiniz...',
+  placeholder = 'Ara ve seç...',
   className = '',
   disabled = false
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find(opt => opt.value === value);
 
+  // Dışarı tıklamayı yakalamak ve state'i sıfırlamak
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setIsFocused(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Değer veya odak değiştiğinde arama metnini senkronize et
+  useEffect(() => {
+    if (!isFocused) {
+      setSearchQuery(selectedOption ? selectedOption.label : '');
+    }
+  }, [value, selectedOption, isFocused]);
 
   const filteredOptions = options.filter(opt => 
     opt.label.toLowerCase().includes(searchQuery.toLowerCase())
@@ -45,73 +55,66 @@ export function SearchableSelect({
 
   return (
     <div className={`relative ${className}`} ref={wrapperRef}>
-      <div 
-        className={`w-full px-3 py-2 border border-gray-300 rounded-lg flex items-center justify-between cursor-pointer bg-white transition-shadow ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'focus-within:ring-2 focus-within:ring-indigo-500 hover:border-gray-400'}`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        tabIndex={disabled ? -1 : 0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            if (!disabled) setIsOpen(!isOpen);
-          }
-        }}
-      >
-        <span className={`truncate ${selectedOption ? 'text-gray-900' : 'text-gray-500'}`}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <div className="flex items-center gap-1">
-          {value && !disabled && (
-            <div 
-              className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange('');
-                setSearchQuery('');
-              }}
-            >
-              <X size={14} />
-            </div>
-          )}
-          <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+      <div className="relative">
+        <input
+          type="text"
+          className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-white transition-shadow pr-8 ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-gray-400 text-sm'}`}
+          placeholder={placeholder}
+          value={searchQuery}
+          disabled={disabled}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsOpen(true);
+            // Tamamen temizlendiyse seçimi kaldır
+            if (e.target.value === '') {
+              onChange('');
+            }
+            // NOT: Kısmi yazımda onChange çağırma — sadece liste filtrele
+          }}
+          onFocus={() => {
+            setIsFocused(true);
+            setSearchQuery('');   // Odaklanınca aramayı temizle — tüm liste görünsün
+            setIsOpen(true);      // Her zaman açık
+          }}
+        />
+        
+        {value && !disabled && (
+          <div 
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
+            onMouseDown={(e) => {
+              e.preventDefault(); // Focus kaybetmeyi engelle
+              e.stopPropagation();
+              onChange('');
+              setSearchQuery('');
+              setIsOpen(false);
+            }}
+          >
+            <X size={14} />
+          </div>
+        )}
       </div>
 
       {isOpen && !disabled && (
-        <div className="w-full mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-2 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
-            <Search size={16} className="text-gray-400" />
-            <input
-              type="text"
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
-              placeholder="Ara..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus
-            />
-          </div>
-          <div className="max-h-60 overflow-y-auto overscroll-contain">
-            <div 
-              className="px-4 py-2.5 text-sm text-gray-500 hover:bg-gray-100 cursor-pointer transition-colors"
-              onClick={() => { onChange(''); setIsOpen(false); setSearchQuery(''); }}
-            >
-              -- Temizle --
-            </div>
-            {filteredOptions.map(opt => (
-              <div
-                key={opt.value}
-                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${opt.value === value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                  setSearchQuery('');
-                }}
-              >
-                {opt.label}
-              </div>
-            ))}
-            {filteredOptions.length === 0 && (
-              <div className="px-4 py-4 text-sm text-gray-500 text-center italic">Sonuç bulunamadı</div>
+        <div className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+          <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => (
+                <div
+                  key={opt.value}
+                  className={`px-4 py-2 text-sm cursor-pointer transition-colors ${opt.value === value ? 'bg-indigo-50 text-indigo-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // input blur olmasını engelle
+                    onChange(opt.value);
+                    setSearchQuery(opt.label);
+                    setIsOpen(false);
+                    setIsFocused(false);
+                  }}
+                >
+                  {opt.label}
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-3 text-sm text-gray-500 text-center italic">Sonuç bulunamadı</div>
             )}
           </div>
         </div>

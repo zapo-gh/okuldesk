@@ -4,7 +4,7 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import { useSettings } from '../../../context/SettingsContext';
 import {
   CalendarRange, Save, Trash2, MapPin, Users, BarChart2,
-  Settings, Printer, Zap, Plus, Edit, ChevronLeft, ChevronRight, X, Shield
+  Settings, Printer, Zap, Plus, Edit, ChevronLeft, ChevronRight, X, Shield, UploadCloud
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import toast from 'react-hot-toast';
@@ -102,10 +102,22 @@ export default function DutySchedulePage() {
   const academicYear = settings?.academicYear || '2025-2026';
 
   // Ay/Yıl seçimi
-  const now = new Date();
-  const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(MONTHS.find(m => m.val === now.getMonth() + 1) ? now.getMonth() + 1 : 9);
-  const [selectedWeek, setSelectedWeek] = useState(0);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const m = new Date().getMonth() + 1;
+    return MONTHS.find(x => x.val === m) ? m : 9;
+  });
+  const [selectedWeek, setSelectedWeek] = useState(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    if (!MONTHS.find(m => m.val === currentMonth)) return 0;
+    
+    const days = getWorkDays(currentYear, currentMonth);
+    const activeDay = days.find(d => d.date >= now);
+    return activeDay ? activeDay.weekNum : (days.length > 0 ? days[days.length - 1].weekNum : 0);
+  });
 
   const [activeTab, setActiveTab] = useState<'cizelge' | 'istatistik' | 'personel' | 'idareci' | 'yerler' | 'ayarlar'>('cizelge');
 
@@ -131,6 +143,40 @@ export default function DutySchedulePage() {
   const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: 'Nobet_Cizelgesi_Aylik' });
   const printRefAll = useRef<HTMLDivElement>(null);
   const handlePrintAll = useReactToPrint({ contentRef: printRefAll, documentTitle: 'Nobet_Cizelgesi_TumAylar' });
+
+  // Upload Excel
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!await confirm(`"${file.name}" dosyası yüklenecek. Mevcut nöbet yerleri ve nöbet atamaları silinip, bu dosyaya göre sıfırdan oluşturulacak. Onaylıyor musunuz?`)) {
+       if (fileInputRef.current) fileInputRef.current.value = '';
+       return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('academicYear', academicYear);
+    
+    try {
+      setLoading(true);
+      const res = await api.post('/duty-schedule/upload-excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(res.data.data.message || 'Çizelge başarıyla aktarıldı!');
+      if (res.data.data.warnings && res.data.data.warnings.length > 0) {
+        toast.error('Bazı satırlar veya personeller tam eşleştirilemedi. Lütfen çizelgeyi gözden geçirin.', { duration: 5000 });
+        console.warn('Nöbet Çizelgesi Aktarım Uyarıları:', res.data.data.warnings);
+      }
+      fetchAll();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Yükleme başarısız.');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // ── Veri Yükle ──
   const fetchAll = useCallback(async () => {
@@ -724,6 +770,10 @@ export default function DutySchedulePage() {
         icon={<CalendarRange size={24} />}
         actions={
           <div className="flex gap-2">
+            <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+            <Button variant="ghost" onClick={() => fileInputRef.current?.click()} className="text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 flex items-center gap-1.5 text-sm rounded-lg">
+              <UploadCloud size={16} /> Excel'den Aktar
+            </Button>
             <Button variant="ghost" onClick={() => handlePrint()} className="text-slate-600 px-3 py-1.5 flex items-center gap-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
               <Printer size={16} /> Bu Ayı Yazdır
             </Button>
@@ -776,7 +826,7 @@ export default function DutySchedulePage() {
           <select
             value={selectedWeek}
             onChange={e => setSelectedWeek(Number(e.target.value))}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
           >
             {weekList.map((week, i) => {
               const dutySD = settings?.dutyStartDate ? new Date(settings.dutyStartDate) : null;
@@ -784,7 +834,7 @@ export default function DutySchedulePage() {
               const isBefore = dutySD && lastDayOfWeek.date < dutySD;
               return (
                 <option key={i} value={i}>
-                  {isBefore ? '🔒 ' : ''}{i + 1}. Hafta {isBefore ? '(nöbet yok)' : ''}
+                  {isBefore ? '🔒 ' : ''}{i + 1}. Hafta
                 </option>
               );
             })}
@@ -801,7 +851,7 @@ export default function DutySchedulePage() {
       </div>
 
       {/* Sekmeler */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-fit overflow-x-auto">
         {([
           { key: 'cizelge',    label: 'Çizelge',          icon: <CalendarRange size={15}/> },
           { key: 'istatistik', label: 'İstatistik',        icon: <BarChart2 size={15}/> },
@@ -813,7 +863,7 @@ export default function DutySchedulePage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition whitespace-nowrap ${
               activeTab === tab.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -970,12 +1020,11 @@ export default function DutySchedulePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {stations.flatMap((station: any) => 
-                            Array.from({ length: station.capacity || 1 }).map((_, slotIdx) => (
-                              <tr key={`${station.id}-${slotIdx}`} className="hover:bg-slate-50/50">
+                          {stations.map((station: any, index: number) => (
+                              <tr key={station.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                                 <td className="px-4 py-2.5 border-r border-slate-100">
                                   <div className="font-semibold text-sm text-slate-800">
-                                    {station.name} {(station.capacity || 1) > 1 && <span className="text-slate-400 text-xs ml-1">({slotIdx + 1})</span>}
+                                    {station.name}
                                   </div>
                                   <div className="text-xs text-slate-400">{SHIFT_OPTIONS.find(s => s.val === station.shift)?.label?.split(' ')[0] || 'Tüm Gün'}</div>
                                 </td>
@@ -984,50 +1033,55 @@ export default function DutySchedulePage() {
                                   
                                   if (!d) {
                                     return (
-                                      <td key={`empty-${day.val}-${slotIdx}`} className="px-2 py-2 border-r border-slate-100 last:border-r-0 bg-slate-50/50">
+                                      <td key={`empty-${day.val}`} className="px-2 py-2 border-r border-slate-100 last:border-r-0 bg-slate-50/50">
                                         <div className="text-center text-xs text-slate-300">—</div>
                                       </td>
                                     );
                                   }
 
-                                  // Get all assignments for this station+day+week — filter by year+month to prevent
-                                  // cross-month contamination (weekNumber is relative to each month, not global)
-                                  const asgns = assignments.filter(a =>
-                                    a.stationId === station.id &&
-                                    a.dayOfWeek === d.dayOfWeek &&
-                                    a.weekNumber === d.weekNum &&
-                                    a.year === selectedYear &&
-                                    a.month === selectedMonth
-                                  );
-                                  const asgn = asgns[slotIdx]; // Pick the assignment for this specific slot
-                                  
                                   return (
-                                    <td key={`${d.dayOfWeek}-${d.weekNum}-${slotIdx}`} className="px-2 py-2 border-r border-slate-100 last:border-r-0">
-                                    <select
-                                      value={asgn?.staffId || ''}
-                                      onChange={e => handleAssignmentChange(station.id, d.dayOfWeek, d.weekNum, slotIdx, e.target.value)}
-                                      className={`w-full text-xs rounded-lg border px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition ${
-                                        asgn?.staffId
-                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold'
-                                          : 'bg-white border-slate-200 text-slate-400'
-                                      }`}
-                                    >
-                                      <option value="">— Boş —</option>
-                                      {staffList.filter(s => {
-                                        const g = (s.gorev || '').toLowerCase();
-                                        const isTeacher = g.includes('öğretmen');
-                                        const isAdminStation = station.name.toLowerCase().includes('idare') || station.name.toLowerCase().includes('müdür');
-                                        return isAdminStation ? !isTeacher : isTeacher;
-                                      }).map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                      ))}
-                                    </select>
+                                    <td key={`${d.dayOfWeek}-${d.weekNum}`} className="px-2 py-2 border-r border-slate-100 last:border-r-0 align-top">
+                                      <div className="flex flex-col gap-1.5 h-full justify-center">
+                                        {Array.from({ length: station.capacity || 1 }).map((_, slotIdx) => {
+                                          // Get all assignments for this station+day+week
+                                          const asgns = assignments.filter(a =>
+                                            a.stationId === station.id &&
+                                            a.dayOfWeek === d.dayOfWeek &&
+                                            a.weekNumber === d.weekNum &&
+                                            a.year === selectedYear &&
+                                            a.month === selectedMonth
+                                          );
+                                          const asgn = asgns[slotIdx]; // Pick the assignment for this specific slot
+                                          
+                                          return (
+                                            <select
+                                              key={slotIdx}
+                                              value={asgn?.staffId || ''}
+                                              onChange={e => handleAssignmentChange(station.id, d.dayOfWeek, d.weekNum, slotIdx, e.target.value)}
+                                              className={`w-full text-xs rounded-lg border px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition ${
+                                                asgn?.staffId
+                                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold'
+                                                  : 'bg-white border-slate-200 text-slate-400'
+                                              }`}
+                                            >
+                                              <option value="">— Boş —</option>
+                                              {staffList.filter(s => {
+                                                const g = (s.gorev || '').toLowerCase();
+                                                const isTeacher = g.includes('öğretmen');
+                                                const isAdminStation = station.name.toLowerCase().includes('idare') || station.name.toLowerCase().includes('müdür');
+                                                return isAdminStation ? !isTeacher : isTeacher;
+                                              }).map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                              ))}
+                                            </select>
+                                          );
+                                        })}
+                                      </div>
                                     </td>
                                   );
                                 })}
                               </tr>
-                            ))
-                          )}
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -1040,7 +1094,7 @@ export default function DutySchedulePage() {
           {/* ── İSTATİSTİK ── */}
           {activeTab === 'istatistik' && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
                 <h3 className="font-bold text-slate-800 text-sm">{monthName} {selectedYear} — Nöbet Eşitlik Raporu</h3>
                 <button onClick={fetchStats} className="text-xs text-indigo-600 hover:underline">Yenile</button>
               </div>

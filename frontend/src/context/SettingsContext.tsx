@@ -6,6 +6,7 @@ interface Settings {
   schoolName: string;
   principalName: string;
   academicYear: string;
+  lessonPeriodsJson?: string;
   dutyRotationFreq?: string;
   dutyRotationDates?: string; // JSON string → string[] (özel rotasyon tarihleri)
   dutyStartDate?: string | null; // "YYYY-MM-DD" — nöbet başlangıç tarihi

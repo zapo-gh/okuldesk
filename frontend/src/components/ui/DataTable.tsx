@@ -59,7 +59,7 @@ export function DataTable<T extends { id?: string | number }>({
   }
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${hidePrint ? 'print:hidden' : ''}`}>
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden min-w-0 ${hidePrint ? 'print:hidden' : ''}`}>
       {exportable && (
         <div className="px-4 py-3 border-b border-gray-100 flex justify-end bg-gray-50/30">
           <button 
@@ -71,14 +71,14 @@ export function DataTable<T extends { id?: string | number }>({
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-100">
+      <div className="overflow-x-auto touch-pan-x">
+        <table className="min-w-max w-full divide-y divide-gray-100">
           <thead className="bg-gray-50/50">
             <tr>
               {columns.map((col, i) => (
                 <th
                   key={i}
-                  className={`px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider ${
+                  className={`px-4 sm:px-6 py-3 sm:py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap ${
                     col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                   } ${col.className || ''}`}
                 >
@@ -100,7 +100,7 @@ export function DataTable<T extends { id?: string | number }>({
                   {columns.map((col, colIndex) => (
                     <td
                       key={colIndex}
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-700 ${
+                      className={`px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-700 ${
                         col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                       } ${col.className || ''}`}
                     >

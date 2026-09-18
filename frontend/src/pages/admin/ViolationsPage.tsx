@@ -402,7 +402,7 @@ export default function ViolationsPage() {
           }}
         />
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {tab === 'entry' && (
             <div className="space-y-6">
               {!result && (
@@ -529,7 +529,7 @@ export default function ViolationsPage() {
                 <div className="space-y-6 animate-in fade-in duration-500">
                   {/* Özet Kartı */}
                   <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="flex justify-between items-start mb-6">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-6">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">Sonuçlar — {result.typeLabel}</h3>
                         <p className="text-sm text-gray-500 mt-1">Tarih: {formatDate(result.violationDate)} | {result.ocrLines.length} giriş işlendi</p>
@@ -539,7 +539,7 @@ export default function ViolationsPage() {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100">
                         <div className="text-3xl font-bold text-indigo-600">{result.summary.matchedCount}</div>
                         <div className="text-xs font-semibold text-indigo-800 uppercase tracking-wider mt-1">Eşleşen</div>
@@ -602,48 +602,48 @@ export default function ViolationsPage() {
 
                   {result.matched.length > 0 && (
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                      <div className="p-4 border-b border-gray-100 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 bg-gray-50">
                         <h3 className="font-bold text-gray-800">✅ Eşleşen Öğrenciler ({result.matched.length})</h3>
-                        <div className="flex gap-2">
-                          <Button onClick={() => setShowManualAdd(true)} className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 flex items-center gap-1.5 transition">
+                        <div className="flex gap-2 flex-wrap">
+                          <Button onClick={() => setShowManualAdd(true)} className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 flex items-center gap-1.5 transition w-full sm:w-auto justify-center">
                             <UserPlus size={16} /> Manuel Ekle
                           </Button>
                           {!confirmed && (
-                            <Button onClick={handleConfirm} disabled={selectedIds.size === 0 || confirming} variant="primary">
+                            <Button onClick={handleConfirm} disabled={selectedIds.size === 0 || confirming} variant="primary" className="w-full sm:w-auto justify-center">
                               {confirming ? 'Onaylanıyor...' : `Seçilenleri Onayla (${selectedIds.size})`}
                             </Button>
                           )}
                         </div>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-100">
+                        <table className="min-w-max w-full divide-y divide-gray-100">
                           <thead className="bg-gray-50/50">
                             <tr>
-                              {!confirmed && <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={selectedIds.size === result.matched.length} onChange={() => selectedIds.size === result.matched.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(result.matched.map(m => m.id)))} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>}
-                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
-                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf/No</th>
-                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eşleşme</th>
-                              <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Geçmiş</th>
-                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
+                              {!confirmed && <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={selectedIds.size === result.matched.length} onChange={() => selectedIds.size === result.matched.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(result.matched.map(m => m.id)))} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>}
+                              <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Öğrenci</th>
+                              <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Sınıf/No</th>
+                              <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Eşleşme</th>
+                              <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Geçmiş</th>
+                              <th className="text-right px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">İşlem</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {result.matched.map(m => (
                               <tr key={m.id} className={m.requiresDiscipline ? 'bg-red-50' : m.suggestWarning ? 'bg-orange-50/50' : 'bg-white hover:bg-gray-50'}>
-                                {!confirmed && <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelection(m.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></td>}
-                                <td className="px-4 py-3 font-bold text-gray-900">{m.student.fullName}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{m.student.className} <span className="text-gray-400 mx-1">|</span> {m.student.schoolNumber}</td>
-                                <td className="px-4 py-3 text-xs text-gray-500">
+                                {!confirmed && <td className="px-3 sm:px-4 py-3"><input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelection(m.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></td>}
+                                <td className="px-3 sm:px-4 py-3 font-bold text-gray-900 whitespace-nowrap">{m.student.fullName}</td>
+                                <td className="px-3 sm:px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{m.student.className} <span className="text-gray-400 mx-1">|</span> {m.student.schoolNumber}</td>
+                                <td className="px-3 sm:px-4 py-3 text-xs text-gray-500">
                                   <div className="flex items-center gap-2">
                                     <span className={`px-2 py-0.5 rounded font-bold ${m.confidence >= 90 ? 'bg-green-100 text-green-700' : m.confidence >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>%{m.confidence}</span>
                                     <span className="truncate max-w-[120px]" title={m.matchedText}>{m.matchedBy === 'MANUAL' ? '✋ Manuel' : m.matchedText}</span>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                                   {m.previousViolations > 0 ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">{m.previousViolations} kez ⚠️</span> : <span className="text-xs text-gray-400">İlk Kez</span>}
                                 </td>
-                                <td className="px-4 py-3 text-right">
-                                  <div className="flex justify-end gap-2">
+                                <td className="px-3 sm:px-4 py-3 text-right">
+                                  <div className="flex flex-wrap justify-end gap-2">
                                     {m.requiresDiscipline && confirmed && <span className="px-2 py-1 bg-red-100 text-red-700 border border-red-200 rounded text-xs font-bold">🔴 Disiplin</span>}
                                     {!m.requiresDiscipline && m.suggestWarning && confirmed && (() => {
                                       const bCode = BEHAVIOR_MAP[result.type] || 'M164_1_B';
@@ -670,7 +670,7 @@ export default function ViolationsPage() {
                       </div>
                       <div className="divide-y divide-gray-100">
                         {result.unmatched.map((u, i) => (
-                          <div key={i} className="p-3 flex justify-between items-center text-sm">
+                          <div key={i} className="p-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm">
                             <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-mono">"{u.text}"</span>
                             <span className="text-gray-500">{u.reason}</span>
                           </div>
@@ -706,7 +706,7 @@ export default function ViolationsPage() {
 
               {historyView === 'uploads' && (
                 <>
-                  <div className="p-4 flex flex-wrap items-end bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 flex flex-wrap items-end gap-3 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">İhlal Tipi</label>
                       <select value={hFilterType} onChange={e => setHFilterType(e.target.value)} className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500">
@@ -740,7 +740,7 @@ export default function ViolationsPage() {
                           <div key={h.id} className="hover:shadow bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div 
                               onClick={() => handleToggleExpand(h.id)} 
-                              className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isExpanded ? 'bg-indigo-50/30' : 'hover:bg-gray-50'}`}
+                              className={`p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer transition-colors ${isExpanded ? 'bg-indigo-50/30' : 'hover:bg-gray-50'}`}
                             >
                               <div className="flex items-center gap-4">
                                 <div className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}><ChevronRight size={20} /></div>
@@ -760,7 +760,7 @@ export default function ViolationsPage() {
                                 variant="ghost"
                                 onClick={e => { e.stopPropagation(); handleDeleteUpload(h.id); }}
                                 disabled={deletingUploadId === h.id}
-                                className="text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
+                                className="text-xs font-semibold px-3 py-1.5 flex items-center gap-1.5 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition w-full sm:w-auto justify-center"
                                 title="Tüm Yüklemeyi ve Kayıtları Sil"
                               >
                                 <Trash2 size={16} />
@@ -777,13 +777,13 @@ export default function ViolationsPage() {
                               return (
                                 <div className="border-t border-gray-200">
                                   {pendingConfirmCount > 0 && (
-                                    <div className="bg-blue-50 px-4 py-3 flex justify-between items-center border-b border-blue-100">
+                                    <div className="bg-blue-50 px-4 py-3 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 border-b border-blue-100">
                                       <span className="text-sm text-blue-800 font-medium">⏳ {pendingConfirmCount} öğrenci onay bekliyor</span>
                                       <Button onClick={() => handleHistoryConfirm(h.id, (records ?? []).filter(r => !r.isConfirmed).map(r => r.id))} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded shadow-sm hover:bg-blue-700 transition">Tümünü Onayla</Button>
                                     </div>
                                   )}
                                   {pendingWarningCount > 0 && (
-                                    <div className="bg-orange-50 px-4 py-3 flex justify-between items-center border-b border-orange-200">
+                                    <div className="bg-orange-50 px-4 py-3 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2 border-b border-orange-200">
                                       <span className="text-sm text-orange-800 font-medium">⚠️ {pendingWarningCount} öğrenci için yazılı uyarı öneriliyor</span>
                                       <Button onClick={() => handleHistoryBulkWarning(h)} variant="danger">Toplu Yazılı Uyarı Oluştur</Button>
                                     </div>
@@ -792,25 +792,26 @@ export default function ViolationsPage() {
                                   {expandDetailLoading === h.id ? (
                                     <div className="p-8 text-center text-gray-500 animate-pulse text-sm">Detaylar Yükleniyor...</div>
                                   ) : (
-                                    <table className="min-w-full divide-y divide-gray-100">
+                                    <div className="overflow-x-auto">
+                                    <table className="min-w-max w-full divide-y divide-gray-100">
                                       <thead className="bg-gray-50">
                                         <tr>
-                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
-                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf/No</th>
-                                          <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Durum</th>
-                                          <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
+                                          <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Öğrenci</th>
+                                          <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Sınıf/No</th>
+                                          <th className="text-left px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">Durum</th>
+                                          <th className="text-right px-3 sm:px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 whitespace-nowrap">İşlem</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-100">
                                         {records?.map(r => (
                                           <tr key={r.id} className={r.requiresDiscipline && r.isConfirmed ? 'bg-red-50' : r.suggestWarning && r.isConfirmed ? (r.hasWarning ? 'bg-green-50/30' : 'bg-orange-50/30') : 'hover:bg-gray-50'}>
-                                            <td className="px-4 py-2 text-sm font-bold text-gray-900">{r.student.fullName}</td>
-                                            <td className="px-4 py-2 text-sm text-gray-500">{r.student.className} - {r.student.schoolNumber}</td>
-                                            <td className="px-4 py-2">
+                                            <td className="px-3 sm:px-4 py-2 text-sm font-bold text-gray-900 whitespace-nowrap">{r.student.fullName}</td>
+                                            <td className="px-3 sm:px-4 py-2 text-sm text-gray-500 whitespace-nowrap">{r.student.className} - {r.student.schoolNumber}</td>
+                                            <td className="px-3 sm:px-4 py-2 whitespace-nowrap">
                                               {r.isConfirmed ? <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">Onaylı</span> : <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Beklemede</span>}
                                             </td>
-                                            <td className="px-4 py-2 text-right">
-                                              <div className="flex items-center justify-end gap-2">
+                                            <td className="px-3 sm:px-4 py-2 text-right">
+                                              <div className="flex flex-wrap items-center justify-end gap-2">
                                                 {r.requiresDiscipline && r.isConfirmed ? (
                                                   <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">🔴 Disiplin</span>
                                                 ) : r.suggestWarning && r.isConfirmed ? (
@@ -831,6 +832,7 @@ export default function ViolationsPage() {
                                         ))}
                                       </tbody>
                                     </table>
+                                    </div>
                                   )}
                                 </div>
                               );

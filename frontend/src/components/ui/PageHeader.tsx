@@ -25,7 +25,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div
-      className={`relative flex items-center justify-between gap-4 px-6 py-4 rounded-xl shadow-md mb-6 overflow-hidden ${hidePrint ? 'print:hidden' : ''}`}
+      className={`relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 px-4 sm:px-6 py-4 rounded-xl shadow-md mb-6 overflow-hidden ${hidePrint ? 'print:hidden' : ''}`}
       style={{
         background: 'linear-gradient(120deg, #1e3a5f 0%, #1d4ed8 60%, #2563eb 100%)',
         minHeight: '72px',
@@ -41,7 +41,7 @@ export function PageHeader({
       />
 
       {/* Sol — İkon + Başlık */}
-      <div className="relative flex items-center gap-4 min-w-0">
+      <div className="relative flex items-center gap-4 min-w-0 w-full lg:w-auto">
         {/* İkon kutusu */}
         <div
           className="flex items-center justify-center w-10 h-10 rounded-lg shrink-0"
@@ -55,22 +55,16 @@ export function PageHeader({
           <h1 className="text-[15px] font-bold text-white leading-snug tracking-tight truncate">
             {title}
           </h1>
-          <p
-            className="text-[13px] leading-snug truncate mt-0.5"
-            style={{ color: 'rgba(255,255,255,0.65)' }}
-          >
-            {description}
-          </p>
         </div>
       </div>
 
       {/* Sağ — Aksiyon Butonları */}
       {actions ? (
-        <div className="relative flex items-center gap-2 shrink-0" data-dark-header="true">
+        <div className="relative flex flex-wrap items-stretch gap-2 w-full lg:w-auto lg:justify-end" data-dark-header="true">
           {actions}
         </div>
       ) : actionText ? (
-        <div className="relative shrink-0" data-dark-header="true">
+        <div className="relative w-full lg:w-auto" data-dark-header="true">
           <Button onClick={onAction} variant="primary" leftIcon={actionIcon || <Plus size={18} />}>
             {actionText}
           </Button>

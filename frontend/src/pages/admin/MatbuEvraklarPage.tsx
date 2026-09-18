@@ -160,8 +160,8 @@ export default function MatbuEvraklarPage() {
       </div>
 
       {/* Öğrenci Seçim Kartı */}
-      <div className="p-6 print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex items-start gap-4">
+      <div className="p-4 sm:p-6 print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="bg-indigo-50 p-3 rounded-lg text-indigo-600">
             <Search size={24} />
           </div>
@@ -227,10 +227,10 @@ export default function MatbuEvraklarPage() {
       </div>
 
       {/* Evrak Kartları */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print:hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 print:hidden items-stretch">
         {DOCUMENTS.map((doc) => (
-          <div key={doc.id} className="hover:shadow-md p-6 flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="flex items-center gap-3 mb-4">
+          <div key={doc.id} className="hover:shadow-md p-6 flex flex-col h-full min-h-[320px] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="flex items-start gap-3 mb-4 min-h-[64px]">
               <div className="bg-indigo-50 p-2.5 rounded-lg text-indigo-600">
                 <FileText size={22} />
               </div>
@@ -239,15 +239,15 @@ export default function MatbuEvraklarPage() {
               </h3>
             </div>
             
-            <p className="text-gray-500 text-sm mb-6 flex-1">
+            <p className="text-gray-500 text-sm mb-6 flex-1 leading-relaxed">
               {doc.description}
             </p>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap items-center mt-auto">
               <Button
                 onClick={() => handlePrint(doc.id)}
                 variant="primary"
-                className="flex-1"
+                className="flex-1 min-w-[120px]"
                 leftIcon={<Printer size={16} />}
               >
                 Yazdır
@@ -256,7 +256,7 @@ export default function MatbuEvraklarPage() {
               <Button
                 onClick={() => handleDownload(doc.id, doc.title)}
                 variant="secondary"
-                className="px-3"
+                className="px-3 shrink-0"
                 title="İndir (PDF)"
               >
                 <Download size={18} />
@@ -269,7 +269,7 @@ export default function MatbuEvraklarPage() {
                     setIsElectiveSettingsOpen(true);
                   }}
                   variant="outline"
-                  className="px-3 text-gray-600 hover:text-indigo-600 border-gray-300 hover:border-indigo-600"
+                  className="px-3 text-gray-600 hover:text-indigo-600 border-gray-300 hover:border-indigo-600 shrink-0"
                   title="Dersleri Ayarla"
                 >
                   <Settings size={18} />
@@ -297,9 +297,16 @@ export default function MatbuEvraklarPage() {
 
       {/* Seçmeli Ders Ayar Modalı */}
       {isElectiveSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
-          <div className="fixed inset-0 bg-gray-900/60 transition-opacity" onClick={() => setIsElectiveSettingsOpen(false)}></div>
-          <div className="w-full max-w-3xl flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 print:hidden pointer-events-none">
+          <div
+            className="fixed inset-0 z-0 bg-gray-900/60 transition-opacity pointer-events-auto"
+            onClick={() => setIsElectiveSettingsOpen(false)}
+          ></div>
+          <div
+            className="relative z-10 w-full max-w-3xl flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[min(92vh,860px)] pointer-events-auto"
+            role="dialog"
+            aria-modal="true"
+          >
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Settings size={20} className="text-indigo-600" />
@@ -310,7 +317,7 @@ export default function MatbuEvraklarPage() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-gray-50/50">
+            <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-6 bg-gray-50/50">
               {electiveGroups.map((group, groupIdx) => (
                 <div key={groupIdx} className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="flex items-center gap-3 mb-4">
@@ -322,7 +329,7 @@ export default function MatbuEvraklarPage() {
                         newGroups[groupIdx].name = e.target.value;
                         setElectiveGroups(newGroups);
                       }}
-                      className="flex-1 font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-0 px-0 py-1 transition-colors outline-none"
+                      className="flex-1 min-w-0 font-bold text-gray-900 border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-0 px-0 py-1 transition-colors outline-none"
                       placeholder="Grup Adı (Örn: İNSAN, TOPLUM VE BİLİM)"
                     />
                     <button
@@ -340,7 +347,7 @@ export default function MatbuEvraklarPage() {
                   
                   <div className="space-y-2">
                     {group.courses.map((course, courseIdx) => (
-                      <div key={courseIdx} className="flex items-center gap-2 pl-4">
+                      <div key={courseIdx} className="flex items-center gap-2 pl-4 min-w-0">
                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-300 shrink-0"></div>
                         <input
                           type="text"
@@ -350,7 +357,7 @@ export default function MatbuEvraklarPage() {
                             newGroups[groupIdx].courses[courseIdx] = e.target.value;
                             setElectiveGroups(newGroups);
                           }}
-                          className="flex-1 text-sm border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-0 px-0 py-1 transition-colors outline-none text-gray-700"
+                          className="flex-1 min-w-0 text-sm border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:ring-0 px-0 py-1 transition-colors outline-none text-gray-700"
                           placeholder="Ders Adı"
                         />
                         <button
@@ -392,11 +399,11 @@ export default function MatbuEvraklarPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl">
-              <Button variant="outline" onClick={() => setIsElectiveSettingsOpen(false)}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 px-4 sm:px-6 py-4 bg-gray-50/50 border-t border-gray-100 rounded-b-2xl shrink-0">
+              <Button variant="outline" onClick={() => setIsElectiveSettingsOpen(false)} className="w-full sm:w-auto justify-center">
                 İptal
               </Button>
-              <Button variant="primary" onClick={handleSaveElectiveSettings}>
+              <Button variant="primary" onClick={handleSaveElectiveSettings} className="w-full sm:w-auto justify-center">
                 Değişiklikleri Kaydet
               </Button>
             </div>

@@ -5,7 +5,6 @@ export class CoverAssignmentService {
   // ── Absences ──
 
   async getAbsencesForDate(date: Date, academicYear: string) {
-    // Timezone-safe: normalize both sides to UTC midnight
     const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
     const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
     const endOfDay   = new Date(`${dateStr}T23:59:59.999Z`);
@@ -27,7 +26,6 @@ export class CoverAssignmentService {
     endDate: string;
     reason?: string;
   }) {
-    // Force UTC midnight to avoid timezone shifting (e.g. TR +3 shifting date back by 1 day)
     const startDate = new Date(`${data.startDate}T00:00:00.000Z`);
     const endDate   = new Date(`${data.endDate}T00:00:00.000Z`);
     return prisma.staffAbsence.create({
@@ -43,6 +41,7 @@ export class CoverAssignmentService {
   }
 
   async deleteAbsence(id: string) {
+    await prisma.coverAssignment.deleteMany({ where: { absenceId: id } });
     return prisma.staffAbsence.delete({ where: { id } });
   }
 
@@ -53,7 +52,11 @@ export class CoverAssignmentService {
     const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
     const endOfDay   = new Date(`${dateStr}T23:59:59.999Z`);
     return prisma.coverAssignment.findMany({
-      where: { date: { gte: startOfDay, lte: endOfDay }, academicYear },
+      where: {
+        date: { gte: startOfDay, lte: endOfDay },
+        academicYear,
+        absenceId: { not: null }
+      },
       include: {
         absentStaff: { select: { id: true, name: true } },
         substituteStaff: { select: { id: true, name: true } },
@@ -67,75 +70,93 @@ export class CoverAssignmentService {
     return prisma.coverAssignment.delete({ where: { id } });
   }
 
-  async suggestCovers(dateStr: string, academicYear: string) {
-    // UTC midnight to avoid timezone shifts
-    const targetDate = new Date(`${dateStr}T00:00:00.000Z`);
-    const year = Number(dateStr.split('-')[0]);
-    const month = Number(dateStr.split('-')[1]);
+  async suggestCovers(
+    dateStr: string,
+    academicYear: string,
+    rules?: { preventConsecutive: boolean; maxCoversPerHour: number; maxCoversPerDay: number }
+  ) {
+    const parts = dateStr.split('-');
+    const year  = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day   = Number(parts[2]);
+    const targetDateLocal = new Date(year, month - 1, day);
+    const targetDateUTC   = new Date(`${dateStr}T00:00:00.000Z`);
 
-    // 1. Günün iş günü meta verilerini bul
+    // 1. İş günü kontrolü
     const workDays = dutyScheduleService._getWorkDays(year, month);
-    const workDay = workDays.find(d => d.date.getTime() === targetDate.getTime());
-
+    const workDay  = workDays.find(d => d.date.getTime() === targetDateLocal.getTime());
     if (!workDay) {
       return { status: 'warning', message: 'Seçilen tarih bir iş günü (Pzt-Cum) değil.', suggestions: [] };
     }
 
     const { weekNum, dayOfWeek } = workDay;
 
-    // 2. O günkü devamsızlıkları bul
-    const absences = await this.getAbsencesForDate(targetDate, academicYear);
+    // 2. Devamsızlıklar
+    const absences = await this.getAbsencesForDate(targetDateUTC, academicYear);
     if (absences.length === 0) {
       return { status: 'info', message: 'Bu tarihte devamsız öğretmen yok.', suggestions: [] };
     }
 
-    // 3. O gün nöbetçi öğretmenleri bul
+    // 3. Nöbetçi atamalar
     const dutyAssignments = await prisma.dutyAssignment.findMany({
       where: { academicYear, year, month, weekNumber: weekNum, dayOfWeek },
-      include: { staff: { select: { id: true, name: true } }, station: true }
+      include: { staff: { select: { id: true, name: true, title: true } }, station: true }
     });
-
     if (dutyAssignments.length === 0) {
       return { status: 'warning', message: 'Bu tarihte nöbetçi öğretmen ataması bulunamadı.', suggestions: [] };
     }
 
     const onDutyStaffIds = dutyAssignments.map(d => d.staffId);
 
-    // 4. Aktif timetable bul (pasif programlar sonuçlara karışmasın)
+    // A1: academicYear filtresi eklendi — yanlış öğretim yılının programından ders kontrolü yapılmasın
     const activeTimetable = await prisma.timetable.findFirst({
-      where: { isActive: true },
+      where: { isActive: true, academicYear },
       select: { id: true }
     });
 
-    const timetableFilter = activeTimetable
-      ? { timetableId: activeTimetable.id }
-      : {};
+    if (!activeTimetable) {
+      return { status: 'warning', message: 'Bu eğitim yılı için aktif ders programı bulunamadı.', suggestions: [] };
+    }
 
-    // 5. Nöbetçi öğretmenlerin ders programını TEK sorguda çek (N+1 optimizasyonu)
+    const timetableFilter = activeTimetable ? { timetableId: activeTimetable.id } : {};
+
+    // 5. Nöbetçilerin ders programı (N+1 safe — tek sorgu)
     const onDutyTimetable = await prisma.timetableEntry.findMany({
       where: { staffId: { in: onDutyStaffIds }, dayOfWeek, ...timetableFilter }
     });
 
-    // 6. Tüm devamsız öğretmenlerin ders programını TEK sorguda çek (N+1 optimizasyonu)
+    // 6. Devamsız öğretmenlerin ders programı (N+1 safe — tek sorgu)
     const absentStaffIds = absences.map(a => a.staffId);
     const allAbsentTimetable = await prisma.timetableEntry.findMany({
       where: { staffId: { in: absentStaffIds }, dayOfWeek, ...timetableFilter },
       orderBy: { period: 'asc' }
     });
 
-    // 7. Bugün için mevcut cover sayılarını bul (eşit dağıtım)
-    const existingCovers = await prisma.coverAssignment.groupBy({
-      by: ['substituteStaffId'],
-      where: { date: targetDate, substituteStaffId: { in: onDutyStaffIds } },
-      _count: { id: true }
+    // 7. Mevcut covers
+    const existingCovers = await prisma.coverAssignment.findMany({
+      where: { date: targetDateUTC, substituteStaffId: { in: onDutyStaffIds } },
+      select: { id: true, substituteStaffId: true, period: true }
     });
 
+    // A4: coverCountMap — gerçek adil dağıtım için tüm dönemin verisini çek
     const coverCountMap = new Map<string, number>();
-    existingCovers.forEach(c => coverCountMap.set(c.substituteStaffId, c._count.id));
+    onDutyStaffIds.forEach(id => coverCountMap.set(id, 0));
+
+    const historicalCovers = await prisma.coverAssignment.groupBy({
+      by: ['substituteStaffId'],
+      where: {
+        academicYear,
+        substituteStaffId: { in: onDutyStaffIds }
+      },
+      _count: { substituteStaffId: true }
+    });
+
+    historicalCovers.forEach(hc => {
+      coverCountMap.set(hc.substituteStaffId, hc._count.substituteStaffId);
+    });
 
     const suggestions: any[] = [];
 
-    // 8. Her devamsız öğretmenin derslerini dolaş
     for (const absence of absences) {
       const absentTimetable = allAbsentTimetable.filter(e => e.staffId === absence.staffId);
       if (absentTimetable.length === 0) continue;
@@ -144,46 +165,93 @@ export class CoverAssignmentService {
         const period = entry.period;
 
         const candidates = dutyAssignments.map(assignment => {
-          const hasClass = onDutyTimetable.some(
-            t => t.staffId === assignment.staffId && t.period === period
-          );
-          const coverCount = coverCountMap.get(assignment.staffId) || 0;
+          const staffId    = assignment.staffId;
+          const hasClass   = onDutyTimetable.some(t => t.staffId === staffId && t.period === period);
+          const coverCount = coverCountMap.get(staffId) || 0;
+
+          let isEligible    = true;
+          let conflictReason = '';
+
+          if (rules?.maxCoversPerDay && coverCount >= rules.maxCoversPerDay) {
+            isEligible     = false;
+            conflictReason = 'Günlük max limit';
+          }
+
+          if (rules?.preventConsecutive && isEligible) {
+            const hasCoverPrev = existingCovers.some(c => c.substituteStaffId === staffId && c.period === period - 1)
+              || suggestions.some(s => s.substituteStaffId === staffId && s.period === period - 1);
+            const hasCoverNext = existingCovers.some(c => c.substituteStaffId === staffId && c.period === period + 1)
+              || suggestions.some(s => s.substituteStaffId === staffId && s.period === period + 1);
+            if (hasCoverPrev || hasCoverNext) {
+              isEligible     = false;
+              conflictReason = 'Ardışık görev';
+            }
+          }
+
+          const hasCoverThisPeriod =
+            existingCovers.some(c => c.substituteStaffId === staffId && c.period === period)
+            || suggestions.some(s => s.substituteStaffId === staffId && s.period === period);
+          if (hasCoverThisPeriod) {
+            isEligible     = false;
+            conflictReason = 'Bu saatte dolu';
+          }
+
           return {
             staff: assignment.staff,
             station: assignment.station,
             isFree: !hasClass,
-            coverCount
+            coverCount,
+            isEligible,
+            conflictReason
           };
         });
 
-        const freeCandidates = candidates
-          .filter(c => c.isFree)
-          .sort((a, b) => a.coverCount - b.coverCount);
+        const eligibleCandidates = candidates.filter(c => c.isEligible);
 
-        const busyCandidates = candidates
-          .filter(c => !c.isFree)
-          .sort((a, b) => a.coverCount - b.coverCount);
+        // A3: isVicePrincipal güçlendirildi — kısaltma varyantlarını da yakalar
+        const isVicePrincipal = (title: string | null): boolean => {
+          if (!title) return false;
+          const norm = title.toLocaleLowerCase('tr-TR').replace(/[\s.]/g, '');
+          return norm.includes('müdüryardımcısı')
+            || norm.includes('müdüryrd')
+            || norm.includes('myrd')
+            || norm.includes('müdüryardımcı');
+        };
+
+        const teacherCandidates = eligibleCandidates.filter(c => !isVicePrincipal(c.staff.title));
+        const vpCandidates      = eligibleCandidates.filter(c =>  isVicePrincipal(c.staff.title));
+
+        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort((a, b) => a.coverCount - b.coverCount);
+        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort((a, b) => a.coverCount - b.coverCount);
+        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort((a, b) => a.coverCount - b.coverCount);
+        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort((a, b) => a.coverCount - b.coverCount);
 
         let selectedSubstitute: typeof candidates[0] | null = null;
         let isConflict = false;
 
-        if (freeCandidates.length > 0) {
-          selectedSubstitute = freeCandidates[0];
-          coverCountMap.set(selectedSubstitute.staff.id, selectedSubstitute.coverCount + 1);
-        } else if (busyCandidates.length > 0) {
-          selectedSubstitute = busyCandidates[0];
-          isConflict = true;
+        if      (freeTeachers.length > 0) { selectedSubstitute = freeTeachers[0]; }
+        else if (freeVPs.length > 0)      { selectedSubstitute = freeVPs[0]; }
+        else if (busyTeachers.length > 0) { selectedSubstitute = busyTeachers[0]; isConflict = true; }
+        else if (busyVPs.length > 0)      { selectedSubstitute = busyVPs[0];      isConflict = true; }
+
+        if (selectedSubstitute) {
           coverCountMap.set(selectedSubstitute.staff.id, selectedSubstitute.coverCount + 1);
         }
 
         suggestions.push({
-          absenceId: absence.id,
-          absentStaff: absence.staff,
-          period: entry.period,
-          className: entry.className,
-          subject: entry.subject,
+          absenceId:        absence.id,
+          absentStaff:      absence.staff,
+          period:           entry.period,
+          className:        entry.className,
+          subject:          entry.subject,
           substituteStaffId: selectedSubstitute?.staff.id ?? null,
-          availableDutyStaff: candidates.map(c => ({ ...c.staff, isFree: c.isFree, coverCount: c.coverCount })),
+          availableDutyStaff: candidates.map(c => ({
+            ...c.staff,
+            isFree: c.isFree,
+            coverCount: c.coverCount,
+            isEligible: c.isEligible,
+            conflictReason: c.conflictReason
+          })),
           suggestedSubstitute: selectedSubstitute
             ? { staff: selectedSubstitute.staff, station: selectedSubstitute.station, isConflict }
             : null
@@ -194,6 +262,7 @@ export class CoverAssignmentService {
     return { status: 'success', suggestions };
   }
 
+  // A2: saveCovers — N+1 sorgu → upsert ile iyileştirildi (10 atama için artık 2 DB sorgusu)
   async saveCovers(data: {
     date: string;
     academicYear: string;
@@ -206,50 +275,64 @@ export class CoverAssignmentService {
       subject?: string;
     }[];
   }) {
-    // UTC midnight — matches how absences and covers are stored
     const targetDate = new Date(`${data.date}T00:00:00.000Z`);
 
-    const saved = [];
+    // Önce o tarihe ait mevcut tüm cover'ları tek sorguda al
+    const existingCovers = await prisma.coverAssignment.findMany({
+      where: {
+        date: targetDate,
+        absentStaffId: { in: data.covers.map(c => c.absentStaffId) }
+      },
+      select: { id: true, absentStaffId: true, period: true }
+    });
+
+    // Hızlı lookup için map oluştur: "absentStaffId|period" → id
+    const existingMap = new Map<string, string>();
+    existingCovers.forEach(e => existingMap.set(`${e.absentStaffId}|${e.period}`, e.id));
+
+    const toCreate: typeof data.covers = [];
+    const toUpdate: { id: string; substituteStaffId: string; subject?: string }[] = [];
+
     for (const cover of data.covers) {
-      if (!cover.substituteStaffId) continue; // Atama yapılmamışsa atla
+      if (!cover.substituteStaffId) continue;
 
-      // Çift kayıt koruması: önce mevcut kaydı kontrol et
-      const existing = await prisma.coverAssignment.findFirst({
-        where: {
-          date: targetDate,
-          absentStaffId: cover.absentStaffId,
-          period: cover.period
-        }
-      });
+      const key = `${cover.absentStaffId}|${cover.period}`;
+      const existingId = existingMap.get(key);
 
-      let record;
-      if (existing) {
-        // Güncelle
-        record = await prisma.coverAssignment.update({
-          where: { id: existing.id },
-          data: {
-            substituteStaffId: cover.substituteStaffId,
-            subject: cover.subject
-          }
-        });
+      if (existingId) {
+        toUpdate.push({ id: existingId, substituteStaffId: cover.substituteStaffId, subject: cover.subject });
       } else {
-        // Yeni oluştur
-        record = await prisma.coverAssignment.create({
-          data: {
-            absenceId: cover.absenceId || null,
-            absentStaffId: cover.absentStaffId,
-            substituteStaffId: cover.substituteStaffId,
-            date: targetDate,
-            period: cover.period,
-            className: cover.className,
-            subject: cover.subject,
-            academicYear: data.academicYear
-          }
+        toCreate.push(cover);
+      }
+    }
+
+    // Transaction: güncellemeler ve yeni kayıtlar ayrı bloklarda
+    await prisma.$transaction(async (tx) => {
+      // Güncellemeler
+      for (const u of toUpdate) {
+        await tx.coverAssignment.update({
+          where: { id: u.id },
+          data: { substituteStaffId: u.substituteStaffId, subject: u.subject }
         });
       }
-      saved.push(record);
-    }
-    return saved;
+      // Yeni kayıtlar toplu
+      if (toCreate.length > 0) {
+        await tx.coverAssignment.createMany({
+          data: toCreate.map(cover => ({
+            absenceId:         cover.absenceId || null,
+            absentStaffId:     cover.absentStaffId,
+            substituteStaffId: cover.substituteStaffId,
+            date:              targetDate,
+            period:            cover.period,
+            className:         cover.className,
+            subject:           cover.subject,
+            academicYear:      data.academicYear
+          }))
+        });
+      }
+    });
+
+    return { updated: toUpdate.length, created: toCreate.length };
   }
 }
 

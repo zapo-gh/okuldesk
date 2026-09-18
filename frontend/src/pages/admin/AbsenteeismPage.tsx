@@ -297,7 +297,7 @@ export default function AbsenteeismPage() {
         
         {/* Search */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="relative max-w-md">
+          <div className="relative max-w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
@@ -326,10 +326,10 @@ export default function AbsenteeismPage() {
 
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="p-4 border-t border-gray-100 flex items-center justify-center gap-3">
-            <Button disabled={page === 1} onClick={() => setPage(page - 1)} variant="outline">Geri</Button>
-            <span className="text-sm text-gray-600 font-medium">Sayfa {page} / {pagination.totalPages}</span>
-            <Button disabled={page === pagination.totalPages} onClick={() => setPage(page + 1)} variant="outline">İleri</Button>
+          <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+            <Button disabled={page === 1} onClick={() => setPage(page - 1)} variant="outline" className="w-full sm:w-auto">Geri</Button>
+            <span className="text-sm text-gray-600 font-medium text-center">Sayfa {page} / {pagination.totalPages}</span>
+            <Button disabled={page === pagination.totalPages} onClick={() => setPage(page + 1)} variant="outline" className="w-full sm:w-auto">İleri</Button>
           </div>
         )}
       </div>

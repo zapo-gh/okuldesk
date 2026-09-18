@@ -5,6 +5,7 @@ export interface ParsedTimetableEntry {
   period: number;
   className: string;
   subject?: string;
+  room?: string;
 }
 
 export interface ParsedTeacherSchedule {
@@ -47,6 +48,14 @@ export const parseTimetableExcel = (buffer: Buffer): ParsedTeacherSchedule[] => 
     });
   });
 
+  if (teacherSchedules.length === 0) {
+    throw new Error(
+      'Excel dosyasından hiçbir öğretmen ders programı okunamadı. ' +
+      'Dosyanın Yabil çıktı formatında (.xlsx) olduğundan ve "Adı Soyadı" ' +
+      'başlıklarını içerdiğinden emin olun.'
+    );
+  }
+
   return teacherSchedules;
 };
 
@@ -59,10 +68,11 @@ function findTeacherBlocks(sheetData: any[][]): { name: string, startRow: number
 
     const firstCell = String(row[0] || '').trim();
     if (/Adı\s*Soyadı/i.test(firstCell)) {
-      const teacherName = findTeacherNameInColumn(row);
+      const teacherName = findTeacherNameInRow(row);
       
       if (teacherName && isValidTeacherName(teacherName)) {
-        let endRow = rowIndex + 25; // Varsayılan bitiş
+        // endRow: bir sonraki "Adı Soyadı" satırına kadar veya dosya sonu
+        let endRow = sheetData.length; // Dinamik: varsayılan dosya sonu
 
         for (let nextRowIndex = rowIndex + 1; nextRowIndex < sheetData.length; nextRowIndex++) {
           const nextRow = sheetData[nextRowIndex];
@@ -83,17 +93,27 @@ function findTeacherBlocks(sheetData: any[][]): { name: string, startRow: number
   return blocks;
 }
 
-function findTeacherNameInColumn(row: any[]): string | null {
-  if (row.length > 2) {
-    let teacherName = String(row[2] || '').trim();
-    teacherName = teacherName.replace(/^[:\s]+/, '').replace(/[:\s]+$/, '').trim();
-    return teacherName;
+/**
+ * Öğretmen adını satırın birden fazla sütununda arar.
+ * Önce index 2 (standart Yabil formatı), bulamazsa 3 ve 4'e bakar.
+ */
+function findTeacherNameInRow(row: any[]): string | null {
+  const candidateIndices = [2, 3, 4, 1];
+
+  for (const idx of candidateIndices) {
+    if (idx < row.length) {
+      let candidate = String(row[idx] || '').trim();
+      candidate = candidate.replace(/^[:\s]+/, '').replace(/[:\s]+$/, '').trim();
+      if (candidate && candidate.length >= 2) {
+        return candidate;
+      }
+    }
   }
   return null;
 }
 
 function isValidTeacherName(name: string): boolean {
-  if (!name || name.length < 3 || name.length > 50) return false;
+  if (!name || name.length < 2 || name.length > 60) return false;
   
   const nonTeacherPatterns = [
     'GÜNLER', 'SAAT', 'DERS', 'PAZARTESI', 'SALI', 'CARSAMBA', 'PERSEMBE', 'CUMA',
@@ -101,11 +121,13 @@ function isValidTeacherName(name: string): boolean {
   ];
   
   for (const pattern of nonTeacherPatterns) {
-    if (name.toUpperCase().includes(pattern)) return false;
+    if (name.toUpperCase().includes(pattern.toUpperCase())) return false;
   }
   
+  // Sadece rakam, boşluk ve nokta içeriyorsa isim değildir
   if (/^[0-9\s.-]+$/.test(name)) return false;
-  if (!name.includes(' ')) return false;
+  
+  // NOT: Tek kelimeli isimler (örn. "Zeynep") artık geçerlidir — boşluk zorunluluğu kaldırıldı
   
   return true;
 }
@@ -136,13 +158,14 @@ function parseTeacherScheduleFromBlock(teacherData: any[][]): ParsedTimetableEnt
       if (col < dayRow.length) {
         const cellText = String(dayRow[col] || '').trim();
         if (!isEmptyOrFree(cellText)) {
-          const parsed = extractClassAndSubjectFromCell(cellText);
+          const parsed = extractClassSubjectAndRoomFromCell(cellText);
           if (parsed) {
             entries.push({
               dayOfWeek,
               period: periodNum,
               className: parsed.className,
-              subject: parsed.subject
+              subject: parsed.subject,
+              room: parsed.room
             });
           }
         }
@@ -174,7 +197,9 @@ function detectPeriodColumns(headerRow: any[]): Record<number, number> {
     const raw = headerRow[col];
     if (raw == null) continue;
     const text = String(raw).replace(/\n/g, ' ').trim();
-    const m = text.match(/^\((\d{1,2})\)/);
+    
+    // Desteklenen formatlar: "(1)", "1.Ders", "1. Ders", "1.DERS"
+    const m = text.match(/^(?:\()?(\d{1,2})(?:\)|\.Ders|\. Ders)/i);
     if (m) {
       const periodNum = parseInt(m[1], 10);
       if (periodNum >= 1 && periodNum <= 12 && mapping[periodNum] == null) {
@@ -184,43 +209,56 @@ function detectPeriodColumns(headerRow: any[]): Record<number, number> {
   }
   
   if (Object.keys(mapping).length === 0) {
-    // Fallback default format if "(1)" headers are missing
+    // Fallback: Standart Yabil sütun haritası
     return { 1: 2, 2: 6, 3: 12, 4: 14, 5: 15, 6: 18, 7: 20, 8: 22, 9: 24, 10: 25 };
   }
   return mapping;
 }
 
-function extractClassAndSubjectFromCell(cell: string): { className: string; subject?: string } | null {
+/**
+ * Hücre metninden sınıf, ders ve oda bilgilerini çıkarır.
+ * Format: "SINIF DERSKODU" veya "SINIF DERSKODU (ODA)"
+ */
+function extractClassSubjectAndRoomFromCell(cell: string): { className: string; subject?: string; room?: string } | null {
   if (!cell) return null;
-  const text = String(cell).replace(/\s+/g, ' ').trim();
-  
-  // Sınıf kodunu bul (ör: 9-A, 10 B, 11-C)
-  const classMatch = text.match(/\b(\d{1,2})[-\s]?([A-ZÇĞİÖŞÜa-zçğışöü])\b/i);
-  if (!classMatch) {
-    // Sınıf kodu bulunamazsa ham metni kırparak döndür (özel durum)
-    const trimmed = text.toUpperCase();
-    return trimmed.length > 0 ? { className: trimmed.substring(0, 10) } : null;
+
+  // Oda bilgisini parantez içinden çıkar: örn. "ATP10A FELSEFE (101)"
+  let room: string | undefined;
+  const roomMatch = cell.match(/\(([^)]+)\)/g);
+  if (roomMatch) {
+    // Son parantezli ifadeyi oda olarak kabul et; oda gibi görünüyorsa (kısa, rakam/harf karışımı)
+    const lastParenContent = roomMatch[roomMatch.length - 1].replace(/[()]/g, '').trim();
+    if (/^[A-Za-z0-9\s\-\.]+$/.test(lastParenContent) && lastParenContent.length <= 20) {
+      room = lastParenContent;
+    }
   }
 
-  const className = `${classMatch[1]}-${classMatch[2].toUpperCase()}`;
+  // Parantez içlerini ve saat aralıklarını temizle
+  let cleanText = String(cell)
+    .replace(/\([^)]+\)/g, '')
+    .replace(/\b\d{2}:\d{2}-\d{2}:\d{2}\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  if (cleanText.length === 0) return null;
 
-  // Sınıf kodundan önce gelen metni subject olarak al
-  const classIndex = text.toUpperCase().indexOf(classMatch[0].toUpperCase());
-  const subjectRaw = classIndex > 0
-    ? text.substring(0, classIndex).replace(/[:\-,]+$/, '').trim()
-    : '';
+  const parts = cleanText.split(' ');
+  
+  if (parts.length === 1) {
+    return { className: parts[0].toUpperCase(), room };
+  }
 
-  const subject = subjectRaw.length > 1
-    ? subjectRaw.toUpperCase().substring(0, 30)
-    : undefined;
+  // Son parçayı subject (ders kodu), geri kalanları sınıf olarak kabul et
+  const subject = parts.pop()?.toUpperCase() || '';
+  const className = parts.join(' ').toUpperCase();
 
-  return { className, subject };
+  return { className, subject, room };
 }
 
 function isEmptyOrFree(cellValue: string): boolean {
   if (cellValue === null || cellValue === undefined || cellValue === '') return true;
   const text = String(cellValue).trim().toUpperCase();
   if (text.length === 0) return true;
-  if (['BOŞ', 'BOS', '-', 'SERBEST', 'FREE'].includes(text)) return true;
+  if (['BOŞ', 'BOS', '-', 'SERBEST', 'FREE', '---'].includes(text)) return true;
   return false;
 }

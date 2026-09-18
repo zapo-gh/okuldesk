@@ -51,6 +51,12 @@ Tauri v2 (Native Masaüstü Kabuğu — Rust)
 - Müdür yardımcısı, rehber öğretmen, sınıf rehber öğretmeni kayıtları
 - Sınıf ataması (sınıf rehber öğretmenleri için)
 
+### Ders Programı Yönetimi
+- Excel tabanlı öğretmen ders programı içe aktarma
+- Aktif program, program geçmişi ve yeniden aktifleştirme
+- Öğretmen ve sınıf bazlı haftalık görünüm
+- Boş Ders Doldurma modülü için veri kaynağı
+
 ### WhatsApp Entegrasyonu
 - Baileys kütüphanesi ile WhatsApp Web bağlantısı (QR kod)
 - Devamsızlık ve yazılı uyarı için seçili velilere mesaj gönderimi
@@ -87,6 +93,8 @@ Tauri v2 (Native Masaüstü Kabuğu — Rust)
 | Güvenlik | Helmet, CORS (yalnızca localhost), express-rate-limit, magic-byte dosya doğrulama |
 
 ## Kurulum ve Geliştirme
+
+Ek modül notları için [docs/timetable-module.md](docs/timetable-module.md) dosyasına bakın.
 
 ### Gereksinimler
 

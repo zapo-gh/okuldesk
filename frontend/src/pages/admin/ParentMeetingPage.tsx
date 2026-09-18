@@ -1,10 +1,10 @@
 import toast from 'react-hot-toast';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
 import { printPdfBlob } from '../../utils/printPdf';
-import { FileSignature, CheckSquare, Square, Download, Users, Calendar, BookOpen, UserCheck, Search, Loader2, Printer } from 'lucide-react';
+import { FileSignature, CheckSquare, Square, Users, Calendar, BookOpen, UserCheck, Search, Loader2, Printer } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export default function ParentMeetingPage() {
@@ -106,7 +106,7 @@ export default function ParentMeetingPage() {
               Sınıf Seçimi
             </h2>
             
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
@@ -117,17 +117,17 @@ export default function ParentMeetingPage() {
                   className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 w-full sm:w-48"
                 />
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 shrink-0">
                 <Button 
                   variant="ghost"
                   onClick={allSelected ? clearAll : selectAll} 
                   disabled={loadingClasses || filteredClasses.length === 0}
-                  className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 transition"
+                  className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50 transition w-full sm:w-auto justify-center"
                 >
                   {allSelected ? 'Seçimi Kaldır' : 'Tümünü Seç'}
                 </Button>
                 {someSelected && !allSelected && (
-                  <Button variant="ghost" onClick={clearAll} className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-red-600 transition">
+                  <Button variant="ghost" onClick={clearAll} className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-red-600 transition w-full sm:w-auto justify-center">
                     Temizle
                   </Button>
                 )}
@@ -151,7 +151,7 @@ export default function ParentMeetingPage() {
                   const allGradeSelected = gradeClasses.every(c => selectedClasses.includes(c));
                   return (
                     <div key={grade} className="p-5 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 pb-3 border-b border-gray-100">
                         <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">{grade}</span>
                         <Button 
                           variant="ghost"
@@ -278,7 +278,7 @@ export default function ParentMeetingPage() {
               {someSelected && (
                 <div className="mb-5 p-4 bg-green-50 rounded-xl border border-green-100">
                   <div className="text-sm font-bold text-green-800 mb-2">Oluşturulacak Sınıflar:</div>
-                  <div className="text-sm text-green-700 leading-relaxed font-medium mb-3">
+                  <div className="text-sm text-green-700 leading-relaxed font-medium mb-3 break-words">
                     {selectedClasses.join(', ')}
                   </div>
                   <div className="text-xs font-semibold text-green-600/80 bg-green-100 inline-block px-2 py-1 rounded">

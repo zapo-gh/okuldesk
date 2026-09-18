@@ -170,6 +170,7 @@ model SchoolSettings {
   schoolName        String    @default("")
   principalName     String    @default("")
   academicYear      String    @default("2025-2026")
+  lessonPeriodsJson String?   @default("{}")
   waTemplate1       String?   @default("")
   waTemplate2       String?   @default("")
   waTemplate3       String?   @default("")

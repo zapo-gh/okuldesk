@@ -4,7 +4,7 @@ import api from '../../../services/api';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { ActionModal } from '../../../components/ui/ActionModal';
-import { UsersRound, Plus, Trash2, Search, Printer, FileText, Loader2 } from 'lucide-react';
+import { UsersRound, Plus, Trash2, Search, Printer, FileText, Loader2, Edit, X } from 'lucide-react';
 import { useSettings } from '../../../context/SettingsContext';
 import { printPdfBlob } from '../../../utils/printPdf';
 import { Button } from '../../../components/ui/Button';
@@ -31,6 +31,9 @@ export default function ClassTeachersPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [className, setClassName] = useState('');
+  const [isCombinedClass, setIsCombinedClass] = useState(false);
+  const [combinedClasses, setCombinedClasses] = useState<string[]>([]);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -131,8 +134,22 @@ export default function ClassTeachersPage() {
 
   const openAdd = () => {
     setClassName('');
+    setCombinedClasses([]);
     setSelectedStaffId('');
     setFormError('');
+    setEditingStaffId(null);
+    setIsCombinedClass(false);
+    setShowModal(true);
+  };
+
+  const openEdit = (staff: StaffMember) => {
+    const classes = staff.className ? staff.className.split(',').map(c => c.trim()).filter(Boolean) : [];
+    setClassName('');
+    setCombinedClasses(classes);
+    setSelectedStaffId(staff.id);
+    setFormError('');
+    setEditingStaffId(staff.id);
+    setIsCombinedClass(classes.length > 1);
     setShowModal(true);
   };
 
@@ -140,8 +157,10 @@ export default function ClassTeachersPage() {
     e.preventDefault();
     setFormError('');
 
-    if (!className.trim()) {
-      setFormError('Sınıf adı boş olamaz.');
+    const finalClasses = isCombinedClass ? combinedClasses : [className.trim().toUpperCase()].filter(Boolean);
+
+    if (finalClasses.length === 0) {
+      setFormError('Lütfen en az bir sınıf seçin/yazın.');
       return;
     }
     if (!selectedStaffId) {
@@ -149,18 +168,22 @@ export default function ClassTeachersPage() {
       return;
     }
 
-    // Seçilen öğretmenin başka sınıfı var mı kontrol et
-    const existing = allStaff.find(s => s.id === selectedStaffId && s.className && s.className !== className);
-    if (existing) {
-      setFormError(`Bu öğretmen zaten "${existing.className}" sınıfının rehber öğretmeni.`);
-      return;
+    if (!isCombinedClass) {
+      // Seçilen öğretmenin başka sınıfı var mı kontrol et (tekli seçimde)
+      const existing = allStaff.find(s => s.id === selectedStaffId && s.className && s.className !== finalClasses[0]);
+      if (existing && !editingStaffId) {
+        setFormError(`Bu öğretmen zaten "${existing.className}" sınıfının rehber öğretmeni.`);
+        return;
+      }
     }
+
+    const finalClassNameString = finalClasses.join(', ');
 
     setSaving(true);
     try {
       await api.put(`/staff/${selectedStaffId}`, {
         role: 'SINIF_REHBER_OGRETMEN',
-        className: className.trim().toUpperCase()
+        className: finalClassNameString
       });
       setShowModal(false);
       fetchData();
@@ -204,7 +227,7 @@ export default function ClassTeachersPage() {
               {generatingAllPdf ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Printer className="w-5 h-5 mr-2" />}
               <span>Dağılım Çizelgesi Yazdır</span>
             </Button>
-            <Button onClick={() => setShowModal(true)} variant="primary">
+            <Button onClick={openAdd} variant="primary">
               <Plus className="w-5 h-5 mr-2" />
               <span>Görevlendir</span>
             </Button>
@@ -238,9 +261,13 @@ export default function ClassTeachersPage() {
             classTeachers.map((s) => (
               <div key={s.id} className="p-4 flex items-center justify-between hover:bg-slate-50 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <span className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-bold min-w-[3.5rem] text-center shrink-0">
-                    {s.className}
-                  </span>
+                  <div className="flex flex-wrap gap-1 shrink-0 max-w-[150px] justify-center">
+                    {(s.className || '').split(',').map(c => c.trim()).filter(Boolean).map(c => (
+                      <span key={c} className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-bold text-center">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
                   <div className="truncate">
                     <span className="text-sm font-bold text-gray-800 block truncate" title={s.name}>{s.name}</span>
                     <span className="text-xs text-gray-500 truncate">{s.brans || s.unvan || 'Branş Belirtilmemiş'}</span>
@@ -255,6 +282,9 @@ export default function ClassTeachersPage() {
                     title="Aylık Rehberlik Raporu Yazdır"
                   >
                     {generatingReportId === s.id ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
+                  </Button>
+                  <Button variant="ghost" onClick={() => openEdit(s)} className="text-blue-600 hover:bg-blue-50 px-2 py-1 transition-colors" title="Sınıf(ları) Düzenle">
+                    <Edit size={18} />
                   </Button>
                   <Button variant="ghost" onClick={() => handleRemoveRole(s)} className="text-red-600 hover:bg-red-50 px-2 py-1 transition-colors" title="Görevi İptal Et (Havuza Geri Döner)">
                     <Trash2 size={18} />
@@ -281,36 +311,114 @@ export default function ClassTeachersPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sınıf Adı</label>
-            <input
-              type="text"
-              list="class-names"
-              value={className}
-              onChange={(e) => setClassName(e.target.value.toUpperCase())}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
-              placeholder="Örn: 9-A (Yazın veya listeden seçin)"
-              autoFocus
+          <div className="flex items-center gap-2 mb-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100">
+            <input 
+              type="checkbox" 
+              id="isCombined" 
+              checked={isCombinedClass} 
+              onChange={e => {
+                setIsCombinedClass(e.target.checked);
+                if (e.target.checked && className.trim()) {
+                  setCombinedClasses(prev => prev.includes(className.trim()) ? prev : [...prev, className.trim()]);
+                  setClassName('');
+                } else if (!e.target.checked && combinedClasses.length > 0) {
+                  setClassName(combinedClasses[0]);
+                }
+              }}
+              className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer"
             />
-            <datalist id="class-names">
-              {availableClasses
-                .filter(c => !allStaff.some(s => s.className === c))
-                .map(c => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
+            <label htmlFor="isCombined" className="text-sm font-semibold text-indigo-900 cursor-pointer select-none">
+              Birleştirilmiş Sınıf (Birden fazla sınıf seçimi)
+            </label>
           </div>
+
+          {!isCombinedClass ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sınıf Adı</label>
+              <input
+                type="text"
+                list="class-names"
+                value={className}
+                onChange={(e) => setClassName(e.target.value.toUpperCase())}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
+                placeholder="Örn: 9-A (Yazın veya listeden seçin)"
+                autoFocus
+              />
+              <datalist id="class-names">
+                {availableClasses
+                  .filter(c => !allStaff.some(s => s.className?.split(',').map(x=>x.trim()).includes(c)))
+                  .map(c => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sınıfları Ekleyin</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  list="class-names"
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value.toUpperCase())}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && className.trim()) {
+                      e.preventDefault();
+                      if (!combinedClasses.includes(className.trim())) {
+                        setCombinedClasses([...combinedClasses, className.trim()]);
+                      }
+                      setClassName('');
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 uppercase"
+                  placeholder="Örn: 9-A (Yazıp Enter'a basın)"
+                  autoFocus
+                />
+                <Button 
+                  type="button" 
+                  onClick={() => {
+                    if (className.trim() && !combinedClasses.includes(className.trim())) {
+                      setCombinedClasses([...combinedClasses, className.trim()]);
+                      setClassName('');
+                    }
+                  }}
+                  className="shrink-0"
+                >
+                  Ekle
+                </Button>
+              </div>
+              <datalist id="class-names">
+                {availableClasses
+                  .filter(c => !allStaff.some(s => s.className?.split(',').map(x=>x.trim()).includes(c)) && !combinedClasses.includes(c))
+                  .map(c => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+              <div className="flex flex-wrap gap-2 mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg min-h-[50px]">
+                {combinedClasses.map(c => (
+                  <span key={c} className="px-2.5 py-1.5 bg-indigo-100 text-indigo-700 rounded-md text-sm font-semibold flex items-center gap-1.5 shadow-sm">
+                    {c}
+                    <button type="button" onClick={() => setCombinedClasses(prev => prev.filter(x => x !== c))} className="text-indigo-400 hover:text-red-500 transition-colors">
+                       <X size={14} />
+                    </button>
+                  </span>
+                ))}
+                {combinedClasses.length === 0 && <span className="text-xs text-gray-400 m-auto">Henüz sınıf eklenmedi. Yukarıdan seçip "Ekle"ye basın.</span>}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Rehber Öğretmen Seçin</label>
             <select
               value={selectedStaffId}
               onChange={(e) => setSelectedStaffId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              disabled={!!editingStaffId}
+              className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 ${editingStaffId ? 'bg-gray-100 opacity-80 cursor-not-allowed' : ''}`}
             >
               <option value="">-- Personel Havuzundan Seçiniz --</option>
               {allStaff
-                .filter(s => s.role !== 'SINIF_REHBER_OGRETMEN' && !s.className) 
+                .filter(s => editingStaffId ? s.id === editingStaffId : (s.role !== 'SINIF_REHBER_OGRETMEN' && !s.className)) 
                 .map(s => (
                 <option key={s.id} value={s.id}>
                   {s.name} {s.brans ? `(${s.brans})` : ''}

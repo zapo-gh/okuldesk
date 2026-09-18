@@ -522,7 +522,7 @@ export default function StudentListPage() {
           {!loading && displayClasses.length > 0 && (
             <div className="space-y-2 pb-2 px-1 pt-1 -mx-1 -mt-1">
               {/* Normal Sınıflar */}
-              <div className="flex flex-wrap gap-2 overflow-x-auto">
+              <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
                 {displayClasses.filter(c => !(c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A '))).map((cls) => {
                   const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
 
@@ -549,7 +549,7 @@ export default function StudentListPage() {
 
               {/* A- Sınıfları */}
               {displayClasses.some(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')) && (
-                <div className="flex flex-wrap gap-2 overflow-x-auto pt-2 border-t border-gray-100">
+                <div className="flex flex-wrap gap-2 overflow-x-auto pt-2 border-t border-gray-100 pb-1">
                   {displayClasses.filter(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')).map((cls) => {
                     const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
 
@@ -580,8 +580,8 @@ export default function StudentListPage() {
 
         {/* Action Bar (Delete / Summary) */}
         {!loading && displayClasses.length > 0 && (
-          <div className="flex justify-between items-center px-6 py-3 bg-indigo-50/50 border-b border-indigo-100/50 text-sm">
-            <div className="font-medium text-gray-700">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 px-4 sm:px-6 py-3 bg-indigo-50/50 border-b border-indigo-100/50 text-sm">
+            <div className="font-medium text-gray-700 min-w-0">
               <span className="text-indigo-700 font-bold mr-2">
                 {search ? (displayClasses.some(c => c.name === activeClass) ? `Arama: "${search}" (${activeClass})` : `Arama: "${search}" (Tümü)`) : `Sınıf ${activeClass}`}
               </span> 
@@ -594,17 +594,17 @@ export default function StudentListPage() {
               )}
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-wrap lg:justify-end">
               {selectedIds.size > 0 && (
                 <Button 
                   onClick={handleBulkDelete}
                   disabled={bulkDeleting}
-                  className="px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center gap-1 font-medium transition disabled:opacity-50"
+                    className="px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center gap-1 font-medium transition disabled:opacity-50 w-full sm:w-auto justify-center"
                 >
                   {bulkDeleting ? 'Siliniyor...' : <><Trash2 size={14}/> {selectedIds.size} Öğrenciyi Sil</>}
                 </Button>
               )}
-              <span className="text-gray-500">Toplam {students.length} Kayıt</span>
+                <span className="text-gray-500 whitespace-nowrap">Toplam {students.length} Kayıt</span>
             </div>
           </div>
         )}
