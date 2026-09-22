@@ -59,28 +59,33 @@ export default function StudentClubPage() {
     { name: 'Değerler Eğitimi Kulübü', desc: 'Milli, manevi ve evrensel değerlerin kazandırılması' }
   ];
 
-  const loadDefaults = async () => {
-    if (!await confirm('Klasik MEB Öğrenci Kulüpleri (14 Adet) sisteme otomatik eklenecektir. Onaylıyor musunuz?')) return;
-    
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!await confirm(`${file.name} dosyasını yükleyip kulüpleri ve danışman öğretmenleri güncellemek istediğinize emin misiniz?`)) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('academicYear', academicYear);
+
     setLoading(true);
     try {
-      for (const club of DEFAULT_MEB_CLUBS) {
-        await api.post('/student-club', {
-          name: club.name,
-          description: club.desc,
-          academicYear,
-          meetingDay: 'Cuma',
-          meetingTime: '15:00',
-          maxMembers: 30,
-          extraData: JSON.stringify({ activities: [] })
-        });
-      }
-      toast.success('Şablon kulüpler başarıyla eklendi.');
+      const res = await api.post('/student-club/upload-pdf', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(res.data.message || 'PDF başarıyla işlendi.');
       await fetchData();
-    } catch (e) {
-      toast.error('Eklenirken hata oluştu.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'PDF yüklenirken hata oluştu.');
     } finally {
       setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -310,8 +315,9 @@ export default function StudentClubPage() {
         icon={<Users size={24} />}
         actions={
           <div className="flex gap-2">
-            <Button onClick={loadDefaults} variant="outline" className="text-emerald-700 hover:text-emerald-800 border-emerald-200 bg-emerald-50">
-              <span>MEB Listesi Yükle</span>
+            <input type="file" ref={fileInputRef} accept=".pdf" className="hidden" onChange={handleFileUpload} />
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="text-emerald-700 hover:text-emerald-800 border-emerald-200 bg-emerald-50">
+              <span>MEB Listesi Yükle (PDF)</span>
             </Button>
             <Button onClick={handlePrintAll} variant="outline" className="text-slate-700">
               <Printer className="w-5 h-5 mr-2" />

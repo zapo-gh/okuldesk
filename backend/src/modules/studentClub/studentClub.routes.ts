@@ -70,4 +70,58 @@ router.delete('/members/:id', authMiddleware, adminOnly, async (req: Request, re
   catch (e) { next(e); }
 });
 
+import multer from 'multer';
+import { parseClubListPdf } from './utils/clubListParser';
+import prisma from '../shared/utils/prisma';
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/upload-pdf', authMiddleware, adminOnly, upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const file = req.file;
+    if (!file) throw new AppError('Lütfen bir PDF dosyası seçin.', 400);
+
+    const academicYear = req.body.academicYear || '2025-2026';
+    
+    // Parse the PDF
+    const parsedEntries = await parseClubListPdf(file.buffer, academicYear);
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const entry of parsedEntries) {
+      // Find or create the club
+      let club = await prisma.studentClub.findFirst({
+        where: { name: entry.clubName, academicYear }
+      });
+
+      if (!club) {
+        club = await prisma.studentClub.create({
+          data: {
+            name: entry.clubName,
+            academicYear,
+            assignedStaffId: entry.matchedStaffId,
+            isActive: true,
+            maxMembers: 30
+          }
+        });
+        createdCount++;
+      } else {
+        await prisma.studentClub.update({
+          where: { id: club.id },
+          data: { assignedStaffId: entry.matchedStaffId }
+        });
+        updatedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `PDF başarıyla işlendi. ${createdCount} yeni kulüp eklendi, ${updatedCount} kulüp güncellendi.`
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;
