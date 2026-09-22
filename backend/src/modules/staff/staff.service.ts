@@ -19,9 +19,34 @@ class StaffService {
     if (role && VALID_ROLES.includes(role as StaffRole)) {
       where.title = role as StaffRole;
     }
-    return prisma.staff.findMany({
+    const staffList = await prisma.staff.findMany({
       where,
       orderBy: [{ title: 'asc' }, { name: 'asc' }],
+    });
+
+    const activeClubs = await prisma.studentClub.findMany({
+      where: { deletedAt: null, isActive: true },
+      select: { id: true, name: true, assignedStaffId: true, extraData: true }
+    });
+
+    return staffList.map(staff => {
+      const myClubs = activeClubs.filter(c => {
+        if (c.assignedStaffId === staff.id) return true;
+        if (c.extraData) {
+          try {
+            const extra = JSON.parse(c.extraData);
+            if (extra.staffIds && Array.isArray(extra.staffIds)) {
+              return extra.staffIds.includes(staff.id);
+            }
+          } catch (e) {}
+        }
+        return false;
+      });
+
+      return {
+        ...staff,
+        clubName: myClubs.length > 0 ? myClubs.map(c => c.name).join(', ') : null
+      };
     });
   }
 
@@ -36,10 +61,15 @@ class StaffService {
     if (role && VALID_ROLES.includes(role as StaffRole)) {
       where.title = role as StaffRole;
     }
-    return prisma.staff.findMany({
+    const staffList = await prisma.staff.findMany({
       where,
       orderBy: [{ title: 'asc' }, { name: 'asc' }],
     });
+
+    return staffList.map(staff => ({
+      ...staff,
+      clubName: null
+    }));
   }
 
   async create(data: { 
