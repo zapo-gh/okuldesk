@@ -410,34 +410,37 @@ export default function StudentListPage() {
     },
     {
       header: 'Okul No',
+      className: 'w-24',
       render: (s) => <span className="font-semibold text-gray-700">{s.schoolNumber}</span>
     },
     {
       header: 'Ad Soyad',
+      className: 'w-64',
       render: (s) => <span className="font-bold text-gray-900">{s.fullName}</span>
     },
     {
       header: 'Durum',
+      className: 'w-32',
       render: (s) => <StatusBadge status={s.status} />
     },
     {
       header: 'Veli Bilgileri',
       render: (s) => (
-        <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           {s.parents.length > 0 ? (
             s.parents.map((p, pi) => (
-              <div key={pi} className="text-sm border-b border-gray-50 pb-1 last:border-0 last:pb-0">
-                <div>
+              <div key={pi} className="text-sm bg-gray-50 border border-gray-100 rounded-lg p-2.5 pr-4">
+                <div className="flex items-center gap-2 mb-1.5">
                   <span className="font-medium text-gray-800">{p.fullName}</span>
-                  {p.phone && <span className="text-gray-500 ml-2">{p.phone}</span>}
+                  {p.phone && <span className="text-gray-500 text-sm font-mono">{p.phone}</span>}
                 </div>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   {p.waConsentStatus === 'ACCEPTED' && <StatusBadge status="ACTIVE" customText="Onaylı" />}
                   {p.waConsentStatus === 'DECLINED' && <StatusBadge status="REJECTED" customText="Reddedildi" />}
                   {p.waConsentStatus === 'PENDING' && (
                     <>
                       <StatusBadge status="PENDING" customText="Bekliyor" />
-                      <Button variant="ghost" onClick={() => handleSendConsent(p.id)} className="text-blue-600 hover:text-blue-900 px-2 py-1 transition-colors" title="Düzenle">
+                      <Button variant="ghost" onClick={() => handleSendConsent(p.id)} className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-0.5 h-6 text-xs transition-colors rounded" title="Onay İste">
                         Onay İste
                       </Button>
                     </>
@@ -446,7 +449,7 @@ export default function StudentListPage() {
               </div>
             ))
           ) : (
-            <span className="text-gray-400">-</span>
+            <span className="text-gray-400 italic text-sm">-</span>
           )}
         </div>
       )

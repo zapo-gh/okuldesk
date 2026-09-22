@@ -152,38 +152,7 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
           ))
         )}
 
-        {/* Nöbetçi İdareciler */}
-        <div className="mt-4">
-          <div className="bg-gray-100 px-3 py-1 text-xs font-bold uppercase text-gray-600 border border-black border-b-0 text-center">
-            Nöbetçi İdareciler
-          </div>
-          <table className="w-full border-collapse border border-black text-xs text-center">
-            <thead>
-              <tr className="bg-gray-50">
-                {DAYS.map(day => (
-                  <th key={day.val} className="w-1/5 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">{day.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {DAYS.map(day => {
-                  const adminConfigs = staffConfigs.filter(c => c.isAdmin && c.isFixedDay && c.fixedDayOfWeek === day.val);
-                  const adminNames = Array.from(new Set(adminConfigs.map(c => {
-                    const s = staffList.find(staff => staff.id === c.staffId);
-                    return s ? s.name : null;
-                  }).filter(Boolean)));
-                  
-                  return (
-                    <td key={`admin-cell-${day.val}`} className="border border-black p-2 font-semibold">
-                      {adminNames.length > 0 ? adminNames.join(', ') : '-'}
-                    </td>
-                  );
-                })}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
 
         {/* Görev notu */}
         <div className="mt-5 text-xs text-justify">

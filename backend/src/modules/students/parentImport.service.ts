@@ -97,8 +97,24 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
   const allStudents = await prisma.student.findMany({ select: { id: true, schoolNumber: true, fullName: true } });
   const studentByNumber = new Map(allStudents.map((s) => [s.schoolNumber, s]));
 
+  const normalizeName = (name: string) => name.toLocaleUpperCase('tr-TR').replace(/\s+/g, '');
+
+  const findMatchingStudent = (schoolNumber: string, studentName: string) => {
+    let student = studentByNumber.get(schoolNumber);
+    if (student && normalizeName(student.fullName) !== normalizeName(studentName)) {
+      student = undefined;
+    }
+    if (!student) {
+      const atpStudent = studentByNumber.get('A-' + schoolNumber);
+      if (atpStudent && normalizeName(atpStudent.fullName) === normalizeName(studentName)) {
+        student = atpStudent;
+      }
+    }
+    return student;
+  };
+
   for (const row of rows) {
-    const student = studentByNumber.get(row.schoolNumber);
+    const student = findMatchingStudent(row.schoolNumber, row.studentName);
     const matched = !!student;
     result.preview.push({ schoolNumber: row.schoolNumber, studentName: row.studentName, className: row.className, matched, parent1Name: row.parent1Name, parent1Phone: row.parent1Phone, parent2Name: row.parent2Name, parent2Phone: row.parent2Phone });
     if (matched) result.matched++;
@@ -109,7 +125,7 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
 
   const parentEntries: { studentId: string; fullName: string; phone: string; rowNum: string }[] = [];
   for (const row of rows) {
-    const student = studentByNumber.get(row.schoolNumber);
+    const student = findMatchingStudent(row.schoolNumber, row.studentName);
     if (!student) continue;
     if (row.parent1Name && row.parent1Phone) parentEntries.push({ studentId: student.id, fullName: row.parent1Name, phone: row.parent1Phone, rowNum: row.schoolNumber });
     if (row.parent2Name && row.parent2Phone) parentEntries.push({ studentId: student.id, fullName: row.parent2Name, phone: row.parent2Phone, rowNum: row.schoolNumber });
@@ -133,11 +149,17 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
   const generatedPasswordByPhone = new Map<string, string>();
   const hashByPhone = new Map<string, string>();
 
-  await Promise.all(newUserPhones.map(async (phone) => {
-    const rawPassword = generateTemporaryPassword();
-    generatedPasswordByPhone.set(phone, rawPassword);
-    hashByPhone.set(phone, await bcrypt.hash(rawPassword, 12));
-  }));
+  // Perform hashing in chunks to prevent overloading the thread pool
+  // Use cost 6 instead of 8 for temporary bulk passwords to dramatically speed up the process (takes ~2 seconds for 1000 users)
+  // The passwords are 12 random bytes (96 bits entropy), so cost 6 is perfectly safe.
+  for (let i = 0; i < newUserPhones.length; i += 50) {
+    const chunk = newUserPhones.slice(i, i + 50);
+    await Promise.all(chunk.map(async (phone) => {
+      const rawPassword = generateTemporaryPassword();
+      generatedPasswordByPhone.set(phone, rawPassword);
+      hashByPhone.set(phone, await bcrypt.hash(rawPassword, 6));
+    }));
+  }
 
   const BATCH_SIZE = 50;
   const createdParentByPhone = new Map<string, { id: string; students: { id: string }[] }>();

@@ -155,12 +155,12 @@ export default function AdminLayout() {
           {/* Öğrenci İşlemleri */}
           {!collapsed && <span className="text-xs font-bold text-purple-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Öğrenci İşlemleri</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
+          <NavItem to="/admin/parent-leave" icon={FileSignature} label="Veli İzin Dilekçesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/absenteeism" icon={Mail} label="Devamsızlık Mektubu" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/warnings" icon={AlertTriangle} label="Yazılı Uyarılar" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/violations" icon={ShieldAlert} label="İhlal Takibi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/grade-reports" icon={TrendingDown} label="Başarısızlık Riski Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/parent-notification" icon={Bell} label="ÖMYK Devamsızlık Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/parent-leave" icon={FileSignature} label="Veli İzin Dilekçesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/matbu-evraklar" icon={Printer} label="Kayıt Evrakları" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/parent-meeting" icon={FileText} label="Veli Toplantısı İmza Sirküsü" onClick={closeSidebar} collapsed={collapsed} />
 
@@ -173,6 +173,7 @@ export default function AdminLayout() {
           <NavItem to="/admin/board-meeting" icon={UsersRound} label="Öğretmenler Kurulu" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/social-activity" icon={PartyPopper} label="Sosyal Etkinlik Planı" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/student-club" icon={Trophy} label="Öğrenci Kulüpleri" onClick={closeSidebar} collapsed={collapsed} />
+          <NavItem to="/admin/class-teachers" icon={UsersRound} label="Sınıf Rehber Öğretmenleri" onClick={closeSidebar} collapsed={collapsed} />
 
           {/* Personel & İnsan Kaynakları */}
           {!collapsed && <span className="text-xs font-bold text-blue-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Personel & İnsan Kayn.</span>}
@@ -181,9 +182,6 @@ export default function AdminLayout() {
           <NavItem to="/admin/attendance-sheet" icon={FileSignature} label="Personel İmza Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/teblig" icon={FileCheck} label="Tebliğ – Tebellüğ Belgesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/staff-transfer" icon={ArrowRightLeft} label="Personel Nakil Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
-
-          <NavItem to="/admin/class-teachers" icon={UsersRound} label="Sınıf Rehber Öğretmenleri" onClick={closeSidebar} collapsed={collapsed} />
-
 
           {/* Kurullar & Planlama */}
           {!collapsed && <span className="text-xs font-bold text-orange-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Kurullar & Planlama</span>}

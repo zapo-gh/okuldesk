@@ -54,10 +54,10 @@ export function ActionModal({
   if (!isOpen) return null;
 
   const widthClass = {
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-2xl',
-    full: 'max-w-5xl'
+    md: 'w-full max-w-md',
+    lg: 'w-full max-w-lg',
+    xl: 'w-full max-w-2xl',
+    full: 'w-fit max-w-[95vw] 2xl:max-w-[1600px]'
   }[width];
 
   return (
@@ -71,7 +71,7 @@ export function ActionModal({
 
       {/* Modal Dialog */}
       <div 
-        className={`relative w-full ${widthClass} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-100 opacity-100 animate-in fade-in zoom-in duration-200`}
+        className={`relative ${widthClass} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-100 opacity-100 animate-in fade-in zoom-in duration-200`}
         role="dialog"
         aria-modal="true"
       >

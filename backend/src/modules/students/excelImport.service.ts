@@ -79,8 +79,12 @@ export function parseExcelFile(buffer: Buffer): ParsedStudent[] {
       const sNo = parseInt(String(row[0] ?? ''), 10);
       if (isNaN(sNo)) continue; // Not a data row
 
-      const schoolNumber = String(row[1] ?? '').trim();
+      let schoolNumber = String(row[1] ?? '').trim();
       if (!schoolNumber) continue;
+
+      if (currentClassName && currentClassName.startsWith('A-')) {
+        schoolNumber = 'A-' + schoolNumber;
+      }
 
       // Name columns: look for first name and last name
       // Based on the Excel layout, Adı is around column C (index 2-6), Soyadı around column H (index 7-9)
@@ -110,7 +114,7 @@ export function parseExcelFile(buffer: Buffer): ParsedStudent[] {
  */
 function extractClassName(text: string): string {
   let prefix = '';
-  const upperText = text.toUpperCase();
+  const upperText = text.toLocaleUpperCase('tr-TR');
   
   if (upperText.includes('ATP') || upperText.includes('ANADOLU TEKNİK')) {
     prefix = 'A-';
@@ -119,13 +123,13 @@ function extractClassName(text: string): string {
   // Pattern: "X. Sınıf / Y Şubesi" or "X. Akademik Destek / Y Şubesi"
   const match = text.match(/(\d+)\..*?\/\s*([A-Za-z\u00C0-\u024F\u0100-\u017F0-9]+)\s*\u015Eubesi/i);
   if (match) {
-    return `${prefix}${match[1]}/${match[2].toUpperCase()}`;
+    return `${prefix}${match[1]}/${match[2].toLocaleUpperCase('tr-TR')}`;
   }
 
   // Fallback: try simpler pattern
-  const simpleMatch = text.match(/(\d+)\s*\/\s*([A-Za-z])\b/);
+  const simpleMatch = text.match(/(\d+)\s*\/\s*([A-Za-z\u00C0-\u024F\u0100-\u017F])\b/);
   if (simpleMatch) {
-    return `${prefix}${simpleMatch[1]}/${simpleMatch[2].toUpperCase()}`;
+    return `${prefix}${simpleMatch[1]}/${simpleMatch[2].toLocaleUpperCase('tr-TR')}`;
   }
 
   return text.slice(0, 30).trim();

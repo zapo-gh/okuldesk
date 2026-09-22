@@ -33,6 +33,15 @@ export class DutyScheduleController {
     } catch (e) { next(e); }
   }
 
+  async uploadExcel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) throw new AppError('Lütfen bir Excel dosyası yükleyin.', 400);
+      const academicYear = req.body.academicYear || '2025-2026';
+      const result = await dutyScheduleService.uploadExcel(req.file.buffer, academicYear);
+      res.status(201).json({ success: true, data: result });
+    } catch (e) { next(e); }
+  }
+
   // ── Assignments ──
   async getAssignments(req: Request, res: Response, next: NextFunction) {
     try {
@@ -122,9 +131,9 @@ export class DutyScheduleController {
 
   async saveAbsence(req: Request, res: Response, next: NextFunction) {
     try {
-      const { staffId, academicYear, startDate, endDate, reason } = req.body;
+      const { staffId, academicYear, startDate, endDate, reason, absenceTime } = req.body;
       if (!staffId || !academicYear || !startDate || !endDate) throw new AppError('Zorunlu alanlar eksik.', 400);
-      res.status(201).json({ success: true, data: await coverAssignmentService.saveAbsence({ staffId, academicYear, startDate, endDate, reason }) });
+      res.status(201).json({ success: true, data: await coverAssignmentService.saveAbsence({ staffId, academicYear, startDate, endDate, reason, absenceTime }) });
     } catch (e) { next(e); }
   }
 
@@ -139,9 +148,16 @@ export class DutyScheduleController {
 
   async suggestCovers(req: Request, res: Response, next: NextFunction) {
     try {
-      const { date, academicYear } = req.query;
+      const { date, academicYear, preventConsecutive, maxCoversPerHour, maxCoversPerDay } = req.query;
       if (!date || !academicYear) throw new AppError('date ve academicYear zorunludur.', 400);
-      res.json({ success: true, data: await coverAssignmentService.suggestCovers(date as string, academicYear as string) });
+      
+      const rules = {
+        preventConsecutive: preventConsecutive === 'true',
+        maxCoversPerHour: maxCoversPerHour ? Number(maxCoversPerHour) : 1,
+        maxCoversPerDay: maxCoversPerDay ? Number(maxCoversPerDay) : 6
+      };
+
+      res.json({ success: true, data: await coverAssignmentService.suggestCovers(date as string, academicYear as string, rules) });
     } catch (e) { next(e); }
   }
 
@@ -167,6 +183,15 @@ export class DutyScheduleController {
       if (!id) throw new AppError('ID zorunludur.', 400);
       await coverAssignmentService.deleteCover(id);
       res.json({ success: true, message: 'Görevlendirme silindi.' });
+    } catch (e) { next(e); }
+  }
+
+  async clearCoversForDate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { date } = req.query;
+      if (!date) throw new AppError('date zorunludur.', 400);
+      await coverAssignmentService.clearCoversForDate(date as string);
+      res.json({ success: true, message: 'Tüm görevlendirmeler silindi.' });
     } catch (e) { next(e); }
   }
 }

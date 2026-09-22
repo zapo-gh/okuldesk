@@ -21,10 +21,13 @@ const upload = multer({
 router.use(authMiddleware);
 
 router.get('/active',             (req, res, next) => timetableController.getActiveTimetable(req, res, next));
+router.get('/classes',            (req, res, next) => timetableController.getActiveClassList(req, res, next));
 router.get('/history',            (req, res, next) => timetableController.getTimetableHistory(req, res, next));
+router.get('/load-summary',       (req, res, next) => timetableController.getLoadSummary(req, res, next));
 router.get('/teacher/:staffId',   (req, res, next) => timetableController.getTeacherTimetable(req, res, next));
 router.get('/class/:className',   (req, res, next) => timetableController.getClassTimetable(req, res, next));
 router.post('/upload',            upload.single('file'), (req, res, next) => timetableController.uploadTimetable(req, res, next));
+router.post('/:id/upload-class-schedule', upload.single('file'), (req, res, next) => timetableController.uploadClassSchedule(req, res, next));
 router.delete('/:id',             (req, res, next) => timetableController.deleteTimetable(req, res, next));
 router.put('/:id/activate',       (req, res, next) => timetableController.setActiveTimetable(req, res, next));
 

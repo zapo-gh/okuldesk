@@ -754,6 +754,7 @@ model StaffAbsence {
   startDate    DateTime
   endDate      DateTime
   reason       String?
+  absenceTime  String   @default("TAM_GUN") // TAM_GUN, SABAH, OGLEDEN_SONRA
   createdAt    DateTime @default(now())
 
   staff  Staff             @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -773,6 +774,7 @@ model CoverAssignment {
   period            Int
   className         String
   subject           String?
+  room              String?
   academicYear      String
   createdAt         DateTime @default(now())
 
