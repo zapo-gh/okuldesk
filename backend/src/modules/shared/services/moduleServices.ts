@@ -334,11 +334,13 @@ class StudentClubService {
       where: { academicYear, deletedAt: null },
       orderBy: { name: 'asc' },
       include: {
+        assignedStaff: { select: { name: true } },
         _count: { select: { members: true } }
       }
     });
     return clubs.map((c: any) => ({
       ...c,
+      assignedStaffName: c.assignedStaff?.name || '',
       memberCount: c._count?.members || 0
     }));
   }
