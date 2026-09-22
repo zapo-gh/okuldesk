@@ -89,18 +89,49 @@ router.post('/upload-pdf', authMiddleware, adminOnly, upload.single('file'), asy
     let createdCount = 0;
     let updatedCount = 0;
 
+    // Group parsed entries by club name
+    const groupedClubs = new Map<string, { staffIds: string[], staffNames: string[] }>();
+    
     for (const entry of parsedEntries) {
-      // Find or create the club
+      if (!groupedClubs.has(entry.clubName)) {
+        groupedClubs.set(entry.clubName, { staffIds: [], staffNames: [] });
+      }
+      if (entry.matchedStaffId && entry.matchedStaffName) {
+        const clubGroup = groupedClubs.get(entry.clubName)!;
+        if (!clubGroup.staffIds.includes(entry.matchedStaffId)) {
+          clubGroup.staffIds.push(entry.matchedStaffId);
+          clubGroup.staffNames.push(entry.matchedStaffName);
+        }
+      }
+    }
+
+    for (const [clubName, data] of groupedClubs.entries()) {
       let club = await prisma.studentClub.findFirst({
-        where: { name: entry.clubName, academicYear }
+        where: { name: clubName, academicYear }
       });
 
+      const primaryStaffId = data.staffIds.length > 0 ? data.staffIds[0] : null;
+
+      let extraDataStr: string | null = null;
+      if (data.staffIds.length > 0) {
+        let existingExtra: any = {};
+        if (club?.extraData) {
+          try { existingExtra = JSON.parse(club.extraData); } catch (e) {}
+        }
+        existingExtra.staffIds = data.staffIds;
+        existingExtra.staffNames = data.staffNames;
+        extraDataStr = JSON.stringify(existingExtra);
+      } else if (club?.extraData) {
+        extraDataStr = club.extraData;
+      }
+
       if (!club) {
-        club = await prisma.studentClub.create({
+        await prisma.studentClub.create({
           data: {
-            name: entry.clubName,
+            name: clubName,
             academicYear,
-            assignedStaffId: entry.matchedStaffId,
+            assignedStaffId: primaryStaffId,
+            extraData: extraDataStr,
             isActive: true,
             maxMembers: 30
           }
@@ -109,7 +140,11 @@ router.post('/upload-pdf', authMiddleware, adminOnly, upload.single('file'), asy
       } else {
         await prisma.studentClub.update({
           where: { id: club.id },
-          data: { assignedStaffId: entry.matchedStaffId }
+          data: { 
+            assignedStaffId: primaryStaffId,
+            extraData: extraDataStr,
+            deletedAt: null // Restore from soft delete
+          }
         });
         updatedCount++;
       }

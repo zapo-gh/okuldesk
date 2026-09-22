@@ -338,11 +338,22 @@ class StudentClubService {
         _count: { select: { members: true } }
       }
     });
-    return clubs.map((c: any) => ({
-      ...c,
-      assignedStaffName: c.assignedStaff?.name || '',
-      memberCount: c._count?.members || 0
-    }));
+    return clubs.map((c: any) => {
+      let extra: any = {};
+      try { if (c.extraData) extra = JSON.parse(c.extraData); } catch(e) {}
+      
+      let staffNameStr = c.assignedStaff?.name || '';
+      if (extra.staffNames && Array.isArray(extra.staffNames) && extra.staffNames.length > 0) {
+        staffNameStr = extra.staffNames.join(', ');
+      }
+
+      return {
+        ...c,
+        extra,
+        assignedStaffName: staffNameStr,
+        memberCount: c._count?.members || 0
+      };
+    });
   }
   async create(d: { name: string; description?: string; assignedStaffId?: string; meetingDay?: string; meetingTime?: string; maxMembers?: number; academicYear: string; extraData?: string }) {
     return prisma.studentClub.create({
