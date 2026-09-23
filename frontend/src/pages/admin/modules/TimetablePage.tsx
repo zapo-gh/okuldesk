@@ -364,7 +364,11 @@ export default function TimetablePage() {
           <style type="text/css" media="print">
             {`
               @page { size: A4 portrait; margin: 10mm; }
-              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              body { 
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                zoom: 0.85;
+              }
             `}
           </style>
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between print:hidden">

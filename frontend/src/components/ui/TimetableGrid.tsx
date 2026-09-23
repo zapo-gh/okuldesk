@@ -84,7 +84,7 @@ export default function TimetableGrid({
       <table className="w-full text-sm border-collapse print:border-2 print:border-black print:text-black">
         <thead>
           <tr>
-            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:py-2">
+            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:p-0.5 print:text-[10px] print:w-auto">
               Gün
             </th>
             {periods.map(p => {
@@ -92,11 +92,11 @@ export default function TimetableGrid({
               return (
                 <th
                   key={p}
-                  className="px-2 py-3 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider min-w-[110px] bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:py-2"
+                  className="px-2 py-3 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider min-w-[110px] bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:p-0.5 print:min-w-0"
                 >
-                  <span className="block">{p}. Ders</span>
+                  <span className="block print:text-[9px] print:leading-none">{p}. Ders</span>
                   {time && (
-                    <span className="block text-[10px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 print:text-black">
+                    <span className="block text-[10px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 print:text-black print:text-[7px] print:leading-none print:mt-0">
                       {time}
                     </span>
                   )}
@@ -120,7 +120,7 @@ export default function TimetableGrid({
                 }`}
               >
                 <td
-                  className={`px-4 py-3 font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors print:static print:bg-gray-50 print:border print:border-black print:shadow-none print:text-black print:py-2 ${
+                  className={`px-4 py-3 font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors print:static print:bg-gray-50 print:border print:border-black print:shadow-none print:text-black print:p-1 print:text-[10px] ${
                     isToday
                       ? 'bg-indigo-100/90 text-indigo-800'
                       : rowIndex % 2 === 0
