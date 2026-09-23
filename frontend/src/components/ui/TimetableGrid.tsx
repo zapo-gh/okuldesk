@@ -139,9 +139,9 @@ export default function TimetableGrid({
                   const cells = getCells(day.val, period);
                   const grouped = groupCells(cells);
                   return (
-                    <td key={period} className="px-1 py-1 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-1">
+                    <td key={period} className="px-1 py-1 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-0">
                       {grouped.length > 0 ? (
-                        <div className="flex flex-col gap-1 w-full h-full">
+                        <div className="flex flex-col gap-0.5 w-full h-full">
                           {grouped.map((group, idx) => (
                             <div
                               key={idx}
@@ -150,16 +150,16 @@ export default function TimetableGrid({
                             >
                               {viewMode === 'teacher' ? (
                                 <>
-                                  <span className="font-extrabold text-[13px] leading-tight mb-0.5 print:text-[11px] print:text-black">
+                                  <span className="font-extrabold text-[13px] leading-tight mb-0.5 print:text-[10px] print:text-black print:mb-0">
                                     {group.classNames.join(', ')}
                                   </span>
                                   {group.subject && (
-                                    <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase print:opacity-100 print:text-black">
+                                    <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase print:opacity-100 print:text-[9px] print:text-black">
                                       {group.subject}
                                     </span>
                                   )}
                                   {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-black">
+                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-[8px] print:text-black print:mt-0">
                                       <span className="print:hidden">🚪 </span>
                                       <span className="hidden print:inline">Derslik: </span>
                                       {group.room}
@@ -169,21 +169,21 @@ export default function TimetableGrid({
                               ) : (
                                 <>
                                   {group.subject && (
-                                    <span className="font-extrabold text-[13px] leading-tight mb-0.5 uppercase print:text-[12px] print:text-black">
+                                    <span className="font-extrabold text-[13px] leading-tight mb-0.5 uppercase print:text-[10px] print:text-black print:mb-0">
                                       {group.subject}
                                     </span>
                                   )}
                                   {group.staffNames.length > 0 && (
-                                    <div className="flex flex-col items-center gap-0 mt-0.5">
+                                    <div className="flex flex-col items-center gap-0 mt-0.5 print:mt-0">
                                       {group.staffNames.map((name: string, i: number) => (
-                                        <span key={i} className="font-semibold text-[10px] opacity-80 leading-tight text-center print:opacity-100 print:text-black">
+                                        <span key={i} className="font-semibold text-[10px] opacity-80 leading-tight text-center print:opacity-100 print:text-[9px] print:text-black">
                                           {name}
                                         </span>
                                       ))}
                                     </div>
                                   )}
                                   {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-black">
+                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-[8px] print:text-black print:mt-0">
                                       <span className="print:hidden">🚪 </span>
                                       <span className="hidden print:inline">Derslik: </span>
                                       {group.room}

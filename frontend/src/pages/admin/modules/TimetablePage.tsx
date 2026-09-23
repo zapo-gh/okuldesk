@@ -361,6 +361,12 @@ export default function TimetablePage() {
 
       {viewEntries.length > 0 && (
         <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
+          <style type="text/css" media="print">
+            {`
+              @page { size: landscape; margin: 10mm; }
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            `}
+          </style>
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between print:hidden">
             <h3 className="font-bold text-slate-800 text-sm">{viewTitle}</h3>
             <p className="text-xs text-slate-400">💡 Bir kutucuğa tıklayarak {viewMode === 'teacher' ? 'sınıfın' : 'öğretmenin'} programını görüntüleyin</p>
