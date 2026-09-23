@@ -80,8 +80,8 @@ export default function TimetableGrid({
   );
 
   return (
-    <div className="overflow-x-auto print:overflow-visible">
-      <table className="w-full text-sm border-collapse print:border-2 print:border-black print:text-black print:table-fixed">
+    <div className="overflow-x-auto print:overflow-visible print:px-1">
+      <table className="w-full text-sm border-collapse print:border-2 print:border-black print:text-black print:table-fixed print:w-full">
         <thead>
           <tr>
             <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:p-0.5 print:text-[9px] print:w-[8%]">

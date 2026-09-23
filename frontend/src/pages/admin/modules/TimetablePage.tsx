@@ -383,7 +383,7 @@ export default function TimetablePage() {
           <TimetableGrid entries={viewEntries} viewMode={viewMode} todayDow={todayDow} getPeriodTime={getPeriodTime} onCellClick={handleCellClick} />
           
           {/* Ders Listesi Özeti (Sadece Çıktıda Görünebilir veya Hep Görünebilir) */}
-          <div className="mt-8 px-4 print:px-0">
+          <div className="mt-8 px-4 print:px-1">
             <table className="w-full text-[11px] border-collapse print:border-2 print:border-black print:text-black">
               <thead>
                 <tr className="bg-slate-100 print:bg-transparent text-slate-700 print:text-black font-bold">
