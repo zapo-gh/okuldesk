@@ -363,7 +363,7 @@ export default function TimetablePage() {
         <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
           <style type="text/css" media="print">
             {`
-              @page { size: landscape; margin: 10mm; }
+              @page { size: A4 portrait; margin: 10mm; }
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             `}
           </style>
@@ -377,6 +377,61 @@ export default function TimetablePage() {
             <p className="text-black text-sm mt-1 font-medium">{academicYear} EĞİTİM ÖĞRETİM YILI — Yazdır: {new Date().toLocaleDateString('tr-TR')}</p>
           </div>
           <TimetableGrid entries={viewEntries} viewMode={viewMode} todayDow={todayDow} getPeriodTime={getPeriodTime} onCellClick={handleCellClick} />
+          
+          {/* Ders Listesi Özeti (Sadece Çıktıda Görünebilir veya Hep Görünebilir) */}
+          <div className="mt-8 px-4 print:px-0">
+            <table className="w-full text-[11px] border-collapse print:border-2 print:border-black print:text-black">
+              <thead>
+                <tr className="bg-slate-100 print:bg-transparent text-slate-700 print:text-black font-bold">
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-8 text-center">Sr</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-24 text-left">Ders Kodu</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 text-left">Ders Adı</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-20 text-center">Alan/Dal</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-12 text-center">Süre</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 text-left">{viewMode === 'teacher' ? 'Sınıf' : 'Öğretmen'}</th>
+                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-32 text-left">Yer</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white print:bg-transparent">
+                {(() => {
+                  const map = new Map<string, any>();
+                  viewEntries.forEach(e => {
+                    const key = viewMode === 'teacher' 
+                      ? `${e.className || ''}-${e.subject || ''}`
+                      : `${e.subject || ''}-${e.staff?.name || ''}`;
+                    if (!map.has(key)) {
+                      map.set(key, {
+                        subject: e.subject || '',
+                        className: e.className || '',
+                        staffName: e.staff?.name || '',
+                        rooms: [e.room].filter(Boolean),
+                        count: 1
+                      });
+                    } else {
+                      const item = map.get(key)!;
+                      item.count++;
+                      if (e.room) item.rooms.push(e.room);
+                    }
+                  });
+                  return Array.from(map.values())
+                    .map(item => ({ ...item, roomStr: Array.from(new Set(item.rooms)).join(' - ') }))
+                    .sort((a, b) => a.subject.localeCompare(b.subject))
+                    .map((item, idx) => (
+                      <tr key={idx} className="print:border-b print:border-black">
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-semibold text-slate-700 print:text-black">{idx + 1}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{item.subject.substring(0, 8)}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-semibold">{item.subject}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center text-slate-600 print:text-black"></td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-bold text-slate-800 print:text-black">{item.count}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{viewMode === 'teacher' ? item.className : item.staffName}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-xs uppercase text-slate-600 print:text-black">{item.roomStr}</td>
+                      </tr>
+                    ));
+                })()}
+              </tbody>
+            </table>
+            <div className="h-4"></div>
+          </div>
         </div>
       )}
 
