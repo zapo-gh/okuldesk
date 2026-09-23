@@ -363,11 +363,11 @@ export default function TimetablePage() {
         <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
           <style type="text/css" media="print">
             {`
-              @page { size: A4 portrait; margin: 10mm; }
+              @page { size: A4 portrait; margin: 8mm; }
               body { 
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact; 
-                zoom: 0.85;
+                zoom: 0.75;
               }
             `}
           </style>
