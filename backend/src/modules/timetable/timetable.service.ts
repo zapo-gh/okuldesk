@@ -226,6 +226,7 @@ class TimetableService {
             dayOfWeek: entry.dayOfWeek,
             period: entry.period,
             subject: entry.subject ?? null,
+            subjectName: entry.subjectName ?? null,
             room: entry.room ?? null
           });
         });

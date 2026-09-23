@@ -5,6 +5,7 @@ export interface ParsedTimetableEntry {
   period: number;
   className: string;
   subject?: string;
+  subjectName?: string;
   room?: string;
 }
 
@@ -34,10 +35,11 @@ export const parseTimetableExcel = (buffer: Buffer): ParsedTeacherSchedule[] => 
     });
 
     const teacherBlocks = findTeacherBlocks(jsonData);
+    const globalSubjectDictionary = extractSubjectDictionary(jsonData);
 
     teacherBlocks.forEach(block => {
       const teacherData = jsonData.slice(block.startRow, block.endRow);
-      const entries = parseTeacherScheduleFromBlock(teacherData);
+      const entries = parseTeacherScheduleFromBlock(teacherData, globalSubjectDictionary);
       
       if (entries.length > 0) {
         teacherSchedules.push({
@@ -132,7 +134,44 @@ function isValidTeacherName(name: string): boolean {
   return true;
 }
 
-function parseTeacherScheduleFromBlock(teacherData: any[][]): ParsedTimetableEntry[] {
+function extractSubjectDictionary(sheetData: any[][]): Map<string, string> {
+  const dictionary = new Map<string, string>();
+  
+  for (let rowIndex = 0; rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    if (!row || row.length < 5) continue;
+
+    let subjectCodeIndex = -1;
+    let subjectNameIndex = -1;
+
+    for (let colIndex = 0; colIndex < row.length; colIndex++) {
+      const cellText = String(row[colIndex] || '').trim();
+      if (cellText === 'Ders Kodu') subjectCodeIndex = colIndex;
+      if (cellText === 'Ders Adı') subjectNameIndex = colIndex;
+    }
+
+    if (subjectCodeIndex !== -1 && subjectNameIndex !== -1) {
+      for (let i = rowIndex + 1; i < sheetData.length; i++) {
+        const itemRow = sheetData[i];
+        if (!itemRow || itemRow.length === 0) break;
+        
+        const srValue = String(itemRow[0] || '').trim();
+        if (srValue === 'Toplam' || srValue.includes('Yukarıdaki')) break;
+        
+        const subjectCode = String(itemRow[subjectCodeIndex] || '').trim();
+        const subjectName = String(itemRow[subjectNameIndex] || '').trim();
+        
+        if (subjectCode && subjectName) {
+          dictionary.set(subjectCode, subjectName);
+        }
+      }
+    }
+  }
+  
+  return dictionary;
+}
+
+function parseTeacherScheduleFromBlock(teacherData: any[][], dictionary: Map<string, string>): ParsedTimetableEntry[] {
   const gunlerRowIndex = findGunlerRow(teacherData);
   if (gunlerRowIndex === -1) return [];
 
@@ -165,6 +204,7 @@ function parseTeacherScheduleFromBlock(teacherData: any[][]): ParsedTimetableEnt
               period: periodNum,
               className: parsed.className,
               subject: parsed.subject,
+              subjectName: parsed.subject ? dictionary.get(parsed.subject) : undefined,
               room: parsed.room
             });
           }

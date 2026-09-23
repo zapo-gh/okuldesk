@@ -406,6 +406,7 @@ export default function TimetablePage() {
                     if (!map.has(key)) {
                       map.set(key, {
                         subject: e.subject || '',
+                        subjectName: (e as any).subjectName || e.subject || '',
                         className: e.className || '',
                         staffName: e.staff?.name || '',
                         rooms: [e.room].filter(Boolean),
@@ -424,7 +425,7 @@ export default function TimetablePage() {
                       <tr key={idx} className="print:border-b print:border-black">
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-semibold text-slate-700 print:text-black">{idx + 1}</td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{item.subject.substring(0, 8)}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-semibold">{item.subject}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-semibold">{item.subjectName}</td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center text-slate-600 print:text-black"></td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-bold text-slate-800 print:text-black">{item.count}</td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{viewMode === 'teacher' ? item.className : item.staffName}</td>
