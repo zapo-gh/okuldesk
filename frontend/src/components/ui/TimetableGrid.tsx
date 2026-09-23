@@ -80,11 +80,11 @@ export default function TimetableGrid({
   );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
+    <div className="overflow-x-auto print:overflow-visible">
+      <table className="w-full text-sm border-collapse print:border-2 print:border-black print:text-black">
         <thead>
           <tr>
-            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)]">
+            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:py-2">
               Gün
             </th>
             {periods.map(p => {
@@ -92,11 +92,11 @@ export default function TimetableGrid({
               return (
                 <th
                   key={p}
-                  className="px-2 py-3 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider min-w-[110px] bg-slate-100/90 border-b border-slate-200"
+                  className="px-2 py-3 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider min-w-[110px] bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:py-2"
                 >
                   <span className="block">{p}. Ders</span>
                   {time && (
-                    <span className="block text-[10px] font-normal text-slate-500 normal-case tracking-normal mt-0.5">
+                    <span className="block text-[10px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 print:text-black">
                       {time}
                     </span>
                   )}
@@ -105,14 +105,13 @@ export default function TimetableGrid({
             })}
           </tr>
         </thead>
-        <tbody className="bg-white">
+        <tbody className="bg-white print:bg-transparent">
           {DAYS.map((day, rowIndex) => {
             const isToday = todayDow !== undefined && day.val === todayDow;
-            // Çift ve tek satırlar arasında renk farkı (border ile birlikte daha belirgin bir grid)
             return (
               <tr
                 key={day.val}
-                className={`transition-colors group border-b border-slate-200 last:border-0 ${
+                className={`transition-colors group border-b border-slate-200 last:border-0 print:border-b print:border-black ${
                   isToday 
                     ? 'bg-indigo-50/80 hover:bg-indigo-100/60' 
                     : rowIndex % 2 === 0 
@@ -121,7 +120,7 @@ export default function TimetableGrid({
                 }`}
               >
                 <td
-                  className={`px-4 py-3 font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors ${
+                  className={`px-4 py-3 font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors print:static print:bg-gray-50 print:border print:border-black print:shadow-none print:text-black print:py-2 ${
                     isToday
                       ? 'bg-indigo-100/90 text-indigo-800'
                       : rowIndex % 2 === 0
@@ -131,7 +130,7 @@ export default function TimetableGrid({
                 >
                   {day.label}
                   {isToday && (
-                    <span className="block text-indigo-500 text-[9px] font-semibold normal-case tracking-normal mt-0.5">
+                    <span className="block text-indigo-500 text-[9px] font-semibold normal-case tracking-normal mt-0.5 print:hidden">
                       ● bugün
                     </span>
                   )}
@@ -140,50 +139,54 @@ export default function TimetableGrid({
                   const cells = getCells(day.val, period);
                   const grouped = groupCells(cells);
                   return (
-                    <td key={period} className="px-2 py-3 text-center align-middle border-l border-slate-100 first:border-l-0">
+                    <td key={period} className="px-1 py-1 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-1">
                       {grouped.length > 0 ? (
-                        <div className="flex flex-col gap-1 w-full">
+                        <div className="flex flex-col gap-1 w-full h-full">
                           {grouped.map((group, idx) => (
                             <div
                               key={idx}
                               onClick={() => onCellClick?.(group)}
-                              className={`flex flex-col items-center justify-center rounded-xl border px-2 py-2.5 w-full min-h-[60px] shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''}`}
+                              className={`flex flex-col items-center justify-center rounded-xl border px-1 py-1.5 w-full min-h-[50px] shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 print:rounded-none print:border-none print:shadow-none print:bg-transparent print:p-0 print:min-h-0 print:text-black ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''}`}
                             >
                               {viewMode === 'teacher' ? (
                                 <>
-                                  <span className="font-extrabold text-[13px] leading-tight mb-1">
+                                  <span className="font-extrabold text-[13px] leading-tight mb-0.5 print:text-[11px] print:text-black">
                                     {group.classNames.join(', ')}
                                   </span>
                                   {group.subject && (
-                                    <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase">
+                                    <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase print:opacity-100 print:text-black">
                                       {group.subject}
                                     </span>
                                   )}
                                   {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5">
-                                      🚪 {group.room}
+                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-black">
+                                      <span className="print:hidden">🚪 </span>
+                                      <span className="hidden print:inline">Derslik: </span>
+                                      {group.room}
                                     </span>
                                   )}
                                 </>
                               ) : (
                                 <>
                                   {group.subject && (
-                                    <span className="font-extrabold text-[13px] leading-tight mb-1 uppercase">
+                                    <span className="font-extrabold text-[13px] leading-tight mb-0.5 uppercase print:text-[12px] print:text-black">
                                       {group.subject}
                                     </span>
                                   )}
                                   {group.staffNames.length > 0 && (
-                                    <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                    <div className="flex flex-col items-center gap-0 mt-0.5">
                                       {group.staffNames.map((name: string, i: number) => (
-                                        <span key={i} className="font-semibold text-[10px] opacity-80 leading-tight text-center">
+                                        <span key={i} className="font-semibold text-[10px] opacity-80 leading-tight text-center print:opacity-100 print:text-black">
                                           {name}
                                         </span>
                                       ))}
                                     </div>
                                   )}
                                   {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5">
-                                      🚪 {group.room}
+                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-black">
+                                      <span className="print:hidden">🚪 </span>
+                                      <span className="hidden print:inline">Derslik: </span>
+                                      {group.room}
                                     </span>
                                   )}
                                 </>
@@ -192,7 +195,7 @@ export default function TimetableGrid({
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-2 py-2 w-full min-h-[60px] text-xs font-medium text-slate-400/60">
+                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-2 py-2 w-full min-h-[60px] text-xs font-medium text-slate-400/60 print:border-none print:bg-transparent print:text-transparent print:min-h-0 print:hidden">
                           Boş
                         </div>
                       )}

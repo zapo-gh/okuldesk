@@ -360,15 +360,15 @@ export default function TimetablePage() {
       )}
 
       {viewEntries.length > 0 && (
-        <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
+        <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between print:hidden">
             <h3 className="font-bold text-slate-800 text-sm">{viewTitle}</h3>
             <p className="text-xs text-slate-400">💡 Bir kutucuğa tıklayarak {viewMode === 'teacher' ? 'sınıfın' : 'öğretmenin'} programını görüntüleyin</p>
           </div>
-          <div className="hidden print:block text-center py-6 border-b border-slate-200">
-            <h1 className="text-xl font-bold">{schoolName}</h1>
-            <h2 className="text-lg font-semibold mt-1">{viewTitle}</h2>
-            <p className="text-slate-500 text-sm mt-1">{academicYear} — Yazdır: {new Date().toLocaleDateString('tr-TR')}</p>
+          <div className="hidden print:block text-center py-4 mb-4 border-b-2 border-black">
+            <h1 className="text-xl font-black uppercase text-black">{schoolName}</h1>
+            <h2 className="text-lg font-bold mt-1 text-black">{viewTitle}</h2>
+            <p className="text-black text-sm mt-1 font-medium">{academicYear} EĞİTİM ÖĞRETİM YILI — Yazdır: {new Date().toLocaleDateString('tr-TR')}</p>
           </div>
           <TimetableGrid entries={viewEntries} viewMode={viewMode} todayDow={todayDow} getPeriodTime={getPeriodTime} onCellClick={handleCellClick} />
         </div>
