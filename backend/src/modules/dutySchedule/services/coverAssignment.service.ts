@@ -152,8 +152,15 @@ export class CoverAssignmentService {
     const targetDateLocal = new Date(year, month - 1, day);
     const targetDateUTC   = new Date(`${dateStr}T00:00:00.000Z`);
 
-    // 1. İş günü kontrolü
-    const workDays = dutyScheduleService._getWorkDays(year, month);
+    // 1. İş günü kontrolü (Hafta sınırları ayları aşabildiği için önceki ve sonraki ayları da tarayalım)
+    const prevMonthDate = new Date(year, month - 2, 1);
+    const nextMonthDate = new Date(year, month, 1);
+    const workDays = [
+      ...dutyScheduleService._getWorkDays(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1),
+      ...dutyScheduleService._getWorkDays(year, month),
+      ...dutyScheduleService._getWorkDays(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1),
+    ];
+    
     const workDay  = workDays.find(d => d.date.getTime() === targetDateLocal.getTime());
     if (!workDay) {
       return { status: 'warning', message: 'Seçilen tarih bir iş günü (Pzt-Cum) değil.', suggestions: [] };
