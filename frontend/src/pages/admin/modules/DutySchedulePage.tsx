@@ -1317,7 +1317,12 @@ export default function DutySchedulePage() {
                 );
 
 
-                const teachers = staffList.filter(s => s.gorev?.toLowerCase().includes('öğretmen') || s.unvan?.toLowerCase().includes('öğretmen'));
+                const teachers = staffList.filter(s => {
+                  const g = s.gorev?.toLowerCase() || '';
+                  const u = s.unvan?.toLowerCase() || '';
+                  const isAdmin = g.includes('müdür') || g.includes('müdüryardımcı') || u.includes('müdür') || g.includes('idareci');
+                  return !isAdmin;
+                });
 
                 return (
                   <>
@@ -1482,7 +1487,11 @@ export default function DutySchedulePage() {
                   </div>
                 );
 
-                const admins = staffList.filter(s => !s.gorev?.toLowerCase().includes('öğretmen') && !s.unvan?.toLowerCase().includes('öğretmen'));
+                const admins = staffList.filter(s => {
+                  const g = s.gorev?.toLowerCase() || '';
+                  const u = s.unvan?.toLowerCase() || '';
+                  return g.includes('müdür') || g.includes('müdüryardımcı') || u.includes('müdür') || g.includes('idareci');
+                });
 
                 return (
                   <>
