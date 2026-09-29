@@ -156,9 +156,9 @@ export class CoverAssignmentService {
     const prevMonthDate = new Date(year, month - 2, 1);
     const nextMonthDate = new Date(year, month, 1);
     const workDays = [
-      ...dutyScheduleService._getWorkDays(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1),
-      ...dutyScheduleService._getWorkDays(year, month),
-      ...dutyScheduleService._getWorkDays(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1),
+      ...dutyScheduleService._getWorkDays(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1).map(d => ({ ...d, assignedYear: prevMonthDate.getFullYear(), assignedMonth: prevMonthDate.getMonth() + 1 })),
+      ...dutyScheduleService._getWorkDays(year, month).map(d => ({ ...d, assignedYear: year, assignedMonth: month })),
+      ...dutyScheduleService._getWorkDays(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1).map(d => ({ ...d, assignedYear: nextMonthDate.getFullYear(), assignedMonth: nextMonthDate.getMonth() + 1 })),
     ];
     
     const workDay  = workDays.find(d => d.date.getTime() === targetDateLocal.getTime());
@@ -166,7 +166,7 @@ export class CoverAssignmentService {
       return { status: 'warning', message: 'Seçilen tarih bir iş günü (Pzt-Cum) değil.', suggestions: [] };
     }
 
-    const { weekNum, dayOfWeek } = workDay;
+    const { weekNum, dayOfWeek, assignedYear, assignedMonth } = workDay;
 
     // 2. Devamsızlıklar
     const absences = await this.getAbsencesForDate(targetDateUTC, academicYear);
@@ -185,7 +185,7 @@ export class CoverAssignmentService {
         dayOfWeek,
         ...(dutyRotationFreq === 'weekly' || dutyRotationFreq === 'none'
           ? { month: 0, weekNumber: 0 }
-          : { year, month, weekNumber: weekNum }
+          : { year: assignedYear, month: assignedMonth, weekNumber: weekNum }
         )
       },
       include: { staff: { select: { id: true, name: true, title: true } }, station: true }
