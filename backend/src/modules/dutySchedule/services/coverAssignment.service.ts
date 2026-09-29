@@ -174,29 +174,30 @@ export class CoverAssignmentService {
       return { status: 'info', message: 'Bu tarihte devamsız öğretmen yok.', suggestions: [] };
     }
 
-    // 3. Nöbetçi atamalar
+    // 3. Okul ayarlarından aktif nöbet modunu çek
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    const dutyRotationFreq = settings?.dutyRotationFreq || 'weekly';
+
+    // 4. Sadece aktif moda ait nöbet atamalarını getir
     const dutyAssignmentsRaw = await prisma.dutyAssignment.findMany({
       where: { 
         academicYear, 
         dayOfWeek,
-        OR: [
-          { month: 0, weekNumber: 0 },
-          { year, month, weekNumber: weekNum }
-        ]
+        ...(dutyRotationFreq === 'weekly' || dutyRotationFreq === 'none'
+          ? { month: 0, weekNumber: 0 }
+          : { year, month, weekNumber: weekNum }
+        )
       },
       include: { staff: { select: { id: true, name: true, title: true } }, station: true }
     });
 
-    // Haftalık ve Aylık mod çakışmalarını önlemek için personeli tekilleştir
     const dutyAssignmentsMap = new Map();
     for (const d of dutyAssignmentsRaw) {
-      if (d.month > 0 || !dutyAssignmentsMap.has(d.staffId)) {
-        dutyAssignmentsMap.set(d.staffId, d);
-      }
+      dutyAssignmentsMap.set(d.staffId, d);
     }
     const dutyAssignments = Array.from(dutyAssignmentsMap.values());
     if (dutyAssignments.length === 0) {
-      return { status: 'warning', message: 'Bu tarihte nöbetçi öğretmen ataması bulunamadı.', suggestions: [] };
+      return { status: 'warning', message: 'Bu tarihte aktif nöbet programına göre atanmış nöbetçi öğretmen bulunamadı.', suggestions: [] };
     }
 
     const onDutyStaffIds = dutyAssignments.map(d => d.staffId);
