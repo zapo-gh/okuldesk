@@ -268,13 +268,14 @@ model GradeReportStudentSubject {
 // ----------------------------------------------------
 
 model DutyStation {
-  id          String           @id @default(uuid())
-  name        String
-  sortOrder   Int              @default(0)
-  isActive    Boolean          @default(true)
-  shift       String           @default("tum") // sabah | oglen | tum | okuloncesi
-  capacity    Int              @default(1) // KaÃ§ nÃ¶betÃ§i olacaÄŸÄ±
-  assignments DutyAssignment[]
+  id           String           @id @default(uuid())
+  name         String
+  sortOrder    Int              @default(0)
+  isActive     Boolean          @default(true)
+  shift        String           @default("tum") // sabah | oglen | tum | okuloncesi
+  capacity     Int              @default(1) // KaÃ§ nÃ¶betÃ§i olacaÄŸÄ±
+  roomKeywords String?
+  assignments  DutyAssignment[]
 }
 
 model DutyAssignment {
@@ -770,7 +771,8 @@ model CoverAssignment {
   id                String   @id @default(uuid())
   absenceId         String?
   absentStaffId     String
-  substituteStaffId String
+  substituteStaffId String?
+  isCancelled       Boolean  @default(false)
   date              DateTime
   period            Int
   className         String
@@ -781,7 +783,7 @@ model CoverAssignment {
 
   absence         StaffAbsence? @relation(fields: [absenceId], references: [id], onDelete: SetNull)
   absentStaff     Staff         @relation("AbsentStaff", fields: [absentStaffId], references: [id], onDelete: Cascade)
-  substituteStaff Staff         @relation("SubstituteStaff", fields: [substituteStaffId], references: [id], onDelete: Cascade)
+  substituteStaff Staff?        @relation("SubstituteStaff", fields: [substituteStaffId], references: [id], onDelete: Cascade)
 
   @@index([date])
   @@index([substituteStaffId])

@@ -13,9 +13,9 @@ export class DutyScheduleController {
 
   async createStation(req: Request, res: Response, next: NextFunction) {
     try {
-      const { name, sortOrder, shift, capacity } = req.body;
+      const { name, sortOrder, shift, capacity, roomKeywords } = req.body;
       if (!name) throw new AppError('Nöbet yeri adı zorunludur.', 400);
-      res.status(201).json({ success: true, data: await dutyScheduleService.createStation({ name, sortOrder, shift, capacity: Number(capacity) || 1 }) });
+      res.status(201).json({ success: true, data: await dutyScheduleService.createStation({ name, sortOrder, shift, capacity: Number(capacity) || 1, roomKeywords }) });
     } catch (e) { next(e); }
   }
 

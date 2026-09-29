@@ -226,10 +226,10 @@ export class CoverAssignmentService {
     
     const allAbsentTimetable = allTimetableToday.filter(e => e.staffId && absentStaffIds.includes(e.staffId));
 
-    // 7. Mevcut covers
+    // 7. Mevcut covers (bugüne ait tüm covers'ları çekiyoruz, iptal edilenler dahil)
     const existingCovers = await prisma.coverAssignment.findMany({
-      where: { date: targetDateUTC, substituteStaffId: { in: onDutyStaffIds } },
-      select: { id: true, substituteStaffId: true, period: true }
+      where: { date: targetDateUTC },
+      select: { id: true, substituteStaffId: true, period: true, absentStaffId: true, isCancelled: true }
     });
 
     // A4: coverCountMap — gerçek adil dağıtım için tüm dönemin verisini çek
@@ -246,7 +246,9 @@ export class CoverAssignmentService {
     });
 
     historicalCovers.forEach(hc => {
-      coverCountMap.set(hc.substituteStaffId, hc._count.substituteStaffId);
+      if (hc.substituteStaffId) {
+        coverCountMap.set(hc.substituteStaffId, hc._count.substituteStaffId);
+      }
     });
 
     const isStaffAbsentForPeriod = (staffId: string, period: number) => {
@@ -276,6 +278,24 @@ export class CoverAssignmentService {
 
       for (const entry of absentTimetable) {
         const period = entry.period;
+
+        // İptal (Boş Bırak) kontrolü
+        const isEntryCancelled = existingCovers.some(
+          c => c.absentStaffId === absence.staffId && c.period === period && c.isCancelled
+        );
+        if (isEntryCancelled) {
+          // Bu saat iptal edilmiş/öğrenciler eve gönderilmiş, nöbetçi atanmayacak
+          continue;
+        }
+
+        // Zaten nöbetçi atanmış mı kontrolü (kendisi de devamsız olmayan ve iptal edilmemiş bir atama)
+        const isAlreadyCovered = existingCovers.some(
+          c => c.absentStaffId === absence.staffId && c.period === period && !c.isCancelled && c.substituteStaffId
+        );
+        if (isAlreadyCovered) {
+          // Zaten bir nöbetçi atanmış ve DB'ye kaydedilmişse bunu yeni öneri olarak getirme
+          // (Not: frontend bunları farklı bir listeden gösterebilir veya gizleyebilir)
+        }
 
         let currentCoTeachers: any[] = [];
         // Eş öğretmen (Co-teaching) kontrolü
@@ -321,6 +341,16 @@ export class CoverAssignmentService {
           const staffId    = assignment.staffId;
           const hasClass   = onDutyTimetable.some(t => t.staffId === staffId && t.period === period);
           const coverCount = coverCountMap.get(staffId) || 0;
+
+          // Yakınlık (Proximity) Bonusu Hesaplama
+          let proximityBonus = 0;
+          if (finalRoom && assignment.station?.roomKeywords) {
+            const keywords = assignment.station.roomKeywords.split(',').map((k: string) => k.trim().toLowerCase());
+            const roomLower = finalRoom.toLowerCase();
+            if (keywords.some((k: string) => k && roomLower.includes(k))) {
+              proximityBonus = 2; // Bu sınıfa yakın, avantajlı! (Tarihsel adalette 2 görev tolere edilir)
+            }
+          }
 
           let isEligible    = true;
           let conflictReason = '';
@@ -369,7 +399,8 @@ export class CoverAssignmentService {
             staff: assignment.staff,
             station: assignment.station,
             isFree: !hasClass,
-            coverCount,
+            coverCount, // Orijinal güncel sayı (gün içi atamalar dahil artar)
+            effectiveScore: coverCount - proximityBonus, // Sıralama için bonuslu skor
             isEligible,
             conflictReason
           };
@@ -390,10 +421,10 @@ export class CoverAssignmentService {
         const teacherCandidates = eligibleCandidates.filter(c => !isVicePrincipal(c.staff.title));
         const vpCandidates      = eligibleCandidates.filter(c =>  isVicePrincipal(c.staff.title));
 
-        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort((a, b) => a.coverCount - b.coverCount);
-        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort((a, b) => a.coverCount - b.coverCount);
-        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort((a, b) => a.coverCount - b.coverCount);
-        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort((a, b) => a.coverCount - b.coverCount);
+        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
+        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
+        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
+        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
 
         let selectedSubstitute: typeof candidates[0] | null = null;
         let isConflict = false;
@@ -421,7 +452,8 @@ export class CoverAssignmentService {
             isFree: c.isFree,
             coverCount: c.coverCount,
             isEligible: c.isEligible,
-            conflictReason: c.conflictReason
+            conflictReason: c.conflictReason,
+            station: c.station
           })),
           suggestedSubstitute: selectedSubstitute
             ? { staff: selectedSubstitute.staff, station: selectedSubstitute.station, isConflict }
@@ -440,11 +472,12 @@ export class CoverAssignmentService {
     covers: {
       absenceId?: string;
       absentStaffId: string;
-      substituteStaffId: string;
+      substituteStaffId: string | null;
       period: number;
       className: string;
       subject?: string;
       room?: string;
+      isCancelled?: boolean;
     }[];
   }) {
     const targetDate = new Date(`${data.date}T00:00:00.000Z`);
@@ -463,16 +496,16 @@ export class CoverAssignmentService {
     existingCovers.forEach(e => existingMap.set(`${e.absentStaffId}|${e.period}`, e.id));
 
     const toCreate: typeof data.covers = [];
-    const toUpdate: { id: string; substituteStaffId: string; subject?: string; room?: string }[] = [];
+    const toUpdate: { id: string; substituteStaffId: string | null; subject?: string; room?: string; isCancelled?: boolean }[] = [];
 
     for (const cover of data.covers) {
-      if (!cover.substituteStaffId) continue;
+      if (!cover.substituteStaffId && !cover.isCancelled) continue;
 
       const key = `${cover.absentStaffId}|${cover.period}`;
       const existingId = existingMap.get(key);
 
       if (existingId) {
-        toUpdate.push({ id: existingId, substituteStaffId: cover.substituteStaffId, subject: cover.subject, room: cover.room });
+        toUpdate.push({ id: existingId, substituteStaffId: cover.substituteStaffId, subject: cover.subject, room: cover.room, isCancelled: cover.isCancelled });
       } else {
         toCreate.push(cover);
       }
@@ -484,7 +517,7 @@ export class CoverAssignmentService {
       for (const u of toUpdate) {
         await tx.coverAssignment.update({
           where: { id: u.id },
-          data: { substituteStaffId: u.substituteStaffId, subject: u.subject, room: (u as any).room }
+          data: { substituteStaffId: u.substituteStaffId, subject: u.subject, room: (u as any).room, isCancelled: u.isCancelled || false }
         });
       }
       // Yeni kayıtlar toplu
@@ -499,7 +532,8 @@ export class CoverAssignmentService {
             className:         cover.className,
             subject:           cover.subject,
             room:              cover.room,
-            academicYear:      data.academicYear
+            academicYear:      data.academicYear,
+            isCancelled:       cover.isCancelled || false
           }))
         });
       }

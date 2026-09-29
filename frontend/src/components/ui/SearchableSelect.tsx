@@ -4,6 +4,7 @@ import { Search, ChevronDown, X } from 'lucide-react';
 interface Option {
   value: string;
   label: string;
+  subLabel?: string;
 }
 
 interface SearchableSelectProps {
@@ -110,7 +111,8 @@ export function SearchableSelect({
                     setIsFocused(false);
                   }}
                 >
-                  {opt.label}
+                  <div>{opt.label}</div>
+                  {opt.subLabel && <div className="text-[10px] text-indigo-400 mt-0.5 truncate">{opt.subLabel}</div>}
                 </div>
               ))
             ) : (

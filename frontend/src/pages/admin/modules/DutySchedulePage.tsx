@@ -132,7 +132,7 @@ export default function DutySchedulePage() {
 
   // Station form
   const [showStationModal, setShowStationModal] = useState(false);
-  const [stationForm, setStationForm] = useState<any>({ name: '', sortOrder: 1, shift: 'tum', capacity: 1 });
+  const [stationForm, setStationForm] = useState<any>({ name: '', sortOrder: 1, shift: 'tum', capacity: 1, roomKeywords: '' });
 
   const [newRotationDate, setNewRotationDate] = useState('');
   // Özel rotasyon tarihleri — local state (context yavaş olduğunda anında güncellemek için)
@@ -592,7 +592,7 @@ export default function DutySchedulePage() {
         await api.post('/duty-schedule/stations', stationForm);
         toast.success('Nöbet yeri eklendi');
       }
-      setStationForm({ name: '', sortOrder: stations.length + 1, shift: 'tum', capacity: 1 });
+      setStationForm({ name: '', sortOrder: stations.length + 1, shift: 'tum', capacity: 1, roomKeywords: '' });
       setShowStationModal(false);
       fetchAll();
     } catch (err: any) { toast.error(err.response?.data?.message || 'Kaydedilemedi.'); }
@@ -1542,12 +1542,23 @@ export default function DutySchedulePage() {
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Derslik / Konum Kelimeleri</label>
+                    <input
+                      type="text"
+                      value={stationForm.roomKeywords || ''}
+                      onChange={e => setStationForm({ ...stationForm, roomKeywords: e.target.value })}
+                      placeholder="Örn: A-, Zemin, OTOM"
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Virgülle ayırarak girin. Nöbetçi atamalarında bu anahtar kelimeleri içeren sınıflara yakınlık önceliği verilir.</p>
+                  </div>
                   <div className="flex gap-2 pt-1">
                     <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold transition">
                       {stationForm.id ? 'Güncelle' : 'Ekle'}
                     </button>
                     {stationForm.id && (
-                      <button type="button" onClick={() => setStationForm({ name: '', sortOrder: stations.length + 1, shift: 'tum', capacity: 1 })} className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg text-sm font-semibold transition">
+                      <button type="button" onClick={() => setStationForm({ name: '', sortOrder: stations.length + 1, shift: 'tum', capacity: 1, roomKeywords: '' })} className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg text-sm font-semibold transition">
                         İptal
                       </button>
                     )}

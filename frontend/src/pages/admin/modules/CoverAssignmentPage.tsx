@@ -223,15 +223,19 @@ export default function CoverAssignmentPage() {
   // ─── Kaydet ve Sil ───────────────────────────────────────────────────────
   const handleSaveCovers = async () => {
     try {
-      const coversToSave = suggestions.map(s => ({
-        absenceId: s.absenceId,
-        absentStaffId: s.absentStaff?.id,
-        substituteStaffId: s.substituteStaffId,
-        period: s.period,
-        className: s.className,
-        subject: s.subject,
-        room: s.room
-      }));
+      const coversToSave = suggestions.map(s => {
+        const isCancelled = s.substituteStaffId === 'CANCEL';
+        return {
+          absenceId: s.absenceId,
+          absentStaffId: s.absentStaff?.id,
+          substituteStaffId: isCancelled ? null : s.substituteStaffId,
+          isCancelled: isCancelled,
+          period: s.period,
+          className: s.className,
+          subject: s.subject,
+          room: s.room
+        };
+      });
       await api.post('/duty-schedule/covers', { date: dateStr, academicYear, covers: coversToSave });
       toast.success('Atamalar başarıyla kaydedildi.');
       fetchData();
@@ -253,7 +257,7 @@ export default function CoverAssignmentPage() {
   const handleClearAllCovers = async () => {
     if (!window.confirm('Tüm kayıtlı görevlendirmeleri silmek istediğinize emin misiniz?')) return;
     try {
-      await api.delete(`/duty-schedule/covers/clear/${dateStr}`);
+      await api.delete(`/duty-schedule/covers-clear?date=${dateStr}`);
       toast.success('Tüm görevlendirmeler silindi.');
       fetchData();
     } catch {
@@ -733,8 +737,9 @@ export default function CoverAssignmentPage() {
               <div className="flex items-center gap-2">
                 {savedCovers.length > 0 && (
                   <Button
+                    variant="danger"
                     onClick={handleClearAllCovers}
-                    className="gap-2 bg-red-100 text-red-600 hover:bg-red-200 border border-red-200 text-xs py-1.5"
+                    className="gap-2 text-xs py-1.5"
                   >
                     <Trash2 size={14} /> Tümünü Sil
                   </Button>
@@ -838,8 +843,14 @@ export default function CoverAssignmentPage() {
                             {c.room && <span className="text-[10px] text-slate-500 font-medium">{c.room}</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="font-semibold text-emerald-700">{c.substituteStaff?.name}</span>
+                        <td className="px-4 py-3 text-center">
+                          {c.isCancelled ? (
+                            <span className="text-xs font-semibold text-slate-500 italic bg-slate-100 px-2 py-1 rounded-full border border-slate-200">İptal Edildi (Boş Geçti)</span>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <span className="font-semibold text-emerald-700">{c.substituteStaff?.name}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
@@ -855,8 +866,8 @@ export default function CoverAssignmentPage() {
                   ) : (
                     // Öneri tablosu — düzenlenebilir
                     displayCovers.map((sug, i) => (
-                      <tr key={i} className={`hover:bg-slate-50 transition-colors ${sug.suggestedSubstitute?.isConflict ? 'bg-orange-50/40' : ''}`}>
-                        <td className="px-4 py-3 font-medium text-slate-800 text-sm">
+                      <tr key={i} className={`hover:bg-slate-50 transition-colors ${sug.substituteStaffId === 'CANCEL' ? 'bg-red-50/50 text-slate-400' : sug.suggestedSubstitute?.isConflict ? 'bg-orange-50/40' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-sm">
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                             {[sug.absentStaff, ...(sug.coAbsentStaffs || [])].filter(Boolean).map((staff: any, idx: number, arr: any[]) => (
                               <div key={staff.id || idx} className="flex items-center">
@@ -894,23 +905,37 @@ export default function CoverAssignmentPage() {
                           <SearchableSelect
                             options={[
                               { value: '', label: '— Seçin —' },
+                              { value: 'CANCEL', label: '❌ İptal Et / Nöbetçi İstenmiyor' },
                               ...(sug.availableDutyStaff?.filter((s: any) => s.isEligible).map((st: any) => ({
                                 value: st.id,
-                                label: `✓ ${st.name} (${st.coverCount} Görev)`
+                                label: `✓ ${st.name} (${st.coverCount} Görev)`,
+                                subLabel: st.station?.name ? (st.station.name.length > 20 ? st.station.name.substring(0, 20) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'
                               })) || []),
                               ...(sug.availableDutyStaff?.filter((s: any) => !s.isEligible).map((st: any) => ({
                                 value: st.id,
-                                label: `⚠ ${st.name} (${st.coverCount} Görev) — ${st.conflictReason}`
+                                label: `⚠ ${st.name} (${st.coverCount} Görev) — ${st.conflictReason}`,
+                                subLabel: st.station?.name ? (st.station.name.length > 20 ? st.station.name.substring(0, 20) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'
                               })) || [])
                             ]}
                             value={sug.substituteStaffId || ''}
                             onChange={val => updateSuggestion(i, val)}
                             placeholder="Nöbetçi ara..."
                           />
-                          {sug.suggestedSubstitute?.isConflict && sug.substituteStaffId && (
-                            <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
-                              <Info size={11} /> Bu saatte dersi var veya kural ihlali
-                            </p>
+                          {sug.substituteStaffId && sug.substituteStaffId !== 'CANCEL' && (
+                            <div className="flex flex-col gap-0.5 mt-1">
+                              {sug.suggestedSubstitute?.isConflict && (
+                                <p className="text-xs text-orange-600 flex items-center gap-1">
+                                  <Info size={11} /> Bu saatte dersi var veya kural ihlali
+                                </p>
+                              )}
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                Nöbet: {(() => {
+                                  const st = sug.availableDutyStaff?.find((s: any) => s.id === sug.substituteStaffId);
+                                  const name = st?.station?.name || 'Belirtilmedi';
+                                  return name.length > 25 ? name.substring(0, 25) + '...' : name;
+                                })()}
+                              </p>
+                            </div>
                           )}
                           {!sug.substituteStaffId && (
                             <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
@@ -950,7 +975,7 @@ export default function CoverAssignmentPage() {
                 <CoverPrintTemplate
                   ref={printRef}
                   date={dateStr}
-                  covers={displayCovers}
+                  covers={displayCovers.filter(c => !c.isCancelled)}
                   absences={absences}
                   schoolName={schoolName}
                 />

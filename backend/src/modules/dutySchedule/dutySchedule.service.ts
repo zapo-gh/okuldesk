@@ -11,24 +11,26 @@ class DutyScheduleService {
     return stations;
   }
 
-  async createStation(data: { name: string; sortOrder?: number; shift?: string; capacity?: number }) {
+  async createStation(data: { name: string; sortOrder?: number; shift?: string; capacity?: number; roomKeywords?: string }) {
     return prisma.dutyStation.create({
       data: {
         name: data.name,
         sortOrder: data.sortOrder ?? 0,
         shift: data.shift ?? 'tum',
-        capacity: data.capacity ?? 1
+        capacity: data.capacity ?? 1,
+        roomKeywords: data.roomKeywords || null
       }
     });
   }
 
-  async updateStation(id: string, data: { name?: string; sortOrder?: number; isActive?: boolean; shift?: string; capacity?: number }) {
+  async updateStation(id: string, data: { name?: string; sortOrder?: number; isActive?: boolean; shift?: string; capacity?: number; roomKeywords?: string }) {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name.trim();
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
     if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
     if (data.shift !== undefined) updateData.shift = data.shift;
     if (data.capacity !== undefined) updateData.capacity = data.capacity;
+    if (data.roomKeywords !== undefined) updateData.roomKeywords = data.roomKeywords || null;
     if (Object.keys(updateData).length === 0) throw new AppError('Güncellenecek alan bulunamadı.', 400);
     return prisma.dutyStation.update({ where: { id }, data: updateData });
   }
