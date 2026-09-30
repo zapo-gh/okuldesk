@@ -38,7 +38,7 @@ import {
   FileBox,
   Receipt
 } from 'lucide-react';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { CommandPalette } from './ui/CommandPalette';
 import packageJson from '../../package.json';
 
