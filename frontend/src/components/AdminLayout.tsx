@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { CommandPalette } from './ui/CommandPalette';
+import packageJson from '../../package.json';
 
 interface NavItemProps {
   to: string;
@@ -272,8 +273,9 @@ export default function AdminLayout() {
                 <div className="text-sm font-semibold text-white/90 overflow-hidden text-ellipsis whitespace-nowrap">
                   {user?.username || 'Yönetici'}
                 </div>
-                <div className="text-xs text-white/40 mt-px">
-                  Yetkili Hesap
+                <div className="text-xs text-white/40 mt-px flex items-center gap-2">
+                  <span>Yetkili Hesap</span>
+                  <span className="bg-white/10 px-1.5 rounded-sm text-[10px]">v{packageJson.version}</span>
                 </div>
               </div>
               <button
