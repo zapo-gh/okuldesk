@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OkulDesk",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "identifier": "com.okuldesk.app",
   "build": {
     "frontendDist": "../backend/dist/public",
@@ -31,7 +31,7 @@
       "open": true
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEQjgyQzJDRDY2RUFFN0IKUldSN3JtN1dMQ3k0blFxdklsVitWNERtTnlFOVpnWkVVbFBrcE1zVklBSUxYQng5VWFLaEhmTWEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzODNDOURGODE2QjFGOTgKUldTWUgydUIzOG1ETTlxZ2VNWVVkWThXUEkrUHh0YnBIYWF5VG1GZitUSEhoTUh2T0x5TlI0V2wK",
       "endpoints": [
         "https://github.com/zapo-gh/okuldesk/releases/latest/download/latest.json"
       ]
