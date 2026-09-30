@@ -1,4 +1,4 @@
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -87,6 +87,62 @@ export default function AdminLayout() {
   };
 
   const closeSidebar = () => setSidebarOpen(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkUpdates = async () => {
+      try {
+        const { check } = await import('@tauri-apps/plugin-updater');
+        const update = await check();
+        if (update && mounted) {
+          toast((t) => (
+            <div className="flex flex-col gap-2">
+              <span className="font-semibold text-sm">Yeni Sürüm Mevcut ({update.version})</span>
+              <span className="text-xs text-slate-500">OkulDesk'in yeni bir sürümü yayınlandı. Şimdi güncellemek ister misiniz?</span>
+              <div className="flex gap-2 mt-1">
+                <button 
+                  onClick={async () => {
+                    toast.dismiss(t.id);
+                    const toastId = toast.loading('Güncelleme indiriliyor, lütfen bekleyin...');
+                    try {
+                      await update.downloadAndInstall((event) => {
+                        if (event.event === 'Finished') {
+                          toast.success('Güncelleme yüklendi. Uygulama yeniden başlatılıyor.', { id: toastId, duration: 5000 });
+                          setTimeout(async () => {
+                            const { relaunch } = await import('@tauri-apps/plugin-process');
+                            await relaunch();
+                          }, 1500);
+                        }
+                      });
+                    } catch(err) {
+                      toast.error('Güncelleme hatası: ' + String(err), { id: toastId });
+                    }
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition"
+                >
+                  Şimdi Güncelle
+                </button>
+                <button 
+                  onClick={() => toast.dismiss(t.id)}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md text-xs font-medium transition"
+                >
+                  Daha Sonra
+                </button>
+              </div>
+            </div>
+          ), { duration: Infinity, position: 'bottom-right' });
+        }
+      } catch (err) {
+        console.log('Update check failed or running in browser:', err);
+      }
+    };
+    
+    if (typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__)) {
+      setTimeout(checkUpdates, 3000);
+    }
+    
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden text-slate-800 font-sans print:h-auto print:overflow-visible">
