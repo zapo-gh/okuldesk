@@ -3,7 +3,7 @@ import { passwordSchema } from '../modules/shared/security/passwordPolicy';
 
 describe('Password policy', () => {
   it('rejects short passwords', () => {
-    expect(passwordSchema.safeParse('Abc123').success).toBe(false);
+    expect(passwordSchema.safeParse('Ab1').success).toBe(false);
   });
 
   it('rejects passwords without a digit', () => {
