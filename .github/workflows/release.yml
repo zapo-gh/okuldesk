@@ -59,6 +59,12 @@ jobs:
           DATABASE_URL: file:./ci.db
           JWT_SECRET: dummy-secret-for-build-process
 
+      - name: Download Node.js Sidecar
+        run: |
+          mkdir -p src-tauri/binaries
+          curl -L "https://nodejs.org/dist/v20.11.1/win-x64/node.exe" -o src-tauri/binaries/node-x86_64-pc-windows-msvc.exe
+        shell: bash
+
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
