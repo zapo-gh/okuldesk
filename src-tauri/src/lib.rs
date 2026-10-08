@@ -1,3 +1,7 @@
+/// Arka plan (node sidecar) sürecini tutar; uygulama kapanırken sonlandırılır.
+#[allow(dead_code)]
+struct SidecarState(std::sync::Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -26,7 +30,8 @@ pub fn run() {
                     .expect("Failed to create sidecar command")
                     .arg(server_js_path.to_str().unwrap());
 
-                let (mut rx, _child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
+                let (mut rx, child) = sidecar_command.spawn().expect("Failed to spawn sidecar");
+                app.manage(SidecarState(std::sync::Mutex::new(Some(child))));
 
                 tauri::async_runtime::spawn(async move {
                     while let Some(event) = rx.recv().await {
@@ -37,6 +42,16 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                use tauri::Manager;
+                if let Some(state) = app_handle.try_state::<SidecarState>() {
+                    if let Some(child) = state.0.lock().unwrap().take() {
+                        let _ = child.kill();
+                    }
+                }
+            }
+        });
 }
