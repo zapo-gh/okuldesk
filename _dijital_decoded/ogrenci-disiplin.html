@@ -1,0 +1,2562 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEB Öğrenci Disiplin ve Davranış Değerlendirme Modülü</title>
+    <style>
+        /* ============================================================
+           TASARIM TOKENLARI — "Resmî Dosya" Kimliği
+           Lacivert (kurumsal otorite) + Mühür Kırmızısı (disiplin/resmiyet)
+           Serif başlıklar (resmi yazışma hissi) + Sans gövde + Mono kodlar
+        ============================================================ */
+        :root {
+            --lacivert: #1B2A4E;
+            --lacivert-koyu: #101A33;
+            --lacivert-parlak: #2F4576;
+            --muhur: #B0203B;
+            --muhur-koyu: #8E1830;
+            --basari: #2563EB;
+            --uyari: #B45309;
+            --kagit: #EEF1F6;
+            --yuzey: #FFFFFF;
+            --yuzey-soluk: #F5F7FA;
+            --murekkep: #161B26;
+            --murekkep-soluk: #64748B;
+            --murekkep-silik: #94A0B3;
+            --cizgi: #E3E7EE;
+            --cizgi-belirgin: #CBD3E1;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --golge-sm: 0 1px 2px rgba(16, 26, 51, 0.06);
+            --golge-md: 0 6px 18px -6px rgba(16, 26, 51, 0.14);
+            --golge-lg: 0 18px 40px -14px rgba(16, 26, 51, 0.22);
+            --font-baslik: Georgia, 'Times New Roman', ui-serif, serif;
+            --font-govde: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-kod: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", "Courier New", monospace;
+            --topbar-h: 62px;
+            --desktopnav-h: 54px;
+            --sidenav-w: 218px;
+            --bottomnav-h: 66px;
+        }
+
+        html { -webkit-text-size-adjust: 100%; }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--kagit);
+            min-height: 100vh;
+            color: var(--murekkep);
+            font-family: var(--font-govde);
+        }
+
+        button, input, select, textarea { font-family: inherit; }
+
+        /* ============================================================
+           ÜST ÇUBUK (TOPBAR) — tüm ekranlarda sabit üstte
+        ============================================================ */
+        .header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--topbar-h);
+            background: var(--yuzey);
+            border-bottom: 1px solid var(--cizgi);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px;
+            z-index: 60;
+            box-shadow: var(--golge-sm);
+        }
+
+        .header-title-area {
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .header-title-area h1 {
+            font-family: var(--font-baslik);
+            font-size: 1.18rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            letter-spacing: -0.2px;
+            color: var(--lacivert);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-subtitle {
+            font-size: 0.72rem;
+            color: var(--murekkep-soluk);
+            margin-top: 1px;
+            font-weight: 600;
+            font-family: var(--font-kod);
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        @media (max-width: 480px) {
+            .header-title-area h1 { font-size: 0.98rem; gap: 6px; }
+            .header-subtitle { font-size: 0.64rem; }
+            .btn-refresh span:last-child { display: none; }
+        }
+
+        .btn-refresh {
+            background: var(--yuzey-soluk);
+            color: var(--lacivert);
+            border: 1px solid var(--cizgi-belirgin);
+            padding: 7px 13px;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 0.78rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .btn-refresh:hover {
+            background: var(--lacivert);
+            color: #fff;
+            border-color: var(--lacivert);
+        }
+
+        /* ============================================================
+           NAVİGASYON — Masaüstünde sol sabit kenar çubuğu,
+           Mobilde alt sabit sekme çubuğu (tek CSS, tek HTML)
+        ============================================================ */
+        .tabs-grid {
+            position: fixed;
+            z-index: 55;
+            display: flex;
+            background: linear-gradient(175deg, var(--lacivert) 0%, var(--lacivert-koyu) 100%);
+            /* Mobil varsayılan: alt sekme çubuğu */
+            left: 0; right: 0; bottom: 0;
+            height: var(--bottomnav-h);
+            flex-direction: row;
+            align-items: stretch;
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)) 4px;
+            gap: 2px;
+            box-shadow: 0 -4px 18px rgba(16, 26, 51, 0.18);
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.62);
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 6px 2px;
+            font-weight: 700;
+            font-size: 0.62rem;
+            line-height: 1.15;
+            text-align: center;
+        }
+
+        .tab-btn .nav-icon { font-size: 1.15rem; line-height: 1; }
+        .tab-btn .nav-label { white-space: nowrap; }
+
+        .tab-btn.active {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .tab-btn:not(.active):hover {
+            color: rgba(255, 255, 255, 0.88);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* ============================================================
+           İÇERİK ALANI
+        ============================================================ */
+        .container {
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: calc(var(--topbar-h) + 16px) 12px calc(var(--bottomnav-h) + 24px) 12px;
+        }
+
+        @media (min-width: 900px) {
+            .tabs-grid {
+                left: 0; right: 0; bottom: auto; top: var(--topbar-h);
+                height: var(--desktopnav-h);
+                width: auto;
+                flex-direction: row;
+                align-items: stretch;
+                justify-content: center;
+                padding: 0 20px;
+                gap: 6px;
+                box-shadow: var(--golge-sm);
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+            .tab-btn {
+                flex: 0 0 auto;
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                gap: 9px;
+                padding: 0 20px;
+                font-size: 0.86rem;
+                text-align: left;
+                border-radius: 0;
+                position: relative;
+            }
+            .tab-btn .nav-icon { font-size: 1.05rem; }
+            .tab-btn.active {
+                background: rgba(255, 255, 255, 0.1);
+            }
+            .tab-btn.active::after {
+                content: '';
+                position: absolute;
+                left: 14px; right: 14px; bottom: 0;
+                height: 3px;
+                border-radius: 3px 3px 0 0;
+                background: var(--muhur);
+            }
+
+            .container {
+                width: auto;
+                max-width: 1080px;
+                margin: 0 auto;
+                padding: calc(var(--topbar-h) + var(--desktopnav-h) + 24px) 34px 40px 34px;
+            }
+        }
+
+        /* ============================================================
+           İSTATİSTİK KARTLARI
+        ============================================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            background: var(--yuzey);
+            border: 1px solid var(--cizgi);
+            border-radius: var(--radius-md);
+            padding: 13px 12px;
+            text-align: center;
+            box-shadow: var(--golge-sm);
+        }
+
+        .stat-val {
+            font-family: var(--font-kod);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--lacivert);
+        }
+
+        .stat-label {
+            font-size: 0.66rem;
+            font-weight: 700;
+            color: var(--murekkep-soluk);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        /* ============================================================
+           KART YAPISI
+        ============================================================ */
+        .card {
+            background: var(--yuzey);
+            border-radius: var(--radius-lg);
+            padding: 18px 20px;
+            margin-bottom: 16px;
+            color: var(--murekkep);
+            box-shadow: var(--golge-md);
+            border: 1px solid var(--cizgi);
+        }
+
+        .card-title {
+            font-family: var(--font-baslik);
+            font-size: 1.02rem;
+            font-weight: 700;
+            color: var(--lacivert);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--lacivert);
+            margin-bottom: 4px;
+        }
+
+        .form-control {
+            flex: 1;
+            min-width: 140px;
+            width: 100%;
+            padding: 9px 12px;
+            border: 1.5px solid var(--cizgi-belirgin);
+            border-radius: var(--radius-sm);
+            font-size: 0.86rem;
+            color: var(--murekkep);
+            outline: none;
+            background: var(--yuzey);
+            transition: all 0.15s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--lacivert-parlak);
+            box-shadow: 0 0 0 3px rgba(47, 69, 118, 0.14);
+        }
+
+        textarea.form-control {
+            min-height: 55px;
+            resize: vertical;
+        }
+
+        .btn-submit {
+            background: var(--muhur);
+            color: #fff;
+            border: none;
+            padding: 9px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.86rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 12px rgba(176, 32, 59, 0.28);
+        }
+
+        .btn-submit:hover {
+            background: var(--muhur-koyu);
+            transform: translateY(-1px);
+        }
+
+        .btn-action-outline {
+            background: var(--yuzey);
+            border: 1.5px solid var(--cizgi-belirgin);
+            color: var(--lacivert);
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-action-outline:hover {
+            background: var(--yuzey-soluk);
+            border-color: var(--lacivert-parlak);
+        }
+
+        .helper-text {
+            font-size: 0.8rem;
+            color: var(--murekkep-soluk);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .upload-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* ============================================================
+           OLAY / DOSYA KARTLARI — "dosya" görünümü:
+           üstte renkli mühür şeridi + monospace Karar No etiketi
+        ============================================================ */
+        .incident-card {
+            background: var(--yuzey);
+            border-radius: var(--radius-lg);
+            padding: 0;
+            margin-bottom: 14px;
+            box-shadow: var(--golge-md);
+            color: var(--murekkep);
+            border: 1px solid var(--cizgi);
+            border-top: 4px solid var(--basari);
+            overflow: hidden;
+            transition: box-shadow 0.15s ease;
+        }
+        .incident-card:hover { box-shadow: var(--golge-lg); }
+
+        .incident-card.weight-uyarma { border-top-color: var(--basari); }
+        .incident-card.weight-kinama { border-top-color: var(--uyari); }
+        .incident-card.weight-okuldegistirme { border-top-color: var(--muhur); }
+
+        .incident-card > * { padding-left: 18px; padding-right: 18px; }
+        .incident-card .inc-top-bar { padding-top: 14px; }
+        .incident-card .inc-actions { padding-bottom: 14px; }
+
+        .inc-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .inc-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 3px 9px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-uyarma { background: #DBEAFE; color: #1D4ED8; }
+        .badge-kinama { background: #FEF3C7; color: var(--uyari); }
+        .badge-okuldegistirme { background: #FBDCE1; color: var(--muhur-koyu); }
+
+        .inc-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--murekkep);
+        }
+
+        .inc-meta {
+            font-size: 0.8rem;
+            color: var(--murekkep-soluk);
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .report-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 10px 0 12px 0;
+            padding: 8px 10px;
+            background: var(--yuzey-soluk);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--cizgi);
+        }
+
+        .report-tag {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tag-active { background: #DCFCE7; color: #15803D; }
+        .tag-passive { background: var(--cizgi); color: var(--murekkep-silik); }
+        .tag-warning { background: #FEF3C7; color: var(--uyari); }
+
+        .inc-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+            border-top: 1px solid var(--cizgi);
+            padding-top: 10px;
+        }
+
+        /* ============================================================
+           MODALLAR
+        ============================================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(16, 26, 51, 0.68);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            padding: 14px;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-box {
+            background: var(--yuzey);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 820px;
+            max-height: 94vh;
+            overflow-y: auto;
+            color: var(--murekkep);
+            padding: 22px;
+            box-shadow: var(--golge-lg);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--cizgi);
+            gap: 10px;
+        }
+
+        .modal-header h3 {
+            font-family: var(--font-baslik);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--lacivert);
+        }
+
+        .btn-close-modal {
+            background: var(--yuzey-soluk);
+            border: 1px solid var(--cizgi);
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--murekkep-soluk);
+            flex-shrink: 0;
+        }
+        .btn-close-modal:hover { background: var(--cizgi); color: var(--murekkep); }
+
+        .autosave-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #15803D;
+            background: #DCFCE7;
+            padding: 3px 9px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+        .autosave-note::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #15803D;
+        }
+
+        .form-section-box {
+            background: var(--yuzey-soluk);
+            border: 1px solid var(--cizgi);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }
+
+        .form-section-header {
+            font-weight: 800;
+            font-size: 0.85rem;
+            color: var(--lacivert);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ============================================================
+           OTOMATİK KAYIT BİLDİRİMİ (toast)
+        ============================================================ */
+        .autosave-toast {
+            position: fixed;
+            left: 50%;
+            bottom: calc(var(--bottomnav-h) + 14px);
+            transform: translate(-50%, 12px);
+            background: var(--lacivert-koyu);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 9px 16px;
+            border-radius: 30px;
+            box-shadow: var(--golge-lg);
+            z-index: 1200;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .autosave-toast::before { content: '✓'; }
+        .autosave-toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+        @media (min-width: 900px) {
+            .autosave-toast { bottom: 22px; }
+        }
+
+
+        /* ============================================================
+           SIFIR BOŞ SAYFA GARANTİLİ YAZDIRMA CSS MOTORU (A4 MEB)
+        ============================================================ */
+        #printArea {
+            display: none;
+        }
+
+        @media print {
+            html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+            }
+
+            body * {
+                visibility: hidden !important;
+            }
+
+            #printArea, #printArea * {
+                visibility: visible !important;
+            }
+
+            #printArea {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-family: "Times New Roman", Times, serif !important;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 8mm 12mm 8mm 12mm;
+            }
+
+            .print-page {
+                display: block !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                box-sizing: border-box !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding-bottom: 4px !important;
+            }
+
+            .print-page:last-child {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+        }
+
+        .doc-header {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+        .doc-header h2 {
+            font-size: 11.5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 1px;
+            line-height: 1.2;
+        }
+        .doc-header h3 {
+            font-size: 10pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+        .doc-header .doc-code {
+            font-weight: bold;
+            font-size: 10pt;
+            margin-bottom: 1px;
+        }
+        .doc-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+            font-size: 8.5pt;
+        }
+        .doc-table th, .doc-table td {
+            border: 1px solid #000;
+            padding: 3px 5px;
+            vertical-align: top;
+        }
+        .doc-table th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+        .doc-section-title {
+            font-weight: bold;
+            font-size: 9pt;
+            margin-top: 5px;
+            margin-bottom: 2px;
+        }
+        .doc-content-box {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            min-height: 35px;
+            font-size: 8.5pt;
+            margin-bottom: 5px;
+            line-height: 1.25;
+        }
+        .signatures-grid {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 8.5pt;
+        }
+        .signature-box {
+            flex: 1;
+            padding: 0 4px;
+        }
+        .doc-footer-page {
+            font-size: 7pt;
+            text-align: right;
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-title-area">
+            <h1>🏛️ Öğrenci Disiplin Modülü</h1>
+            <div class="header-subtitle">
+                Kurum: <span id="lblKurumKodu">999666</span> · <span id="lblOkulAdi">15 TEMMUZ ŞEHİTLERİ ORTAOKULU</span>
+            </div>
+        </div>
+        <button class="btn-refresh" onclick="location.reload()">
+            <span>🔄</span><span>Yenile</span>
+        </button>
+    </div>
+
+    <!-- Sekmeler -->
+    <div class="tabs-grid">
+        <button class="tab-btn active" onclick="switchTab('tab-olaylar', this)"><span class="nav-icon">📋</span><span class="nav-label">Olaylar</span></button>
+        <button class="tab-btn" onclick="switchTab('tab-ogrenciler', this)"><span class="nav-icon">👥</span><span class="nav-label">Öğrenciler</span></button>
+        <button class="tab-btn" onclick="switchTab('tab-ogretmenler', this)"><span class="nav-icon">🧑‍🏫</span><span class="nav-label">Öğretmenler</span></button>
+        <button class="tab-btn" onclick="switchTab('tab-davranislar', this)"><span class="nav-icon">📖</span><span class="nav-label">Davranışlar</span></button>
+        <button class="tab-btn" onclick="switchTab('tab-kullanicilar', this)"><span class="nav-icon">🏛️</span><span class="nav-label">Okul Bilgisi</span></button>
+    </div>
+
+    <!-- TAB 1: OLAYLAR VE RAPOR MERKEZİ -->
+    <div id="tab-olaylar" class="tab-content">
+
+        <div class="card" style="padding: 12px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; background:var(--yuzey-soluk);">
+            <div class="helper-text" style="margin-bottom:0; font-weight:700; color:var(--lacivert);">💾 Çevrimdışı Yedekleme</div>
+            <div class="upload-actions" style="gap: 8px;">
+                <button class="btn-action-outline" onclick="exportFullDataJSON()">📤 Dışa Aktar</button>
+                <div class="file-input-wrapper">
+                    <button class="btn-action-outline">📥 İçe Aktar (.json)</button>
+                    <input type="file" id="importJsonFile" accept=".json" onchange="importFullDataJSON(event)">
+                </div>
+                <button class="btn-action-outline" style="color:var(--muhur); border-color:#fbdce1;" onclick="resetAllData()">⚠️ Sıfırla</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-val" id="stat-total">0</div>
+                <div class="stat-label">Toplam Dosya</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="stat-uyarma" style="color: #60a5fa;">0</div>
+                <div class="stat-label">Uyarma (Madde 55/1-a)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="stat-kinama" style="color: #fbbf24;">0</div>
+                <div class="stat-label">Kınama (Madde 55/1-b)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val" id="stat-okuldegistirme" style="color: #f87171;">0</div>
+                <div class="stat-label">Okul Değiştirme (55/1-c)</div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <div>
+                <div style="font-weight: 800; font-size: 1rem;">📋 Disiplin ve Tutanak Dosyaları</div>
+                <div style="font-size: 0.8rem; color: #64748b;">Tüm şube, rehberlik, veli, savunma ve dizi pusulası form verileri eksiksiz yönetilebilir.</div>
+            </div>
+            <button class="btn-submit" onclick="openIncidentModal()">
+                ➕ Yeni Olay & Disiplin Dosyası Aç
+            </button>
+        </div>
+
+        <div id="olaylarList"></div>
+    </div>
+
+    <!-- TAB 2: ÖĞRENCİLER -->
+    <div id="tab-ogrenciler" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-title">
+                <div>➕ Tek Öğrenci Ekle</div>
+                <span class="inc-badge badge-uyarma" id="count-ogrenciler">0 Öğrenci</span>
+            </div>
+            <form onsubmit="addStudentSingle(event)">
+                <div class="form-row">
+                    <input type="text" id="stuName" class="form-control" placeholder="Ad Soyad *" required>
+                    <input type="text" id="stuClass" class="form-control" placeholder="Sınıf (Örn: 8A)" required>
+                </div>
+                <div class="form-row">
+                    <input type="text" id="stuNo" class="form-control" placeholder="Okul No">
+                    <input type="text" id="stuTC" class="form-control" placeholder="T.C. Kimlik No">
+                </div>
+                <div class="form-row">
+                    <input type="text" id="stuParent" class="form-control" placeholder="Veli Adı Soyadı">
+                    <input type="text" id="stuPhone" class="form-control" placeholder="Veli Telefonu">
+                    <button type="submit" class="btn-submit">Kaydet</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📥 Çevrimdışı CSV ile Toplu Öğrenci Yükleme</div>
+            <div class="helper-text">
+                Sütun Sıralaması: <b>A) Ad Soyad</b> · <b>B) Sınıf</b> · <b>C) Okul No</b> · <b>D) TC No</b> · <b>E) Veli Adı</b> · <b>F) Telefon</b> (1. satır başlık).
+            </div>
+            <div class="upload-actions">
+                <div class="file-input-wrapper">
+                    <button class="btn-action-outline">📁 CSV Dosyası Seç</button>
+                    <input type="file" id="excelStudentFile" accept=".csv, .txt" onchange="updateFileName(this, 'stuFileName')">
+                </div>
+                <span id="stuFileName" style="font-size:0.82rem; color:#64748b;">Seçilmedi</span>
+                <button class="btn-submit" style="background:#2563eb;" onclick="importOfflineStudents()">📥 Listeyi Yükle</button>
+                <button class="btn-action-outline" onclick="downloadStudentTemplate()">↓ Şablon İndir (.csv)</button>
+            </div>
+        </div>
+
+        <div id="ogrencilerList"></div>
+    </div>
+
+    <!-- TAB 3: ÖĞRETMENLER -->
+    <div id="tab-ogretmenler" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-title">
+                <div>➕ Tek Öğretmen Ekle</div>
+                <span class="inc-badge badge-uyarma" id="count-ogretmenler">0 Öğretmen</span>
+            </div>
+            <form onsubmit="addTeacherSingle(event)">
+                <div class="form-row">
+                    <input type="text" id="teaName" class="form-control" placeholder="Ad Soyad *" required>
+                    <input type="text" id="teaBranch" class="form-control" placeholder="Branş (Matematik...)" required>
+                    <button type="submit" class="btn-submit">Kaydet</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📥 Çevrimdışı CSV ile Toplu Öğretmen Yükleme</div>
+            <div class="helper-text">
+                Sütun Sıralaması: <b>A) Ad Soyad</b> · <b>B) Branş</b> (1. satır başlık).
+            </div>
+            <div class="upload-actions">
+                <div class="file-input-wrapper">
+                    <button class="btn-action-outline">📁 CSV Dosyası Seç</button>
+                    <input type="file" id="excelTeacherFile" accept=".csv, .txt" onchange="updateFileName(this, 'teaFileName')">
+                </div>
+                <span id="teaFileName" style="font-size:0.82rem; color:#64748b;">Seçilmedi</span>
+                <button class="btn-submit" style="background:#2563eb;" onclick="importOfflineTeachers()">📥 Listeyi Yükle</button>
+                <button class="btn-action-outline" onclick="downloadTeacherTemplate()">↓ Şablon İndir (.csv)</button>
+            </div>
+        </div>
+
+        <div id="ogretmenlerList"></div>
+    </div>
+
+    <!-- TAB 4: DAVRANIŞ KODLARI -->
+    <div id="tab-davranislar" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-title">
+                <div>➕ Yeni Davranış Maddesi Ekle</div>
+                <span class="inc-badge badge-kinama" id="count-davranislar">41 Madde</span>
+            </div>
+            <form onsubmit="addBehaviorCode(event)">
+                <div class="form-row">
+                    <input type="text" id="behCode" class="form-control" placeholder="Kod (Örn: 55-1-a-1)" required>
+                    <input type="text" id="behDesc" class="form-control" placeholder="Açıklama *" required style="flex:2;">
+                </div>
+                <div class="form-row">
+                    <select id="behWeight" class="form-control">
+                        <option value="Uyarma">Uyarma (Madde 55/1-a)</option>
+                        <option value="Kınama" selected>Kınama (Madde 55/1-b)</option>
+                        <option value="Okul Değiştirme">Okul Değiştirme (Madde 55/1-c)</option>
+                    </select>
+                    <button type="submit" class="btn-submit">Ekle</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="davranislarList"></div>
+    </div>
+
+    <!-- TAB 5: OKUL BİLGİLERİ VE KOMİSYON -->
+    <div id="tab-kullanicilar" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-title">
+                <div>🏛️ Okul Bilgileri ve Komisyon Heyeti</div>
+            </div>
+            <div class="helper-text">Burada yer alan bilgiler Dizi Pusulası, EK-10, Toplantı Tutanağı ve tüm resmi matbu evraklara otomatik basılır.</div>
+            
+            <div class="form-group">
+                <label>Okul / Kurum Adı:</label>
+                <input type="text" id="settingSchoolName" class="form-control" onchange="saveSettings()">
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>İlçe / İl:</label>
+                    <input type="text" id="settingDistrict" class="form-control" placeholder="MEZİTLİ / MERSİN" onchange="saveSettings()">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Kurum Kodu:</label>
+                    <input type="text" id="settingKurumKodu" class="form-control" onchange="saveSettings()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Okul Müdürü:</label>
+                    <input type="text" id="settingPrincipal" class="form-control" onchange="saveSettings()">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Kurul Başkanı (Müdür Yrd.):</label>
+                    <input type="text" id="settingChairman" class="form-control" onchange="saveSettings()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Kurul Üyesi 1 (Öğretmen):</label>
+                    <input type="text" id="settingMember1" class="form-control" onchange="saveSettings()">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Kurul Üyesi 2 (Öğretmen):</label>
+                    <input type="text" id="settingMember2" class="form-control" onchange="saveSettings()">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Kurul Üyesi 3 (Öğretmen):</label>
+                    <input type="text" id="settingMember3" class="form-control" onchange="saveSettings()">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Okul Aile Birliği Bşk. (Kurul Üyesi):</label>
+                    <input type="text" id="settingMember4" class="form-control" onchange="saveSettings()">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Okul Rehber Öğretmeni / Psikolojik Danışman:</label>
+                <input type="text" id="settingCounselor" class="form-control" onchange="saveSettings()">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="autoSaveToast" class="autosave-toast">Otomatik kaydedildi</div>
+
+<!-- MODAL: TÜM FORMLAR İÇİN EKSİKSİZ VERİ GİRİŞ PANELİ -->
+<div id="incidentModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="modalIncidentTitle">➕ Disiplin Dosyası & Tüm Formların Veri Girişi</h3>
+            <button class="btn-close-modal" onclick="closeIncidentModal()">&times;</button>
+        </div>
+        <div class="autosave-note">Girdikleriniz otomatik olarak kaydedilir</div>
+        <form onsubmit="saveIncidentForm(event)">
+            <input type="hidden" id="editIncidentId" value="">
+
+            <!-- 1. Temel Olay Bilgileri -->
+            <div class="form-section-box">
+                <div class="form-section-header">📌 1. Temel Olay ve Öğrenci Seçimi</div>
+                <div class="form-group">
+                    <label>Öğrenci Seç *</label>
+                    <select id="incStudent" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Olayı Bildiren / Şube Rehber Öğretmeni *</label>
+                    <select id="incTeacher" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>İhlal Edilen Yönetmelik Davranış Maddesi *</label>
+                    <select id="incBehavior" class="form-control" required></select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Olay Tarihi *</label>
+                        <input type="date" id="incDate" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Olay Yeri</label>
+                        <input type="text" id="incPlace" class="form-control" placeholder="Koridor, Sınıf, Bahçe...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Olayın ve Yapılan İşlemlerin Özeti (Sevk Yazısı ve Genel Özet) *</label>
+                    <textarea id="incSummary" class="form-control" placeholder="Olay hakkında tutanak özeti..." required></textarea>
+                </div>
+            </div>
+
+            <!-- 2. EK-10 Öğrenci & Aile Detay Bilgileri -->
+            <div class="form-section-box">
+                <div class="form-section-header">👨‍👩‍👦 2. EK-10 Öğrenci, Aile & Sağlık/Ceza Geçmişi Bilgileri</div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Cinsiyet / Yatılılık:</label>
+                        <select id="incGender" class="form-control">
+                            <option value="Erkek">Erkek (Gündüzlü)</option>
+                            <option value="Kız">Kız (Gündüzlü)</option>
+                            <option value="Erkek Yatılı">Erkek (Yatılı)</option>
+                            <option value="Kız Yatılı">Kız (Yatılı)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Ailenin Ekonomik Durumu (Madde 1):</label>
+                        <input type="text" id="incFamilyEconomy" class="form-control" value="Orta Gelirli">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Kardeş Sayısı ve Yaşları (Madde 2):</label>
+                        <input type="text" id="incSiblings" class="form-control" value="2 Kardeş (10 ve 14 yaş)">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Daha Önce Aldığı Yaptırımlar (Madde 4):</label>
+                        <input type="text" id="incPastSanctions" class="form-control" value="Daha önce disiplin kaydı bulunmamaktadır.">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Yaptırımı Hafifleten / Şiddetlendiren Nedenler (Madde 9):</label>
+                        <input type="text" id="incMitigating" class="form-control" value="Öğrencinin ilk olayı olması, pişmanlık duyması hafifletici neden sayılmıştır.">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Kurulun Kanaati / Karar Gerekçesi (Madde 11):</label>
+                        <input type="text" id="incBoardOpinion" class="form-control" value="Öğrencinin olumsuz davranışından ders çıkarması amacıyla oy birliğiyle karar verilmiştir.">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Şube Rehber Öğretmeni Görüş Formu (1., 2. ve 3. Maddeler) -->
+            <div class="form-section-box">
+                <div class="form-section-header">🧑‍🏫 3. Şube Rehber Öğretmeni Görüş Formu (Eksiksiz 3 Madde)</div>
+                <div class="form-group">
+                    <label>1. Madde: Öğrencinin Okul İçinde ve Dışındaki Genel Durumu:</label>
+                    <textarea id="incTeacherItem1" class="form-control" placeholder="Okul içi ve dışındaki genel hal, hareket ve arkadaş ilişkileri..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>2. Madde: Öğrencinin Derslerdeki İlgi ve Başarısı:</label>
+                    <textarea id="incTeacherItem2" class="form-control" placeholder="Ders içi katılımı, ders başarısı, ödev ve sorumluluk bilinci..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>3. Madde: Şube Rehber Öğretmenin Görüş ve Önerileri:</label>
+                    <textarea id="incTeacherItem3" class="form-control" placeholder="Şube rehber öğretmeninin kanaat, teklif ve tavsiyeleri..."></textarea>
+                </div>
+            </div>
+
+            <!-- 4. Okul Rehberlik Servisi Görüş ve Öneri Formu (1., 2., 3. ve 4. Maddeler) -->
+            <div class="form-section-box">
+                <div class="form-section-header">🧭 4. Okul Rehberlik Servisi Görüş ve Öneri Formu</div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>1. Görüşme Tarihi ve Saati:</label>
+                        <input type="text" id="incCounselorTime1" class="form-control" value="Tarih: Olay Günü - Saat: 10:30">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>2. Görüşme Tarihi ve Saati (Varsa):</label>
+                        <input type="text" id="incCounselorTime2" class="form-control" value="Tarih: İzleme Görüşmesi - Saat: 14:00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>1. Madde: Öğrencinin Kişisel Özellikleri:</label>
+                    <textarea id="incCounselorItem1" class="form-control" placeholder="Öğrencinin mizaç, karakter ve iletişim özellikleri..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>2. Madde: Davranışın Niteliği, Önemi ve Ne Gibi Şartlar Altında Yapıldığı:</label>
+                    <textarea id="incCounselorItem2" class="form-control" placeholder="Davranışın ortaya çıkış koşulları ve önemi..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>3. Madde: Davranışın Yapıldığı Zamanki Öğrencinin Psikolojik Durumu:</label>
+                    <textarea id="incCounselorItem3" class="form-control" placeholder="Öğrencinin o andaki duygu durumu, öfke/stres hali..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>4. Madde: Rehber Öğretmenin Görüş ve Önerileri (İzleme Planı):</label>
+                    <textarea id="incCounselorItem4" class="form-control" placeholder="Rehberlik servisinin öneri, tedbir ve takip planı..."></textarea>
+                </div>
+            </div>
+
+            <!-- 5. Savunma, İfade, Sözleşme & Veli Görüşme Formu -->
+            <div class="form-section-box">
+                <div class="form-section-header">📝 5. Savunma, İfade, Sözleşme ve Veli Görüşme Metinleri</div>
+                <div class="form-group">
+                    <label>Öğrencinin Yazılı Savunması (Savunma Tutanağı Metni):</label>
+                    <textarea id="incStudentStatement" class="form-control" placeholder="Öğrencinin savunma beyanı..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Tanık İfadeleri ve Deliller (İfade Tutanağı Metni):</label>
+                    <textarea id="incWitnesses" class="form-control" placeholder="Görgü tanıklarının ifadeleri ve nöbetçi defteri notları..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Öğrenci Sözleşmesi Öğrenci Olay Özeti (EK-9 Metni):</label>
+                    <textarea id="incContractSummary" class="form-control" placeholder="Öğrencinin sözleşmede kendi yazdığı olay özeti..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Veli Görüşme Formu: Görüşmenin İçeriği:</label>
+                    <textarea id="incParentMeetingContent" class="form-control" placeholder="Veli ile yapılan toplantının detayları..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Veli Görüşme Formu: Velinin Görüşü ve Taahhüdü:</label>
+                    <textarea id="incParentOpinion" class="form-control" placeholder="Velinin beyanı ve taahhütleri..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Veli Görüşme Formu: Sonuç ve Öneriler:</label>
+                    <textarea id="incParentMeetingResult" class="form-control" placeholder="Veli görüşmesi neticesinde alınan kararlar..."></textarea>
+                </div>
+            </div>
+
+            <!-- 6. Dizi Pusulası & Hukuki Durum -->
+            <div class="form-section-box">
+                <div class="form-section-header">🗂️ 6. Dizi Pusulası & Hukuki / İtiraz Veri Alanları</div>
+                <div class="form-group">
+                    <label>⚖️ Mahkeme Kararı ve/veya Safahatı (Dizi Pusulası Sıra 11) *:</label>
+                    <div class="form-row">
+                        <select id="incCourtStatus" class="form-control" style="flex:1;" onchange="toggleCourtCustom(this.value)">
+                            <option value="Konu Mahkemeye İntikal Etmemiştir">Konu Mahkemeye İntikal Etmemiştir</option>
+                            <option value="Mahkeme Kararı / Savcılık Yazısı Ektedir">Mahkeme Kararı / Savcılık Yazısı Ektedir</option>
+                            <option value="ÖZEL">Diğer (Özel Açıklama Giriniz)</option>
+                        </select>
+                        <input type="text" id="incCourtCustom" class="form-control" placeholder="Mahkeme dosya/karar no giriniz..." style="flex:1; display:none;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>İtiraz Dilekçesi Durumu (Sıra 2):</label>
+                        <select id="incAppealStatus" class="form-control">
+                            <option value="İtiraz Yoktur">İtiraz Yoktur</option>
+                            <option value="İtiraz Dilekçesi Ektedir">İtiraz Dilekçesi Ektedir</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Veliye Ceza Tebliği Durumu (Sıra 3):</label>
+                        <input type="text" id="incNotificationStatus" class="form-control" value="Tebliğ Edildi (Tebliğ-Tebellüğ Belgesi Ektedir)">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>E-Okul Başarı Çizelgesi (Sıra 9):</label>
+                        <input type="text" id="incEOkulStatus" class="form-control" value="E-Okul Not Çizelgesi Eklendi">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Öğrenci Adres/MERNİS Belgesi (Sıra 10):</label>
+                        <input type="text" id="incAddressDocStatus" class="form-control" value="MERNİS / İkametgâh Belgesi Eklendi">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Diğer Ek Evraklar (Sıra 12):</label>
+                    <input type="text" id="incOtherDocs" class="form-control" value="Öğrenci Sözleşmesi, Olay Tutanağı ve Nöbet Defteri Sureti">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+                <button type="button" class="btn-action-outline" onclick="closeIncidentModal()">Kapat</button>
+                <button type="submit" class="btn-submit">💾 Verileri Kaydet ve Dosyayı Kapat</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: RESMİ MATBU EVRAK YAZDIRMA PANELİ -->
+<div id="printDocsModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3>📑 Resmi Disiplin Evrakları Yazdırma Menüsü</h3>
+            <button class="btn-close-modal" onclick="closePrintModal()">&times;</button>
+        </div>
+        <div class="helper-text">Yönetmeliğe uygun ıslak imzalı resmi evrakları tek tıkla yazdırabilirsiniz:</div>
+        
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 15px 0;">
+            <button class="btn-submit" style="background:#0f172a; text-align:left; padding:12px 16px;" onclick="generateDoc('ALL')">
+                🗂️ <b>TÜM DİSİPLİN DOSYASINI TEK TIKLA YAZDIR (Tam MEB Paketi)</b>
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('DIZI_PUSULASI')">
+                1️⃣ Dizi Pusulası (12 Evraklı Resmi Liste)
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('EK10')">
+                2️⃣ EK-10 Öğrenci Davranışlarını Değerlendirme Kurulu Kararı
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('TOPLANTI')">
+                3️⃣ Kurul Toplantı Tutanağı
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('SEVK')">
+                4️⃣ Müdür Islak İmzalı Sevk Yazısı
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('SAVUNMA')">
+                5️⃣ Öğrenci Savunma Tutanağı
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('IFADE')">
+                6️⃣ İfade Tutanağı (Öğrenci / Tanık)
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('SUBE_GORUS')">
+                7️⃣ Şube Rehber Öğretmeni Görüş Formu
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('REHBERLIK_GORUS')">
+                8️⃣ Okul Rehberlik Servisi Görüş ve Öneri Formu
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('EK9')">
+                9️⃣ EK-9 Öğrenci Sözleşmesi
+            </button>
+            <button class="btn-action-outline" style="text-align:left;" onclick="generateDoc('VELI')">
+                🔟 Veli Görüşme Formu
+            </button>
+        </div>
+        <div style="text-align:right;">
+            <button class="btn-action-outline" onclick="closePrintModal()">Kapat</button>
+        </div>
+    </div>
+</div>
+
+<!-- GİZLİ YAZDIRMA ALANI -->
+<div id="printArea"></div>
+
+<script>
+    /* ============================================================
+       VERİTABANI VE MEB DAVRANIŞ KODLARI (OFFLINE DEPOLAMA)
+    ============================================================ */
+    const STORAGE_KEY = 'MEB_DISIPLIN_MODULU_OFFLINE_V2';
+
+    const DEFAULT_BEHAVIORS = [
+        // Uyarma (Madde 55/1-a)
+        { id: 1, code: '55-1-a-1', desc: 'Derse ve diğer etkinliklere vaktinde gelmemek ve geçerli bir neden olmaksızın bu davranışı tekrar etmek.', weight: 'Uyarma' },
+        { id: 2, code: '55-1-a-2', desc: 'Okula özürsüz devamsızlığını, özür bildirim formu ya da raporla belgelendirmemek, bunu alışkanlık hâline getirmek, okul yönetimi tarafından verilen izin süresini özürsüz uzatmak.', weight: 'Uyarma' },
+        { id: 3, code: '55-1-a-3', desc: 'Yatılı bölge ortaokullarında öğrenci dolaplarını amacı dışında kullanmak, yasaklanmış malzemeyi dolapta bulundurmak ve yönetime bilgi vermeden dolabını başka arkadaşına devretmek.', weight: 'Uyarma' },
+        { id: 4, code: '55-1-a-4', desc: 'Okula, yönetimce yasaklanmış malzeme getirmek ve bunları kullanmak.', weight: 'Uyarma' },
+        { id: 5, code: '55-1-a-5', desc: 'Yalan söylemek.', weight: 'Uyarma' },
+        { id: 6, code: '55-1-a-6', desc: 'Duvarları, sıraları ve okul çevresini kirletmek.', weight: 'Uyarma' },
+        { id: 7, code: '55-1-a-7', desc: 'Görgü kurallarına uymamak.', weight: 'Uyarma' },
+        { id: 8, code: '55-1-a-8', desc: 'Okul kütüphanesinden veya laboratuvarlardan aldığı kitap, araç, gereç ve malzemeyi zamanında teslim etmemek veya geri vermemek.', weight: 'Uyarma' },
+        { id: 9, code: '55-1-a-9', desc: 'Derslerde cep telefonunu açık bulundurmak.', weight: 'Uyarma' },
+        { id: 10, code: '55-1-a-10', desc: 'Kılık ve kıyafetle ilgili kurallara uymamak.', weight: 'Uyarma' },
+
+        // Kınama (Madde 55/1-b)
+        { id: 11, code: '55-1-b-1', desc: 'Yöneticilere, öğretmenlere, görevlilere ve arkadaşlarına kaba ve saygısız davranmak.', weight: 'Kınama' },
+        { id: 12, code: '55-1-b-2', desc: 'Okulun kurallarını dikkate almayarak kuralları ve ders ortamını bozmak, ders ve ders dışı etkinliklerin yapılmasını engellemek.', weight: 'Kınama' },
+        { id: 13, code: '55-1-b-3', desc: 'Okul yönetimini yanlış bilgilendirmek, yalan söylemeyi alışkanlık hâline getirmek.', weight: 'Kınama' },
+        { id: 14, code: '55-1-b-4', desc: 'Okulda bulunduğu hâlde törenlere özürsüz olarak katılmamak ve törenlerde uygun olmayan davranışlarda bulunmak.', weight: 'Kınama' },
+        { id: 15, code: '55-1-b-5', desc: 'Okulda ya da okul dışında sigara içmek.', weight: 'Kınama' },
+        { id: 16, code: '55-1-b-6', desc: 'Resmî evrakta değişiklik yapmak.', weight: 'Kınama' },
+        { id: 17, code: '55-1-b-7', desc: 'Okulda kavga etmek.', weight: 'Kınama' },
+        { id: 18, code: '55-1-b-8', desc: 'Sınıfta cep telefonu kullanmak.', weight: 'Kınama' },
+        { id: 19, code: '55-1-b-9', desc: 'Başkasının malını haberi olmadan almak.', weight: 'Kınama' },
+        { id: 20, code: '55-1-b-10', desc: 'Okulun ve öğrencilerin eşya, araç ve gerecine kasıtlı olarak zarar vermek.', weight: 'Kınama' },
+        { id: 21, code: '55-1-b-11', desc: 'Kılık ve kıyafetle ilgili kurallara uymamakta ısrar etmek.', weight: 'Kınama' },
+        { id: 22, code: '55-1-b-12', desc: 'Okul ile ilgili mekân ve malzemeyi izinsiz ve eğitimin amaçları dışında kullanmak.', weight: 'Kınama' },
+        { id: 23, code: '55-1-b-13', desc: 'Yatılı bölge ortaokullarında, izinsiz olarak okulu terk etmek ve gece dışarıda kalmak.', weight: 'Kınama' },
+        { id: 24, code: '55-1-b-14', desc: 'Sınavda kopya çekmek veya kopya vermek.', weight: 'Kınama' },
+        { id: 25, code: '55-1-b-15', desc: 'Diğer öğrencilerin sosyal veya duygusal gelişimlerini, akran ve arkadaşlık ilişkilerini olumsuz yönde etkileyecek davranışları alışkanlık hâline getirmek.', weight: 'Kınama' },
+
+        // Okul Değiştirme (Madde 55/1-c)
+        { id: 26, code: '55-1-c-1', desc: 'Anayasanın başlangıcında belirtilen temel ilkelere dayalı millî, demokratik, lâik, sosyal ve hukuk devleti niteliklerine aykırı davranışlarda bulunmak.', weight: 'Okul Değiştirme' },
+        { id: 27, code: '55-1-c-2', desc: 'Sarkıntılık, hakaret, iftira, tehdit ve taciz etmek veya başkalarını bu gibi davranışlara kışkırtmak.', weight: 'Okul Değiştirme' },
+        { id: 28, code: '55-1-c-3', desc: 'Okula yaralayıcı, öldürücü aletler getirmek ve bunları bulundurmak.', weight: 'Okul Değiştirme' },
+        { id: 29, code: '55-1-c-4', desc: 'Okul ve çevresinde kasıtlı olarak yangın çıkarmak.', weight: 'Okul Değiştirme' },
+        { id: 30, code: '55-1-c-5', desc: 'Okul ile ilgili mekân ve malzemeyi izinsiz ve eğitim amaçları dışında kullanmayı alışkanlık hâline getirmek.', weight: 'Okul Değiştirme' },
+        { id: 31, code: '55-1-c-6', desc: 'Okul içinde ve dışında; siyasi parti ve sendikaların propagandasını yapmak ve eylemlere katılmak.', weight: 'Okul Değiştirme' },
+        { id: 32, code: '55-1-c-7', desc: 'Herhangi bir kurum ve örgüt adına yardım ve para toplamak.', weight: 'Okul Değiştirme' },
+        { id: 33, code: '55-1-c-8', desc: 'Kişi veya grupları dil, ırk, cinsiyet, siyasi düşünce ve inançlarına göre ayırmak, kınamak, kötülemek.', weight: 'Okul Değiştirme' },
+        { id: 34, code: '55-1-c-9', desc: 'Başkasının malına zarar vermek, haberi olmadan almayı alışkanlık hâline getirmek.', weight: 'Okul Değiştirme' },
+        { id: 35, code: '55-1-c-10', desc: 'Okulun bina, eklenti ve donanımlarını kasıtlı olarak tahrip etmeyi alışkanlık hâline getirmek.', weight: 'Okul Değiştirme' },
+        { id: 36, code: '55-1-c-11', desc: 'Okula, derslere, sınavlara girilmesine, derslerin ve sınavların sağlıklı yapılmasına engel olmak.', weight: 'Okul Değiştirme' },
+        { id: 37, code: '55-1-c-12', desc: 'Okul içinde ve dışında personele ve arkadaşlarına şiddet uygulamak, saldırıda bulunmak.', weight: 'Okul Değiştirme' },
+        { id: 38, code: '55-1-c-13', desc: 'Yatılı bölge ortaokullarında, gece izinsiz olarak dışarıda kalmayı alışkanlık hâline getirmek.', weight: 'Okul Değiştirme' },
+        { id: 39, code: '55-1-c-14', desc: 'Okul ile ilişiği olmayan kişileri okulda veya okula ait yerlerde barındırmak.', weight: 'Okul Değiştirme' },
+        { id: 40, code: '55-1-c-15', desc: 'Kendi yerine başkasının sınava girmesini sağlamak, başkasının yerine sınava girmek.', weight: 'Okul Değiştirme' },
+        { id: 41, code: '55-1-c-16', desc: 'Alkol veya bağımlılık yapan maddeleri kullanmak veya başkalarını kullanmaya teşvik etmek.', weight: 'Okul Değiştirme' },
+        { id: 42, code: '55-1-c-18', desc: 'Dijital araçlar ya da sosyal medya kanalıyla kişilik haklarını ihlal edecek şekilde ses ya da görüntü kaydetmek veya yayımlamak.', weight: 'Okul Değiştirme' }
+        // Not: 55-1-c-17 maddesi 10/7/2019 tarihli (RG-30827) değişiklikle yürürlükten kaldırılmıştır (mülga), bu yüzden listede yer almamaktadır.
+    ];
+
+    let db = {
+        settings: {
+            schoolName: '15 TEMMUZ ŞEHİTLERİ ORTAOKULU',
+            district: 'MEZİTLİ / MERSİN',
+            kurumKodu: '999666',
+            principal: 'Celalettin AKDOĞAN',
+            chairman: 'Müdür Yardımcısı (Kurul Bşk.)',
+            member1: 'Öğretmen Üye 1',
+            member2: 'Öğretmen Üye 2',
+            member3: 'Öğretmen Üye 3',
+            member4: 'Okul Aile Bir. Bşk.',
+            counselor: 'Okul Rehber Öğretmeni'
+        },
+        students: [
+            { id: 1, name: 'Ahmet Erken', grade: '8A', no: '124', tc: '11111111110', parent: 'Mustafa Erken', phone: '05551112233' },
+            { id: 2, name: 'Zeynep Kaya', grade: '7B', no: '302', tc: '22222222220', parent: 'Fatma Kaya', phone: '05554445566' }
+        ],
+        teachers: [
+            { id: 1, name: 'Mehmet Yılmaz', branch: 'Matematik Öğretmeni' },
+            { id: 2, name: 'Ayşe Demir', branch: 'Türkçe Öğretmeni' }
+        ],
+        behaviors: DEFAULT_BEHAVIORS,
+        incidents: []
+    };
+
+    let selectedIncidentForPrint = null;
+
+    function loadData() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                db = JSON.parse(saved);
+                if (!db.behaviors || db.behaviors.length === 0) {
+                    db.behaviors = DEFAULT_BEHAVIORS;
+                }
+            } catch (e) {
+                console.error("Veri okuma hatası:", e);
+            }
+        }
+        renderAll();
+    }
+
+    function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        renderAll();
+    }
+
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        
+        document.getElementById(tabId).style.display = 'block';
+        if (el) el.classList.add('active');
+    }
+
+    function renderAll() {
+        document.getElementById('lblKurumKodu').textContent = db.settings.kurumKodu || '999666';
+        document.getElementById('lblOkulAdi').textContent = db.settings.schoolName || 'Okul Adı';
+
+        document.getElementById('settingSchoolName').value = db.settings.schoolName || '';
+        document.getElementById('settingDistrict').value = db.settings.district || '';
+        document.getElementById('settingKurumKodu').value = db.settings.kurumKodu || '';
+        document.getElementById('settingPrincipal').value = db.settings.principal || '';
+        document.getElementById('settingChairman').value = db.settings.chairman || '';
+        document.getElementById('settingMember1').value = db.settings.member1 || '';
+        document.getElementById('settingMember2').value = db.settings.member2 || '';
+        document.getElementById('settingMember3').value = db.settings.member3 || '';
+        document.getElementById('settingMember4').value = db.settings.member4 || '';
+        document.getElementById('settingCounselor').value = db.settings.counselor || '';
+
+        document.getElementById('stat-total').textContent = db.incidents.length;
+        document.getElementById('stat-uyarma').textContent = db.incidents.filter(i => i.behaviorWeight === 'Uyarma').length;
+        document.getElementById('stat-kinama').textContent = db.incidents.filter(i => i.behaviorWeight === 'Kınama').length;
+        document.getElementById('stat-okuldegistirme').textContent = db.incidents.filter(i => i.behaviorWeight === 'Okul Değiştirme').length;
+
+        document.getElementById('count-ogrenciler').textContent = db.students.length + ' Öğrenci';
+        document.getElementById('count-ogretmenler').textContent = db.teachers.length + ' Öğretmen';
+        document.getElementById('count-davranislar').textContent = db.behaviors.length + ' Madde';
+
+        renderIncidents();
+        renderStudents();
+        renderTeachers();
+        renderBehaviors();
+    }
+
+    function renderIncidents() {
+        const container = document.getElementById('olaylarList');
+        if (db.incidents.length === 0) {
+            container.innerHTML = `<div class="card" style="text-align:center; padding:35px; color:#64748b;">Henüz kayıtlı bir disiplin olayı veya dosya bulunmuyor.</div>`;
+            return;
+        }
+        
+        container.innerHTML = db.incidents.map(inc => {
+            const weightClass = inc.behaviorWeight === 'Uyarma' ? 'weight-uyarma' : (inc.behaviorWeight === 'Kınama' ? 'weight-kinama' : 'weight-okuldegistirme');
+            const badgeClass = inc.behaviorWeight === 'Uyarma' ? 'badge-uyarma' : (inc.behaviorWeight === 'Kınama' ? 'badge-kinama' : 'badge-okuldegistirme');
+            const hasCourt = inc.courtDecision && !inc.courtDecision.includes('İntikal Etmemiştir');
+            const hasAppeal = inc.appealStatus && !inc.appealStatus.includes('Yoktur');
+
+            return `
+            <div class="incident-card ${weightClass}">
+                <div class="inc-top-bar">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="inc-badge ${badgeClass}">${escapeHtml(inc.behaviorWeight)}</span>
+                        <span style="font-size:0.8rem; font-weight:700; color:#64748b;">Karar No: #${inc.id.toString().slice(-4)}</span>
+                    </div>
+                    <span style="font-size:0.82rem; font-weight:600; color:#64748b;">📅 ${inc.date}</span>
+                </div>
+                
+                <div class="inc-title">${escapeHtml(inc.studentName)} (${escapeHtml(inc.studentGrade)} - No: ${escapeHtml(inc.studentNo || '---')})</div>
+                <div style="font-size:0.88rem; color:#1e293b; margin-top:4px; font-weight:600;">
+                    [${escapeHtml(inc.behaviorCode)}] ${escapeHtml(inc.behaviorDesc)}
+                </div>
+                
+                <div class="inc-meta">
+                    <span>📍 ${escapeHtml(inc.place || 'Okul İçi')}</span>
+                    <span>🧑‍🏫 ${escapeHtml(inc.teacherName)}</span>
+                    <span>👨‍👩‍👦 Veli: ${escapeHtml(inc.studentParent)}</span>
+                </div>
+
+                <div class="report-tags-container">
+                    <span class="report-tag ${inc.statement ? 'tag-active' : 'tag-passive'}">📝 Savunma ${inc.statement ? '✓' : '—'}</span>
+                    <span class="report-tag ${inc.witnesses ? 'tag-active' : 'tag-passive'}">👥 İfade/Tanık ${inc.witnesses ? '✓' : '—'}</span>
+                    <span class="report-tag ${inc.teacherItem1 || inc.teacherItem2 || inc.teacherItem3 ? 'tag-active' : 'tag-passive'}">🧑‍🏫 Şube (3 Madde) ✓</span>
+                    <span class="report-tag ${inc.counselorItem1 || inc.counselorItem4 ? 'tag-active' : 'tag-passive'}">🧭 Rehberlik (4 Madde) ✓</span>
+                    <span class="report-tag ${inc.parentOpinion ? 'tag-active' : 'tag-passive'}">👨‍👩‍👦 Veli Formu ✓</span>
+                    <span class="report-tag ${hasCourt ? 'tag-warning' : 'tag-active'}">⚖️ Mahkeme: ${hasCourt ? 'Karar Var' : 'İntikal Yok'}</span>
+                    <span class="report-tag ${hasAppeal ? 'tag-warning' : 'tag-passive'}">📨 İtiraz: ${hasAppeal ? 'Var' : 'Yok'}</span>
+                    <span class="report-tag tag-active">🗂️ Dizi Pusulası Hazır ✓</span>
+                </div>
+
+                <div class="inc-actions">
+                    <button class="btn-action-outline" onclick="editIncident(${inc.id})">✏️ Tüm Form Verilerini Düzenle</button>
+                    <button class="btn-submit" style="background:#0f172a;" onclick="openPrintModal(${inc.id})">🖨️ Matbu Evrakları Yazdır</button>
+                    <button class="btn-action-outline" style="color:#dc2626; border-color:#fecaca;" onclick="deleteIncident(${inc.id})">🗑️ Sil</button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+
+    function renderStudents() {
+        const container = document.getElementById('ogrencilerList');
+        if (db.students.length === 0) {
+            container.innerHTML = `<div class="card" style="text-align:center; color:#64748b;">Henüz öğrenci kaydı yok.</div>`;
+            return;
+        }
+        container.innerHTML = db.students.map(s => `
+            <div class="card" style="padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; font-size:0.92rem;">${escapeHtml(s.name)}</div>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+                        Sınıf: <b>${escapeHtml(s.grade)}</b> | Okul No: <b>${escapeHtml(s.no || '-')}</b> | TC: ${escapeHtml(s.tc || '-')} | Veli: ${escapeHtml(s.parent || '-')} (${escapeHtml(s.phone || '-')})
+                    </div>
+                </div>
+                <button class="btn-action-outline" style="color:#dc2626; padding:5px 10px;" onclick="deleteStudent(${s.id})">Sil</button>
+            </div>
+        `).join('');
+    }
+
+    function renderTeachers() {
+        const container = document.getElementById('ogretmenlerList');
+        if (db.teachers.length === 0) {
+            container.innerHTML = `<div class="card" style="text-align:center; color:#64748b;">Henüz öğretmen kaydı yok.</div>`;
+            return;
+        }
+        container.innerHTML = db.teachers.map(t => `
+            <div class="card" style="padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; font-size:0.92rem;">${escapeHtml(t.name)}</div>
+                    <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">Branş: <b>${escapeHtml(t.branch)}</b></div>
+                </div>
+                <button class="btn-action-outline" style="color:#dc2626; padding:5px 10px;" onclick="deleteTeacher(${t.id})">Sil</button>
+            </div>
+        `).join('');
+    }
+
+    function renderBehaviors() {
+        const container = document.getElementById('davranislarList');
+        if (db.behaviors.length === 0) {
+            container.innerHTML = `<div class="card" style="text-align:center; color:#64748b;">Henüz davranış kodu yok.</div>`;
+            return;
+        }
+        container.innerHTML = db.behaviors.map(b => `
+            <div class="card" style="padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <div style="flex:1;">
+                    <div style="font-weight:800; font-size:0.85rem; color:var(--primary-indigo);">${escapeHtml(b.code)}</div>
+                    <div style="font-size:0.84rem; font-weight:600; color:#1e293b; margin-top:2px;">${escapeHtml(b.desc)}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="inc-badge ${b.weight==='Uyarma'?'badge-uyarma':(b.weight==='Kınama'?'badge-kinama':'badge-okuldegistirme')}">${escapeHtml(b.weight)}</span>
+                    <button class="btn-action-outline" style="color:#dc2626; padding:5px 10px;" onclick="deleteBehavior(${b.id})">Sil</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    /* CRUD İşlemleri */
+    function addStudentSingle(e) {
+        e.preventDefault();
+        const name = document.getElementById('stuName').value.trim();
+        const grade = document.getElementById('stuClass').value.trim();
+        const no = document.getElementById('stuNo').value.trim();
+        const tc = document.getElementById('stuTC').value.trim();
+        const parent = document.getElementById('stuParent').value.trim();
+        const phone = document.getElementById('stuPhone').value.trim();
+        if (!name) return;
+
+        db.students.push({ id: Date.now(), name, grade, no, tc, parent, phone });
+        saveData();
+        document.getElementById('stuName').value = '';
+        document.getElementById('stuClass').value = '';
+        document.getElementById('stuNo').value = '';
+        document.getElementById('stuTC').value = '';
+        document.getElementById('stuParent').value = '';
+        document.getElementById('stuPhone').value = '';
+    }
+
+    function deleteStudent(id) {
+        if (confirm('Öğrenci kaydını silmek istediğinize emin misiniz?')) {
+            db.students = db.students.filter(s => s.id !== id);
+            saveData();
+        }
+    }
+
+    function addTeacherSingle(e) {
+        e.preventDefault();
+        const name = document.getElementById('teaName').value.trim();
+        const branch = document.getElementById('teaBranch').value.trim();
+        if (!name) return;
+
+        db.teachers.push({ id: Date.now(), name, branch });
+        saveData();
+        document.getElementById('teaName').value = '';
+        document.getElementById('teaBranch').value = '';
+    }
+
+    function deleteTeacher(id) {
+        if (confirm('Öğretmen kaydını silmek istediğinize emin misiniz?')) {
+            db.teachers = db.teachers.filter(t => t.id !== id);
+            saveData();
+        }
+    }
+
+    function addBehaviorCode(e) {
+        e.preventDefault();
+        const code = document.getElementById('behCode').value.trim();
+        const desc = document.getElementById('behDesc').value.trim();
+        const weight = document.getElementById('behWeight').value;
+        if (!code || !desc) return;
+
+        db.behaviors.push({ id: Date.now(), code, desc, weight });
+        saveData();
+        document.getElementById('behCode').value = '';
+        document.getElementById('behDesc').value = '';
+    }
+
+    function deleteBehavior(id) {
+        if (confirm('Davranış kodunu silmek istediğinize emin misiniz?')) {
+            db.behaviors = db.behaviors.filter(b => b.id !== id);
+            saveData();
+        }
+    }
+
+    function saveSettings() {
+        db.settings.schoolName = document.getElementById('settingSchoolName').value.trim();
+        db.settings.district = document.getElementById('settingDistrict').value.trim();
+        db.settings.kurumKodu = document.getElementById('settingKurumKodu').value.trim();
+        db.settings.principal = document.getElementById('settingPrincipal').value.trim();
+        db.settings.chairman = document.getElementById('settingChairman').value.trim();
+        db.settings.member1 = document.getElementById('settingMember1').value.trim();
+        db.settings.member2 = document.getElementById('settingMember2').value.trim();
+        db.settings.member3 = document.getElementById('settingMember3').value.trim();
+        db.settings.member4 = document.getElementById('settingMember4').value.trim();
+        db.settings.counselor = document.getElementById('settingCounselor').value.trim();
+        saveData();
+        showAutoSaveToast();
+    }
+
+    /* ============================================================
+       OTOMATİK KAYIT ALTYAPISI
+       - debounce: kullanıcı yazmayı bıraktıktan kısa süre sonra kaydeder
+       - showAutoSaveToast: küçük "Otomatik kaydedildi" bildirimi gösterir
+       - setupAutoSaveListeners: Ayarlar sekmesi ve Olay formundaki tüm
+         alanlara otomatik kayıt dinleyicisi bağlar
+    ============================================================ */
+    function debounce(fn, delay) {
+        let timer;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    function showAutoSaveToast() {
+        const toast = document.getElementById('autoSaveToast');
+        if (!toast) return;
+        toast.classList.add('show');
+        clearTimeout(showAutoSaveToast._t);
+        showAutoSaveToast._t = setTimeout(() => toast.classList.remove('show'), 1500);
+    }
+
+    const debouncedSaveSettings = debounce(saveSettings, 600);
+    const debouncedAutoSaveIncident = debounce(autoSaveIncidentDraft, 700);
+
+    function setupAutoSaveListeners() {
+        // Okul Bilgileri ve Komisyon sekmesi: her tuş vuruşundan kısa süre sonra otomatik kaydeder
+        document.querySelectorAll('#tab-kullanicilar input').forEach(el => {
+            el.removeAttribute('onchange');
+            el.addEventListener('input', debouncedSaveSettings);
+        });
+
+        // Disiplin Dosyası formu: tüm alanlar otomatik kaydedilir
+        document.querySelectorAll('#incidentModal form input, #incidentModal form select, #incidentModal form textarea').forEach(el => {
+            if (el.id === 'editIncidentId') return;
+            el.addEventListener('input', debouncedAutoSaveIncident);
+            el.addEventListener('change', debouncedAutoSaveIncident);
+        });
+    }
+
+    function toggleCourtCustom(val) {
+        const customInput = document.getElementById('incCourtCustom');
+        if (val === 'ÖZEL') {
+            customInput.style.display = 'block';
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+        }
+    }
+
+    function populateModalSelects() {
+        const selStu = document.getElementById('incStudent');
+        selStu.innerHTML = db.students.map(s => `<option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.grade)} - No: ${escapeHtml(s.no||'-')})</option>`).join('');
+
+        const selTea = document.getElementById('incTeacher');
+        selTea.innerHTML = db.teachers.length > 0 
+            ? db.teachers.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${escapeHtml(t.branch)})</option>`).join('')
+            : `<option value="0">Okul Yönetimi</option>`;
+
+        const selBeh = document.getElementById('incBehavior');
+        selBeh.innerHTML = db.behaviors.map(b => `<option value="${b.id}">[${escapeHtml(b.code)}] (${b.weight}) ${escapeHtml(b.desc)}</option>`).join('');
+    }
+
+    function openIncidentModal() {
+        if (db.students.length === 0 || db.behaviors.length === 0) {
+            alert('Lütfen önce en az bir öğrenci ve davranış kodu ekleyiniz.');
+            return;
+        }
+
+        populateModalSelects();
+        document.getElementById('modalIncidentTitle').textContent = '➕ Disiplin Dosyası & Tüm Formların Veri Girişi';
+        document.getElementById('editIncidentId').value = '';
+        document.getElementById('incDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('incPlace').value = 'Okul İçi';
+        document.getElementById('incSummary').value = '';
+        
+        // EK-10 Alanları
+        document.getElementById('incGender').value = 'Erkek';
+        document.getElementById('incFamilyEconomy').value = 'Orta Gelirli';
+        document.getElementById('incSiblings').value = '2 Kardeş (10 ve 14 yaş)';
+        document.getElementById('incPastSanctions').value = 'Daha önce disiplin kaydı bulunmamaktadır.';
+        document.getElementById('incMitigating').value = 'Öğrencinin ilk olayı olması ve pişmanlık göstermesi hafifletici neden sayılmıştır.';
+        document.getElementById('incBoardOpinion').value = 'Öğrencinin olumsuz davranışından ders çıkarması amacıyla oy birliğiyle karar verilmiştir.';
+
+        // Şube Rehber Öğretmeni 1, 2, 3. Maddeler
+        document.getElementById('incTeacherItem1').value = 'Öğrencinin okul içinde ve dışındaki arkadaş ilişkileri genel olarak uyumlu olmakla birlikte zaman zaman kuralları hatırlatmak gerekmektedir.';
+        document.getElementById('incTeacherItem2').value = 'Ders içi katılımı orta düzeydedir, ders araç ve gereçlerini eksiksiz getirmekte, ödev ve sorumluluklarını takip etmektedir.';
+        document.getElementById('incTeacherItem3').value = 'Öğrenciye rehberlik servisiyle birlikte yapıcı telkinlerde bulunulması, olumlu davranışlarının pekiştirilmesi uygun olacaktır.';
+
+        // Rehberlik Servisi 1, 2, 3, 4. Maddeler & Saatler
+        document.getElementById('incCounselorTime1').value = '1. Görüşme: Olay Günü - Saat: 10:30';
+        document.getElementById('incCounselorTime2').value = '2. Görüşme: İzleme Oturumu - Saat: 14:00';
+        document.getElementById('incCounselorItem1').value = 'Öğrenci görüşmeye açık, yapılan uyarılardan ders çıkarma eğiliminde, iletişim becerileri gelişime açıktır.';
+        document.getElementById('incCounselorItem2').value = 'Davranış fevri bir anlık öfke ve dikkatsizlik sonucu gerçekleşmiş olup alışkanlık haline gelmediği gözlemlenmiştir.';
+        document.getElementById('incCounselorItem3').value = 'Davranışın gerçekleştiği anda heyecanlı ve öfkeli olduğu, sonrasında ise üzüntü ve pişmanlık duyduğu tespit edilmiştir.';
+        document.getElementById('incCounselorItem4').value = 'Öfke kontrolü ve iletişim becerilerini geliştirmesi adına bireysel psikolojik danışma oturumlarına devam edilmesi ve velisiyle koordineli takip yapılması önerilmektedir.';
+
+        // Savunma, İfade, Sözleşme, Veli
+        document.getElementById('incStudentStatement').value = 'Hakkımda isnat edilen konuyla ilgili olay anında fevri davrandım, pişmanım, bir daha tekrarlamayacağım.';
+        document.getElementById('incWitnesses').value = 'Görgü tanıklarının ifadeleri ve nöbetçi öğretmen tutanağı incelenmiş olup öğrencinin beyanıyla örtüşmektedir.';
+        document.getElementById('incContractSummary').value = 'Öğretmenimin sözlü uyarısını anladım, yaptığım hatanın farkındayım, okul kurallarına tam uyacağıma söz veriyorum.';
+        document.getElementById('incParentMeetingContent').value = 'Öğrencinin okul ortamındaki uyumu ve gerçekleşen disiplin hadisesi veli ile detaylı şekilde görüşülmüştür.';
+        document.getElementById('incParentOpinion').value = 'Öğrencinin ev ortamındaki çalışma ve dinlenme saatlerine dikkat edileceği, okul kurallarına uyması konusunda gerekli uyarılarda bulunulduğu belirtilmiştir.';
+        document.getElementById('incParentMeetingResult').value = 'Veli ve okul rehberlik servisi iş birliğiyle öğrencinin haftalık gelişiminin takip edilmesine karar verilmiştir.';
+
+        // Dizi Pusulası & Hukuk
+        document.getElementById('incCourtStatus').value = 'Konu Mahkemeye İntikal Etmemiştir';
+        document.getElementById('incCourtCustom').value = '';
+        document.getElementById('incCourtCustom').style.display = 'none';
+        document.getElementById('incAppealStatus').value = 'İtiraz Yoktur';
+        document.getElementById('incNotificationStatus').value = 'Tebliğ Edildi (Tebliğ-Tebellüğ Belgesi Ektedir)';
+        document.getElementById('incEOkulStatus').value = 'E-Okul Not Çizelgesi Eklendi';
+        document.getElementById('incAddressDocStatus').value = 'MERNİS / İkametgâh Belgesi Eklendi';
+        document.getElementById('incOtherDocs').value = 'Öğrenci Sözleşmesi, Olay Tutanağı ve Nöbet Defteri Sureti';
+
+        document.getElementById('incidentModal').classList.add('active');
+    }
+
+    function editIncident(id) {
+        const inc = db.incidents.find(i => i.id === id);
+        if (!inc) return;
+
+        populateModalSelects();
+        document.getElementById('modalIncidentTitle').textContent = '✏️ Disiplin Dosyası & Tüm Form Verilerini Düzenle';
+        document.getElementById('editIncidentId').value = inc.id;
+        document.getElementById('incStudent').value = inc.studentId;
+        document.getElementById('incTeacher').value = inc.teacherId || 0;
+        
+        const beh = db.behaviors.find(b => b.code === inc.behaviorCode);
+        if (beh) document.getElementById('incBehavior').value = beh.id;
+
+        document.getElementById('incDate').value = inc.date;
+        document.getElementById('incPlace').value = inc.place || '';
+        document.getElementById('incSummary').value = inc.summary || '';
+
+        // EK-10
+        document.getElementById('incGender').value = inc.gender || 'Erkek';
+        document.getElementById('incFamilyEconomy').value = inc.familyEconomy || 'Orta Gelirli';
+        document.getElementById('incSiblings').value = inc.siblings || '2 Kardeş';
+        document.getElementById('incPastSanctions').value = inc.pastSanctions || 'Daha önce disiplin kaydı bulunmamaktadır.';
+        document.getElementById('incMitigating').value = inc.mitigating || '';
+        document.getElementById('incBoardOpinion').value = inc.boardOpinion || '';
+
+        // Şube Rehber Öğretmeni
+        document.getElementById('incTeacherItem1').value = inc.teacherItem1 || '';
+        document.getElementById('incTeacherItem2').value = inc.teacherItem2 || '';
+        document.getElementById('incTeacherItem3').value = inc.teacherItem3 || '';
+
+        // Rehberlik Servisi
+        document.getElementById('incCounselorTime1').value = inc.counselorTime1 || '';
+        document.getElementById('incCounselorTime2').value = inc.counselorTime2 || '';
+        document.getElementById('incCounselorItem1').value = inc.counselorItem1 || '';
+        document.getElementById('incCounselorItem2').value = inc.counselorItem2 || '';
+        document.getElementById('incCounselorItem3').value = inc.counselorItem3 || '';
+        document.getElementById('incCounselorItem4').value = inc.counselorItem4 || '';
+
+        // Savunma, İfade, Sözleşme, Veli
+        document.getElementById('incStudentStatement').value = inc.statement || '';
+        document.getElementById('incWitnesses').value = inc.witnesses || '';
+        document.getElementById('incContractSummary').value = inc.contractSummary || '';
+        document.getElementById('incParentMeetingContent').value = inc.parentMeetingContent || '';
+        document.getElementById('incParentOpinion').value = inc.parentOpinion || '';
+        document.getElementById('incParentMeetingResult').value = inc.parentMeetingResult || '';
+
+        // Mahkeme ve Dizi Pusulası
+        const courtVal = inc.courtDecision || 'Konu Mahkemeye İntikal Etmemiştir';
+        if (courtVal === 'Konu Mahkemeye İntikal Etmemiştir' || courtVal === 'Mahkeme Kararı / Savcılık Yazısı Ektedir') {
+            document.getElementById('incCourtStatus').value = courtVal;
+            document.getElementById('incCourtCustom').style.display = 'none';
+        } else {
+            document.getElementById('incCourtStatus').value = 'ÖZEL';
+            document.getElementById('incCourtCustom').value = courtVal;
+            document.getElementById('incCourtCustom').style.display = 'block';
+        }
+
+        document.getElementById('incAppealStatus').value = inc.appealStatus || 'İtiraz Yoktur';
+        document.getElementById('incNotificationStatus').value = inc.notificationStatus || 'Tebliğ Edildi (Tebliğ-Tebellüğ Belgesi Ektedir)';
+        document.getElementById('incEOkulStatus').value = inc.eOkulStatus || 'E-Okul Not Çizelgesi Eklendi';
+        document.getElementById('incAddressDocStatus').value = inc.addressDocStatus || 'MERNİS / İkametgâh Belgesi Eklendi';
+        document.getElementById('incOtherDocs').value = inc.otherDocs || 'Öğrenci Sözleşmesi, Olay Tutanağı ve Nöbet Defteri Sureti';
+
+        document.getElementById('incidentModal').classList.add('active');
+    }
+
+    function closeIncidentModal() {
+        document.getElementById('incidentModal').classList.remove('active');
+    }
+
+    function collectIncidentFormData(idOverride) {
+        const studentId = parseInt(document.getElementById('incStudent').value);
+        const teacherId = parseInt(document.getElementById('incTeacher').value);
+        const behaviorId = parseInt(document.getElementById('incBehavior').value);
+
+        const student = db.students.find(s => s.id === studentId);
+        const teacher = db.teachers.find(t => t.id === teacherId) || { name: '---', branch: '---' };
+        const behavior = db.behaviors.find(b => b.id === behaviorId);
+        const date = document.getElementById('incDate').value;
+
+        if (!student || !behavior || !date) return null;
+
+        let courtDecisionVal = document.getElementById('incCourtStatus').value;
+        if (courtDecisionVal === 'ÖZEL') {
+            courtDecisionVal = document.getElementById('incCourtCustom').value.trim() || 'Mahkeme Kararı Ektedir';
+        }
+
+        return {
+            id: idOverride,
+            studentId,
+            studentName: student.name,
+            studentGrade: student.grade,
+            studentNo: student.no,
+            studentTC: student.tc || '---',
+            studentParent: student.parent || '---',
+            studentPhone: student.phone || '---',
+            teacherId,
+            teacherName: teacher.name,
+            teacherBranch: teacher.branch,
+            behaviorCode: behavior.code,
+            behaviorDesc: behavior.desc,
+            behaviorWeight: behavior.weight,
+            date,
+            place: document.getElementById('incPlace').value.trim() || 'Okul İçi',
+            summary: document.getElementById('incSummary').value.trim(),
+
+            // EK-10
+            gender: document.getElementById('incGender').value,
+            familyEconomy: document.getElementById('incFamilyEconomy').value.trim(),
+            siblings: document.getElementById('incSiblings').value.trim(),
+            pastSanctions: document.getElementById('incPastSanctions').value.trim(),
+            mitigating: document.getElementById('incMitigating').value.trim(),
+            boardOpinion: document.getElementById('incBoardOpinion').value.trim(),
+
+            // Şube Rehber Öğretmeni Formu 3 Madde
+            teacherItem1: document.getElementById('incTeacherItem1').value.trim(),
+            teacherItem2: document.getElementById('incTeacherItem2').value.trim(),
+            teacherItem3: document.getElementById('incTeacherItem3').value.trim(),
+
+            // Rehberlik Servisi Formu 4 Madde & Saatler
+            counselorTime1: document.getElementById('incCounselorTime1').value.trim(),
+            counselorTime2: document.getElementById('incCounselorTime2').value.trim(),
+            counselorItem1: document.getElementById('incCounselorItem1').value.trim(),
+            counselorItem2: document.getElementById('incCounselorItem2').value.trim(),
+            counselorItem3: document.getElementById('incCounselorItem3').value.trim(),
+            counselorItem4: document.getElementById('incCounselorItem4').value.trim(),
+
+            // Savunma, İfade, Sözleşme, Veli
+            statement: document.getElementById('incStudentStatement').value.trim(),
+            witnesses: document.getElementById('incWitnesses').value.trim(),
+            contractSummary: document.getElementById('incContractSummary').value.trim(),
+            parentMeetingContent: document.getElementById('incParentMeetingContent').value.trim(),
+            parentOpinion: document.getElementById('incParentOpinion').value.trim(),
+            parentMeetingResult: document.getElementById('incParentMeetingResult').value.trim(),
+
+            // Dizi Pusulası & Hukuk
+            courtDecision: courtDecisionVal,
+            appealStatus: document.getElementById('incAppealStatus').value,
+            notificationStatus: document.getElementById('incNotificationStatus').value.trim(),
+            eOkulStatus: document.getElementById('incEOkulStatus').value.trim(),
+            addressDocStatus: document.getElementById('incAddressDocStatus').value.trim(),
+            otherDocs: document.getElementById('incOtherDocs').value.trim()
+        };
+    }
+
+    function saveIncidentForm(e) {
+        e.preventDefault();
+        const editId = document.getElementById('editIncidentId').value;
+        const idOverride = editId ? parseInt(editId) : Date.now();
+        const recordData = collectIncidentFormData(idOverride);
+
+        if (!recordData) {
+            alert('Lütfen zorunlu alanları doldurunuz: Öğrenci, Davranış Maddesi ve Olay Tarihi.');
+            return;
+        }
+
+        if (editId) {
+            const index = db.incidents.findIndex(i => i.id === parseInt(editId));
+            if (index !== -1) db.incidents[index] = recordData;
+        } else {
+            db.incidents.unshift(recordData);
+        }
+
+        saveData();
+        closeIncidentModal();
+    }
+
+    /* Her alan değiştikçe (debounce ile) sessizce kaydeder; ilk geçerli
+       girişte kayıt otomatik oluşturulur, sonrasında aynı kayıt güncellenir. */
+    function autoSaveIncidentDraft() {
+        const modal = document.getElementById('incidentModal');
+        if (!modal.classList.contains('active')) return;
+
+        const editField = document.getElementById('editIncidentId');
+        const idOverride = editField.value ? parseInt(editField.value) : Date.now();
+        const recordData = collectIncidentFormData(idOverride);
+        if (!recordData) return; // Zorunlu alanlar (Öğrenci/Davranış/Tarih) tamamlanmadan otomatik kayıt yapılmaz
+
+        if (editField.value) {
+            const index = db.incidents.findIndex(i => i.id === idOverride);
+            if (index !== -1) db.incidents[index] = recordData;
+        } else {
+            db.incidents.unshift(recordData);
+            editField.value = idOverride;
+        }
+
+        saveData();
+        showAutoSaveToast();
+    }
+
+    function deleteIncident(id) {
+        if (confirm('Bu disiplin dosyasını tamamen silmek istediğinize emin misiniz?')) {
+            db.incidents = db.incidents.filter(i => i.id !== id);
+            saveData();
+        }
+    }
+
+    /* ============================================================
+       RESMİ MATBU EVRAK ÇIKTI ÜRETİCİSİ (A4 FORMATI)
+    ============================================================ */
+    function openPrintModal(incidentId) {
+        selectedIncidentForPrint = db.incidents.find(i => i.id === incidentId);
+        if (!selectedIncidentForPrint) return;
+        document.getElementById('printDocsModal').classList.add('active');
+    }
+
+    function closePrintModal() {
+        document.getElementById('printDocsModal').classList.remove('active');
+    }
+
+    function getDocHTML(type, inc, set) {
+        const dateFormatted = inc.date.split('-').reverse().join('/');
+        const hasCourt = inc.courtDecision && !inc.courtDecision.includes('İntikal Etmemiştir');
+        const hasAppeal = inc.appealStatus && !inc.appealStatus.includes('Yoktur');
+        const isBoy = (inc.gender || 'Erkek').includes('Erkek');
+
+        switch(type) {
+            case 'DIZI_PUSULASI':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ DAVRANIŞLARI DEĞERLENDİRME KURULU DOSYASI DİZİ PUSULASI</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">ÖĞRENCİNİN OKULU:</th><td>${escapeHtml(set.schoolName)}</td></tr>
+                        <tr><th>ADI VE SOYADI:</th><td><b>${escapeHtml(inc.studentName)}</b></td></tr>
+                        <tr><th>SINIFI / NUMARASI:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                    </table>
+                    <table class="doc-table">
+                        <thead>
+                            <tr style="background:#e2e8f0;">
+                                <th style="width:6%; text-align:center;">Sıra</th>
+                                <th style="width:60%;">GÖNDERİLECEK EVRAKLAR</th>
+                                <th style="width:8%; text-align:center;">VAR</th>
+                                <th style="width:26%;">AÇIKLAMA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="text-align:center;">1</td><td>Okul Öğrenci Davranışları Değerlendirme Kurulu Kararının Onaylı Örneği (Yön. 61)</td><td style="text-align:center;">[ X ]</td><td>Karar No: #${inc.id.toString().slice(-4)} Ektedir</td></tr>
+                            <tr><td style="text-align:center;">2</td><td>İtiraz Dilekçesi veya Yazısı (Yön. 61-c) (Sadece İtiraz dosyalarında)</td><td style="text-align:center;">${hasAppeal ? '[ X ]' : '[   ]'}</td><td>${escapeHtml(inc.appealStatus || 'İtiraz Yoktur')}</td></tr>
+                            <tr><td style="text-align:center;">3</td><td>Verilen Cezanın Öğrenci Velisine Tebliği (Yön. 61) (Sadece İtiraz dosyalarında)</td><td style="text-align:center;">[ X ]</td><td>${escapeHtml(inc.notificationStatus || 'Tebliğ Edildi')}</td></tr>
+                            <tr><td style="text-align:center;">4</td><td>Kurula Sevk Edilen Öğrenci ve Tanıkların Yazılı İfadeleri (Yön. 61)</td><td style="text-align:center;">[ X ]</td><td>${inc.witnesses ? 'İfadeler Dosyada Mevcut' : 'Tutanak Ektedir'}</td></tr>
+                            <tr><td style="text-align:center;">5</td><td>Yazılı Savunma (Yön. 61)</td><td style="text-align:center;">[ X ]</td><td>${inc.statement ? 'Yazılı Savunma Alındı' : 'Savunma Dosyasında'}</td></tr>
+                            <tr><td style="text-align:center;">6</td><td>Sınıf Rehber Öğretmeninin Öğrenci İle İlgili Görüşü</td><td style="text-align:center;">[ X ]</td><td>${inc.teacherItem1 ? 'Şube Görüş Raporu (3 Madde) Eklendi' : 'Mevcut'}</td></tr>
+                            <tr><td style="text-align:center;">7</td><td>Öğrenci Velisinin Öğrenci İle İlgili Görüşü</td><td style="text-align:center;">[ X ]</td><td>${inc.parentOpinion ? 'Veli Görüşme Formu Eklendi' : 'Mevcut'}</td></tr>
+                            <tr><td style="text-align:center;">8</td><td>Okul Rehberlik Servisinin Öğrenci İle İlgili Görüşü</td><td style="text-align:center;">[ X ]</td><td>${inc.counselorItem1 ? 'Rehberlik Değerlendirmesi (4 Madde) Eklendi' : 'Mevcut'}</td></tr>
+                            <tr><td style="text-align:center;">9</td><td>E-Okuldan Alınacak Öğrencinin Başarısını Gösterir Çizelge</td><td style="text-align:center;">[ X ]</td><td>${escapeHtml(inc.eOkulStatus || 'E-Okul Not Çizelgesi Eklendi')}</td></tr>
+                            <tr><td style="text-align:center;">10</td><td>Öğrencinin Adres Bilgisini Gösteren Belge</td><td style="text-align:center;">[ X ]</td><td>${escapeHtml(inc.addressDocStatus || 'MERNİS / Adres Belgesi')}</td></tr>
+                            <tr><td style="text-align:center;">11</td><td>Mahkeme Kararı ve/veya Safahatı (Varsa)</td><td style="text-align:center;">${hasCourt ? '[ X ]' : '[   ]'}</td><td><b>${escapeHtml(inc.courtDecision || 'Konu Mahkemeye İntikal Etmemiştir')}</b></td></tr>
+                            <tr><td style="text-align:center;">12</td><td>Diğer</td><td style="text-align:center;">[ X ]</td><td>${escapeHtml(inc.otherDocs || 'Öğrenci Sözleşmesi')}</td></tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top:14px; text-align:right; font-size:9.5pt; padding-right:20px;">
+                        ${dateFormatted}<br><br>
+                        <b>${escapeHtml(set.principal)}</b><br>
+                        Okul Müdürü<br>
+                        İmza - Mühür
+                    </div>
+                    <div style="font-size:7.5pt; margin-top:10px; border-top:1px solid #000; padding-top:4px; line-height:1.25;">
+                        <b>Açıklamalar:</b><br>
+                        1. Öğrenci Davranışları Değerlendirme Dosyaları mutlaka üst yazı ekinde zarf içerisinde gönderilecektir.<br>
+                        2. Dizi pusulasında sıralanan hususların karşısındaki VAR kısmına (x) işareti konulacak, eğer evrak dosyaya konulmamışsa konulmama sebebi açıklama kısmına yazılacaktır. 11 numaralı evrak konulamamışsa açıklama sütununa "Konu Mahkemeye İntikal Etmemiştir" ifadeleri yazılmalı, diğer evraklar ise dosyaya mutlaka konulmalıdır.<br>
+                        3. Dosyaya suretleri konulan belgeler okul müdürlüğünce "Aslı Gibidir" ifadesi yazılıp onaylanacaktır.<br>
+                        4. Dizi pusulasının altı Okul Müdürü tarafından imzalanacaktır.
+                    </div>
+                </div>`;
+
+            case 'EK10':
+                return `
+                <div class="print-page">
+                    <div class="doc-footer-page">Disiplin Modülü • EK-10 Sayfa 1</div>
+                    <div class="doc-header">
+                        <div class="doc-code">EK-10</div>
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ DAVRANIŞLARINI DEĞERLENDİRME KURULU KARARI</h3>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-weight:bold; font-size:9pt;">
+                        <div>Karar No: ${inc.id.toString().slice(-4)}</div>
+                        <div>Karar Tarihi: ${dateFormatted}</div>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Adı ve Soyadı:</th><td><b>${escapeHtml(inc.studentName)}</b></td><th style="width:20%;">Cinsiyeti:</th><td>${isBoy ? 'Erkek [ X ] Kız [  ]' : 'Erkek [  ] Kız [ X ]'}</td></tr>
+                        <tr><th>Sınıfı / No:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td><th>Yarı Yıl:</th><td>Dönem İçi</td></tr>
+                        <tr><th>Yatılı / Gündüzlü:</th><td>${escapeHtml(inc.gender || 'Gündüzlü')}</td><th>Başarı / Sağlık:</th><td>Normal / Sağlıklı</td></tr>
+                    </table>
+                    <div class="doc-section-title">Anne-Baba Durumu:</div>
+                    <table class="doc-table" style="text-align:center;">
+                        <tr style="background:#f2f2f2;"><th></th><th>Anne</th><th>Baba</th></tr>
+                        <tr><th style="text-align:left;">Yaşı / Eğitimi</th><td>---</td><td>---</td></tr>
+                        <tr><th style="text-align:left;">Hayatta mı? / Öz mü? / Birlikte mi?</th><td>Evet / Öz / Birlikte</td><td>Evet / Öz / Birlikte</td></tr>
+                    </table>
+                    <table class="doc-table">
+                        <tr><th style="width:35%;">1. Ailenin ekonomik durumu:</th><td>${escapeHtml(inc.familyEconomy || 'Orta Gelirli')}</td></tr>
+                        <tr><th>2. Kardeş sayısı ve yaşları:</th><td>${escapeHtml(inc.siblings || '2 Kardeş')}</td></tr>
+                        <tr><th>3. Ailesinin ikamet adresi:</th><td>${escapeHtml(set.district)}</td></tr>
+                        <tr><th>4. Şimdiye kadar aldığı yaptırımlar:</th><td>${escapeHtml(inc.pastSanctions || 'Daha önce disiplin kaydı bulunmamaktadır.')}</td></tr>
+                        <tr><th>5. Yaptırım gerektiren yer ve tarih:</th><td>${escapeHtml(inc.place)} / ${inc.date}</td></tr>
+                        <tr><th>6. Yaptırım gerektiren davranış:</th><td><b>${escapeHtml(inc.behaviorCode)} - ${escapeHtml(inc.behaviorDesc)}</b></td></tr>
+                        <tr><th>7. Davranışın nedeni:</th><td>${escapeHtml(inc.summary)}</td></tr>
+                    </table>
+                    <div class="doc-section-title">8. Olayla İlgili İfade ve Savunma Özetleri:</div>
+                    <div class="doc-content-box"><b>a) Öğrencinin Savunması:</b> ${escapeHtml(inc.statement || 'Öğrencinin sözlü ve yazılı savunması dinlendi.')}</div>
+                    <div class="doc-content-box"><b>b) Tanıkların İfadesi & Deliller:</b> ${escapeHtml(inc.witnesses || 'Görgü tanıklarının ifadeleri ve nöbetçi öğretmen tutanağı incelendi.')}</div>
+                    <div class="doc-section-title">9. Yaptırımı Hafifleten veya Şiddetlendiren Nedenler:</div>
+                    <div class="doc-content-box">${escapeHtml(inc.mitigating || 'Öğrencinin ilk olayı olması hafifletici neden sayılmıştır.')}</div>
+                    <div class="doc-section-title">10. Verilen Yaptırım Çeşidi ve Yönetmelik Maddesi:</div>
+                    <div class="doc-content-box">
+                        Millî Eğitim Bakanlığı Okul Öncesi ve İlköğretim Kurumları Yönetmeliğinin <b>${escapeHtml(inc.behaviorCode)}</b> maddesi gereğince öğrenciye <b>"${escapeHtml(inc.behaviorWeight)}"</b> yaptırımı uygulanmasına oy birliği ile karar verilmiştir.
+                    </div>
+                </div>
+                <div class="print-page">
+                    <div class="doc-footer-page">Disiplin Modülü • EK-10 Sayfa 2 (İmza Sirküsü)</div>
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ DAVRANIŞLARINI DEĞERLENDİRME KURULU KARAR İMZA SİRKÜSÜ</h3>
+                    </div>
+                    <p style="font-size:9pt; margin:10px 0;">Karar No: <b>${inc.id.toString().slice(-4)}</b> | Karar Tarihi: <b>${dateFormatted}</b></p>
+                    <div class="doc-section-title">11. Öğrenci Davranışlarını Değerlendirme Kurulunun Kanaati:</div>
+                    <div class="doc-content-box" style="min-height:50px;">
+                        ${escapeHtml(inc.boardOpinion || 'Öğrencinin olumsuz davranışından ders çıkarması amacıyla yaptırım kararı onaylanmıştır.')}
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:14px; font-size:8.5pt;">
+                        <div style="border:1px solid #000; padding:6px; min-height:65px;">
+                            <b>KURUL BAŞKANI</b><br>
+                            Adı Soyadı: ${escapeHtml(set.chairman)}<br>
+                            Görevi: Müdür Yardımcısı<br>
+                            İmza: .................................
+                        </div>
+                        <div style="border:1px solid #000; padding:6px; min-height:65px;">
+                            <b>ÜYE 1 (Öğretmen)</b><br>
+                            Adı Soyadı: ${escapeHtml(set.member1)}<br>
+                            İmza: .................................
+                        </div>
+                        <div style="border:1px solid #000; padding:6px; min-height:65px;">
+                            <b>ÜYE 2 (Öğretmen)</b><br>
+                            Adı Soyadı: ${escapeHtml(set.member2)}<br>
+                            İmza: .................................
+                        </div>
+                        <div style="border:1px solid #000; padding:6px; min-height:65px;">
+                            <b>ÜYE 3 (Öğretmen)</b><br>
+                            Adı Soyadı: ${escapeHtml(set.member3)}<br>
+                            İmza: .................................
+                        </div>
+                        <div style="border:1px solid #000; padding:6px; min-height:65px; grid-column:span 2;">
+                            <b>OKUL AİLE BİRLİĞİ BAŞKANI (ÜYE)</b><br>
+                            Adı Soyadı: ${escapeHtml(set.member4)}<br>
+                            İmza: .................................
+                        </div>
+                    </div>
+                    <div style="margin-top:35px; text-align:center; font-size:10pt;">
+                        <b>UYGUNDUR</b><br>
+                        ${dateFormatted}<br><br>
+                        <b>${escapeHtml(set.principal)}</b><br>
+                        Okul Müdürü<br>
+                        İmza - Mühür
+                    </div>
+                </div>`;
+
+            case 'TOPLANTI':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ DAVRANIŞLARINI DEĞERLENDİRME KURULU TOPLANTI TUTANAĞI</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Karar No:</th><td>${inc.id.toString().slice(-4)}</td><th style="width:25%;">Karar Tarihi:</th><td>${dateFormatted}</td></tr>
+                    </table>
+                    <div class="doc-content-box" style="min-height:140px; line-height:1.5; font-size:9pt;">
+                        Okulumuz Öğrenci Davranışları Değerlendirme Kurulu <b>${dateFormatted}</b> tarihinde toplanarak, <b>${inc.date}</b> tarihinde gerçekleşen <b>"${escapeHtml(inc.behaviorDesc)}"</b> konulu olayı ve evrakları görüşmüştür.<br><br>
+                        Hazırlanan soruşturma evraklarına, savunma tutanağına, tanık ifadelerine ve rehberlik raporuna göre öğrencinin fiili gerçekleştirdiği yönünde tam kanaat oluşmuştur.<br><br>
+                        Söz konusu öğrenci <b>${escapeHtml(inc.studentName)}</b>'e Millî Eğitim Bakanlığı Okul Öncesi ve İlköğretim Kurumları Yönetmeliğinin <b>"${escapeHtml(inc.behaviorCode)}"` +
+                        `"</b> maddesi gereğince <b>"${escapeHtml(inc.behaviorWeight)}"` +
+                        `"</b> yaptırımı uygulanmasına oy birliği ile karar verilmiştir.
+                    </div>
+                    <div class="signatures-grid" style="margin-top:25px;">
+                        <div class="signature-box"><b>Başkan</b><br>${escapeHtml(set.chairman)}<br><br>İmza</div>
+                        <div class="signature-box"><b>Üye</b><br>${escapeHtml(set.member1)}<br><br>İmza</div>
+                        <div class="signature-box"><b>Üye</b><br>${escapeHtml(set.member2)}<br><br>İmza</div>
+                        <div class="signature-box"><b>Okul Aile Bşk.</b><br>${escapeHtml(set.member4)}<br><br>İmza</div>
+                    </div>
+                    <div style="margin-top:35px; text-align:center; font-size:10pt;">
+                        <b>UYGUNDUR</b><br>
+                        ${dateFormatted}<br><br>
+                        <b>${escapeHtml(set.principal)}</b><br>
+                        Okul Müdürü
+                    </div>
+                </div>`;
+
+            case 'SEVK':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>MÜDÜR ISLAK İMZALI SEVK YAZISI</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:30%;">Öğrencinin Adı Soyadı:</th><td><b>${escapeHtml(inc.studentName)}</b></td></tr>
+                        <tr><th>Sınıfı / Okul Numarası:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                        <tr><th>Olay Tarihi / Yeri:</th><td>${inc.date} / ${escapeHtml(inc.place)}</td></tr>
+                        <tr><th>Davranış Maddesi:</th><td><b>${escapeHtml(inc.behaviorCode)} - ${escapeHtml(inc.behaviorDesc)}</b></td></tr>
+                        <tr><th>Olayı Kaydeden Öğretmen:</th><td>${escapeHtml(inc.teacherName)} (${escapeHtml(inc.teacherBranch)})</td></tr>
+                    </table>
+                    <div class="doc-section-title">Olayın ve Yapılan İşlemlerin Özeti:</div>
+                    <div class="doc-content-box" style="min-height:180px; line-height:1.45;">
+                        ${escapeHtml(inc.summary)}<br><br>
+                        <b>Öğrenci Beyanı:</b> ${escapeHtml(inc.statement || 'Öğrencinin ilk ifadesi alınarak kurula arz edilmiştir.')}
+                    </div>
+                    <p style="font-size:9pt; margin-top:14px; line-height:1.4;">
+                        Yukarıdaki bilgi ve belgeler doğrultusunda öğrencinin Öğrenci Davranışlarını Değerlendirme Kurulu gündemine alınması ve gerekli işlemlerin yapılması hususunu arz ederim.
+                    </p>
+                    <div style="margin-top:40px; text-align:right; font-size:10pt; padding-right:20px;">
+                        <b>${escapeHtml(set.principal)}</b><br>
+                        Okul Müdürü<br>
+                        İmza: .................................<br>
+                        Tarih: ${dateFormatted}
+                    </div>
+                </div>`;
+
+            case 'SAVUNMA':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>SAVUNMA TUTANAĞI</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Tarih / Yer:</th><td>${dateFormatted} / ${escapeHtml(set.schoolName)}</td></tr>
+                        <tr><th>Öğrencinin Adı Soyadı:</th><td><b>${escapeHtml(inc.studentName)}</b></td></tr>
+                        <tr><th>Sınıfı / Numarası:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                        <tr><th>T.C. Kimlik No:</th><td>${escapeHtml(inc.studentTC)}</td></tr>
+                        <tr><th>Savunmanın Konusu:</th><td>${escapeHtml(inc.behaviorDesc)}</td></tr>
+                    </table>
+                    <div class="doc-section-title">Savunmanızı Yazmaya Buradan Başlayınız:</div>
+                    <div class="doc-content-box" style="min-height:280px; line-height:1.5;">
+                        ${escapeHtml(inc.statement || 'Hakkımda isnat edilen konuyla ilgili savunmamı özgür irademle yazıyorum...')}<br><br>
+                        ...................................................................................................................................................................<br><br>
+                        ...................................................................................................................................................................
+                    </div>
+                    <div style="margin-top:35px; text-align:right; font-size:9.5pt; padding-right:30px;">
+                        <b>Savunması Alınan Öğrenci</b><br>
+                        ${escapeHtml(inc.studentName)}<br><br>
+                        İmza: .................................
+                    </div>
+                </div>`;
+
+            case 'IFADE':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ DAVRANIŞLARINI DEĞERLENDİRME KURULU İFADE TUTANAĞI</h3>
+                    </div>
+                    <div style="border:1px solid #000; padding:8px; margin-bottom:6px; font-size:8.5pt; line-height:1.3;">
+                        Sayın <b>${escapeHtml(inc.studentName)}</b>;<br>
+                        <b>${inc.date}</b> tarihinde gerçekleştiği iddia edilen <i>"${escapeHtml(inc.behaviorDesc)}"</i> konusuyla ilgili ifadenizi ayrıntılı bir şekilde yazmanızı rica ederim.<br>
+                        <div style="text-align:right; margin-top:4px;"><b>${escapeHtml(set.chairman)}</b><br>Kurul Başkanı</div>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Adı - Soyadı:</th><td>${escapeHtml(inc.studentName)}</td><th style="width:20%;">Sınıf / No:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                        <tr><th>İfadenin Konusu:</th><td colspan="3">${escapeHtml(inc.behaviorDesc)}</td></tr>
+                    </table>
+                    <div class="doc-section-title">İfadenizi Yazmaya Buradan Başlayınız:</div>
+                    <div class="doc-content-box" style="min-height:250px; line-height:1.5;">
+                        ${escapeHtml(inc.witnesses || inc.statement || 'Konu hakkındaki beyanım aşağıdadır...')}<br><br>
+                        ...................................................................................................................................................................<br><br>
+                        ...................................................................................................................................................................
+                    </div>
+                    <div style="margin-top:30px; text-align:right; font-size:9.5pt; padding-right:30px;">
+                        <b>İfade Veren</b><br>
+                        Adı Soyadı: ${escapeHtml(inc.studentName)}<br><br>
+                        İmza: .................................
+                    </div>
+                </div>`;
+
+            case 'SUBE_GORUS':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)} MÜDÜRLÜĞÜNE</h2>
+                        <h3>(Öğrenci Davranışlarını Değerlendirme Kuruluna)</h3>
+                        <div style="text-align:right; font-size:8.5pt; margin-top:2px;">${escapeHtml(set.district)}</div>
+                    </div>
+                    <p style="font-size:9pt; margin-bottom:6px; line-height:1.3;">
+                        Okulumuzun <b>${escapeHtml(inc.studentGrade)}</b> sınıfından, <b>${escapeHtml(inc.studentNo || '---')}</b> numaralı ve <b>${escapeHtml(inc.studentName)}</b> isimli öğrencisi hakkındaki düşünce, görüş ve önerilerim aşağıda belirttiğim gibidir.
+                    </p>
+                    <div class="doc-section-title">Öğrencinin Okul İçinde ve Dışındaki Genel Durumu:</div>
+                    <div class="doc-content-box" style="min-height:85px;">
+                        ${escapeHtml(inc.teacherItem1 || 'Öğrencinin arkadaş ilişkileri genel olarak uyumlu olmakla birlikte zaman zaman kuralları hatırlatmak gerekmektedir.')}
+                    </div>
+                    <div class="doc-section-title">Öğrencinin Derslerdeki İlgi ve Başarısı:</div>
+                    <div class="doc-content-box" style="min-height:85px;">
+                        ${escapeHtml(inc.teacherItem2 || 'Ders içi katılımı orta düzeydedir, ödev ve sorumluluklarını takip etmektedir.')}
+                    </div>
+                    <div class="doc-section-title">Şube Rehber Öğretmenin Görüş ve Önerileri:</div>
+                    <div class="doc-content-box" style="min-height:95px;">
+                        ${escapeHtml(inc.teacherItem3 || 'Öğrenciye rehberlik servisiyle birlikte yapıcı telkinlerde bulunulması, olumlu davranışlarının pekiştirilmesi uygun olacaktır.')}
+                    </div>
+                    <div style="margin-top:30px; text-align:right; font-size:9.5pt; padding-right:20px;">
+                        ${dateFormatted}<br><br>
+                        <b>${escapeHtml(inc.teacherName)}</b><br>
+                        ${escapeHtml(inc.studentGrade)} Şube Rehber Öğretmeni<br>
+                        İmza: .................................
+                    </div>
+                </div>`;
+
+            case 'REHBERLIK_GORUS':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)} MÜDÜRLÜĞÜNE</h2>
+                        <h3>(Öğrenci Davranışlarını Değerlendirme Kuruluna)</h3>
+                        <div style="text-align:right; font-size:8.5pt; margin-top:2px;">${escapeHtml(set.district)}</div>
+                    </div>
+                    <p style="font-size:9pt; margin-bottom:4px; line-height:1.3;">
+                        Okulumuzun <b>${escapeHtml(inc.studentGrade)}</b> sınıfından, <b>${escapeHtml(inc.studentNo || '---')}</b> numaralı ve <b>${escapeHtml(inc.studentName)}</b> isimli öğrencisiyle yaptığım görüşmeler sonucunda edindiğim kanı aşağıda belirttiğim gibidir.
+                    </p>
+                    <table class="doc-table">
+                        <tr><th style="width:30%;">1. Görüşme Tarihi ve Saati:</th><td>${escapeHtml(inc.counselorTime1 || 'Olay Günü - 10:30')}</td></tr>
+                        <tr><th>2. Görüşme Tarihi ve Saati:</th><td>${escapeHtml(inc.counselorTime2 || 'İzleme Oturumu - 14:00')}</td></tr>
+                    </table>
+                    <div class="doc-section-title">Öğrencinin Kişisel Özellikleri:</div>
+                    <div class="doc-content-box" style="min-height:65px;">
+                        ${escapeHtml(inc.counselorItem1 || 'Öğrenci görüşmeye açık, yapılan uyarılardan ders çıkarma eğilimindedir.')}
+                    </div>
+                    <div class="doc-section-title">Davranışın Niteliği, Önemi ve Ne Gibi Şartlar Altında Yapıldığı:</div>
+                    <div class="doc-content-box" style="min-height:65px;">
+                        ${escapeHtml(inc.counselorItem2 || inc.summary)}
+                    </div>
+                    <div class="doc-section-title">Davranışın Yapıldığı Zamanki Öğrencinin Psikolojik Durumu:</div>
+                    <div class="doc-content-box" style="min-height:65px;">
+                        ${escapeHtml(inc.counselorItem3 || 'Öğrencinin anlık öfke ve stres yaşadığı, akabinde pişman olduğu gözlemlenmiştir.')}
+                    </div>
+                    <div class="doc-section-title">Rehber Öğretmenin Görüş ve Önerileri:</div>
+                    <div class="doc-content-box" style="min-height:75px;">
+                        ${escapeHtml(inc.counselorItem4 || 'Öğrencinin öfke kontrolü ve iletişim becerilerini geliştirmesi adına bireysel psikolojik danışma oturumlarına devam edilmesi önerilmektedir.')}
+                    </div>
+                    <div style="margin-top:25px; text-align:right; font-size:9.5pt; padding-right:20px;">
+                        ${dateFormatted}<br><br>
+                        <b>${escapeHtml(set.counselor)}</b><br>
+                        Okul Rehber Öğretmeni / Psikolojik Danışman<br>
+                        İmza: .................................
+                    </div>
+                </div>`;
+
+            case 'EK9':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <div class="doc-code">EK-9</div>
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>ÖĞRENCİ SÖZLEŞMESİ</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Öğrencinin Adı Soyadı:</th><td><b>${escapeHtml(inc.studentName)}</b></td></tr>
+                        <tr><th>Sınıfı / Okul Numarası:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                        <tr><th>Olay Tarihi / Konu:</th><td>${inc.date} / ${escapeHtml(inc.behaviorDesc)}</td></tr>
+                    </table>
+                    <div class="doc-content-box" style="margin-top:10px; line-height:1.5; font-size:9pt;">
+                        Ben <b>${escapeHtml(inc.studentName)}</b>;<br>
+                        <b>${dateFormatted}</b> tarihinde, öğretmenim <b>${escapeHtml(inc.teacherName)}</b> tarafından hatalı davranışlarımdan dolayı sözlü olarak uyarıldım. Hatalı olduğumu anladım. Olumsuz davranışlarımın tekrarlanması durumunda uygulanabilecek yaptırımlar konusunda bilgilendirildim. Aynı tür davranışları bir kez daha yapmayacağıma ve okulun kurallarına uyacağıma söz veriyorum.
+                    </div>
+                    <div class="doc-section-title">Olayın Özeti: (Öğrenci Tarafından Doldurulacaktır)</div>
+                    <div class="doc-content-box" style="min-height:90px;">
+                        ${escapeHtml(inc.contractSummary || inc.statement || inc.summary)}
+                    </div>
+                    <div class="signatures-grid" style="margin-top:35px;">
+                        <div class="signature-box">
+                            <b>Öğrenci</b><br>
+                            ${escapeHtml(inc.studentName)}<br><br>
+                            İmza: ........................
+                        </div>
+                        <div class="signature-box">
+                            <b>Öğretmen</b><br>
+                            ${escapeHtml(inc.teacherName)}<br><br>
+                            İmza: ........................
+                        </div>
+                        <div class="signature-box">
+                            <b>Veli (Temsilci)</b><br>
+                            ${escapeHtml(inc.studentParent)}<br><br>
+                            İmza: ........................
+                        </div>
+                    </div>
+                </div>`;
+
+            case 'VELI':
+                return `
+                <div class="print-page">
+                    <div class="doc-header">
+                        <h2>${escapeHtml(set.schoolName)}</h2>
+                        <h3>VELİ GÖRÜŞME FORMU</h3>
+                    </div>
+                    <table class="doc-table">
+                        <tr><th style="width:25%;">Öğrencinin Adı Soyadı:</th><td><b>${escapeHtml(inc.studentName)}</b></td><th style="width:20%;">Sınıf / No:</th><td>${escapeHtml(inc.studentGrade)} / ${escapeHtml(inc.studentNo || '---')}</td></tr>
+                        <tr><th>Görüşme Tarihi:</th><td>${dateFormatted}</td><th>Veli Adı Soyadı:</th><td>${escapeHtml(inc.studentParent)}</td></tr>
+                    </table>
+                    <div class="doc-section-title">Görüşmenin Konusu:</div>
+                    <div class="doc-content-box">${escapeHtml(inc.behaviorDesc)}</div>
+                    <div class="doc-section-title">Görüşmenin İçeriği:</div>
+                    <div class="doc-content-box" style="min-height:95px;">
+                        ${escapeHtml(inc.parentMeetingContent || inc.summary)}
+                    </div>
+                    <div class="doc-section-title">Velinin Görüşü:</div>
+                    <div class="doc-content-box" style="min-height:75px;">
+                        ${escapeHtml(inc.parentOpinion || 'Öğrencinin ev ortamındaki çalışma ve dinlenme saatlerine dikkat edileceği, okul kurallarına uyması konusunda gerekli uyarılarda bulunulduğu belirtilmiştir.')}
+                    </div>
+                    <div class="doc-section-title">Sonuç ve Öneriler:</div>
+                    <div class="doc-content-box" style="min-height:65px;">
+                        ${escapeHtml(inc.parentMeetingResult || 'Veli ve okul rehberlik servisi iş birliğiyle sürecin haftalık takip edilmesine karar verilmiştir.')}
+                    </div>
+                    <div style="font-size:7pt; font-style:italic; margin-bottom:6px;">* Velinin toplantıya gelmemesi durumunda tutanak tutulacaktır.</div>
+                    <div class="signatures-grid" style="margin-top:20px;">
+                        <div class="signature-box" style="text-align:left;">
+                            <b>Öğrenci Velisi / Yasal Temsilci</b><br>
+                            Adı Soyadı: ${escapeHtml(inc.studentParent)}<br>
+                            T.C. Kimlik No: ${escapeHtml(inc.studentTC)}<br>
+                            Telefon No: ${escapeHtml(inc.studentPhone)}<br>
+                            İmza: .................................
+                        </div>
+                        <div class="signature-box" style="text-align:left;">
+                            <b>Görüşmeyi Yapan Öğretmen</b><br>
+                            Adı Soyadı: ${escapeHtml(inc.teacherName)}<br>
+                            Branşı / Görevi: ${escapeHtml(inc.teacherBranch)}<br>
+                            Tarih: ${dateFormatted}<br>
+                            İmza: .................................
+                        </div>
+                    </div>
+                </div>`;
+        }
+        return '';
+    }
+
+    function generateDoc(type) {
+        const inc = selectedIncidentForPrint;
+        const set = db.settings;
+        const printArea = document.getElementById('printArea');
+
+        if (type === 'ALL') {
+            const docTypes = ['DIZI_PUSULASI', 'EK10', 'TOPLANTI', 'SEVK', 'SAVUNMA', 'IFADE', 'SUBE_GORUS', 'REHBERLIK_GORUS', 'EK9', 'VELI'];
+            printArea.innerHTML = docTypes.map(t => getDocHTML(t, inc, set)).join('');
+        } else {
+            printArea.innerHTML = getDocHTML(type, inc, set);
+        }
+
+        window.print();
+    }
+
+    /* ============================================================
+       100% ÇEVRİMDIŞI ÇALIŞAN CSV / VERİ AKTARIM MOTORU
+    ============================================================ */
+    function updateFileName(input, targetId) {
+        if (input.files && input.files[0]) {
+            document.getElementById(targetId).textContent = input.files[0].name;
+        }
+    }
+
+    function parseCSVLine(line) {
+        let delimiter = line.includes(';') ? ';' : ',';
+        let result = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            let c = line[i];
+            if (c === '"') {
+                inQuotes = !inQuotes;
+            } else if (c === delimiter && !inQuotes) {
+                result.push(cur.trim());
+                cur = '';
+            } else {
+                cur += c;
+            }
+        }
+        result.push(cur.trim());
+        return result;
+    }
+
+    function importOfflineStudents() {
+        const fileInput = document.getElementById('excelStudentFile');
+        if (!fileInput.files[0]) {
+            alert('Lütfen bir CSV veya metin dosyası seçiniz.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const lines = text.split(/\r\n|\n/);
+            let added = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cols = parseCSVLine(line);
+                if (cols[0]) {
+                    db.students.push({
+                        id: Date.now() + i,
+                        name: cols[0] || '',
+                        grade: cols[1] || '',
+                        no: cols[2] || '',
+                        tc: cols[3] || '',
+                        parent: cols[4] || '',
+                        phone: cols[5] || ''
+                    });
+                    added++;
+                }
+            }
+            saveData();
+            alert(`${added} adet öğrenci başarıyla yüklendi.`);
+            fileInput.value = '';
+            document.getElementById('stuFileName').textContent = 'Seçilmedi';
+        };
+        reader.readAsText(fileInput.files[0], 'UTF-8');
+    }
+
+    function importOfflineTeachers() {
+        const fileInput = document.getElementById('excelTeacherFile');
+        if (!fileInput.files[0]) {
+            alert('Lütfen bir CSV veya metin dosyası seçiniz.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            const lines = text.split(/\r\n|\n/);
+            let added = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cols = parseCSVLine(line);
+                if (cols[0]) {
+                    db.teachers.push({
+                        id: Date.now() + i,
+                        name: cols[0] || '',
+                        branch: cols[1] || 'Öğretmen'
+                    });
+                    added++;
+                }
+            }
+            saveData();
+            alert(`${added} adet öğretmen başarıyla yüklendi.`);
+            fileInput.value = '';
+            document.getElementById('teaFileName').textContent = 'Seçilmedi';
+        };
+        reader.readAsText(fileInput.files[0], 'UTF-8');
+    }
+
+    function downloadStudentTemplate() {
+        const csvContent = "\uFEFFAd Soyad;Sinif;Okul No;TC Kimlik;Veli Adi;Telefon\nAhmet Yilmaz;8A;105;11111111110;Mustafa Yilmaz;05551112233\nElif Demir;7B;210;22222222220;Fatma Demir;05552223344";
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "ogrenci_sablon.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function downloadTeacherTemplate() {
+        const csvContent = "\uFEFFAd Soyad;Brans\nMehmet Yilmaz;Matematik\nAyse Kaya;Turkce";
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "ogretmen_sablon.csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportFullDataJSON() {
+        const dataStr = JSON.stringify(db, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json;charset=utf-8;' });
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = URL.createObjectURL(blob);
+        downloadAnchor.download = `Disiplin_Modulu_Yedek_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    function importFullDataJSON(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const imported = JSON.parse(evt.target.result);
+                if (imported.students && imported.behaviors) {
+                    db = imported;
+                    saveData();
+                    alert('Yedek başarıyla geri yüklendi!');
+                } else {
+                    alert('Geçersiz yedek dosyası formatı.');
+                }
+            } catch (err) {
+                alert('Dosya okunurken bir hata oluştu: ' + err.message);
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function resetAllData() {
+        if (confirm('Tüm veriler sıfırlanacaktır. Emin misiniz?')) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    window.onload = function () {
+        loadData();
+        setupAutoSaveListeners();
+    };
+</script>
+
+</body>
+</html>

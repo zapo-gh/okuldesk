@@ -1,0 +1,1 @@
+Kullanýcýnýn açýk onayý veya fikri istenmediði sürece, iþlemleri (kod yazma, terminal komutu çalýþtýrma vb.) gerçekleþtirirken kullanýcýya 'Bunu yapayým mý?', 'Onaylýyor musunuz?' gibi sorular SORMAMALISINIZ. Doðrudan inisiyatif alýp çözümü uygulayýn ve sadece sonucunu raporlayýn.

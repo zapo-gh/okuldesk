@@ -1,0 +1,26 @@
+[package]
+name = "okuldesk"
+version = "1.0.4"
+description = "OkulDesk - Okul Yönetim Otomasyonu (Tauri v2)"
+authors = ["OkulDesk"]
+license = ""
+repository = ""
+edition = "2021"
+
+[lib]
+name = "okuldesk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+tauri-plugin-process = "2.4.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

@@ -1,0 +1,218 @@
+import React, { RefObject, useState } from "react";
+import { ActionModal } from "../../../components/ui/ActionModal";
+import { ShieldAlert, Upload } from "lucide-react";
+import { ParentImportResult } from "./types";
+import { Button } from '../../../components/ui/Button';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  parentError: string;
+  parentPreview: ParentImportResult | null;
+  parentDone: ParentImportResult | null;
+  parentLoading: boolean;
+  parentFileRef: RefObject<HTMLInputElement>;
+  handleParentFileSelect: (f: File) => void;
+  resetParentModal: () => void;
+  handleParentImportConfirm: () => void;
+}
+
+export function ParentImportModal({
+  isOpen,
+  onClose,
+  parentError,
+  parentPreview,
+  parentDone,
+  parentLoading,
+  parentFileRef,
+  handleParentFileSelect,
+  resetParentModal,
+  handleParentImportConfirm,
+}: Props) {
+  const [filter, setFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
+
+  const filteredPreview = parentPreview?.preview.filter(r => {
+    if (filter === 'all') return true;
+    if (filter === 'matched') return r.matched;
+    if (filter === 'unmatched') return !r.matched;
+    return true;
+  }) || [];
+
+  return (
+    <ActionModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Veli Bilgisi Aktar (Excel)"
+      width="lg"
+    >
+      <div className="space-y-4">
+        {parentError && (
+          <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100 flex items-center gap-2">
+            <ShieldAlert size={16} /> {parentError}
+          </div>
+        )}
+
+        {!parentPreview && !parentDone && (
+          <>
+            <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800 mb-2">
+              <strong>Desteklenen Sütunlar:</strong> Okul No | Öğr. Ad Soyad | Sınıf/Grup | 1.
+              Veli Telefon | 1. Veli Ad Soyad | 1. Veli Yakınlık | 2. Veli Telefon | 2. Veli Adı
+            </div>
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-indigo-500 hover:bg-indigo-50 transition cursor-pointer"
+              onClick={() => parentFileRef.current?.click()}
+            >
+              {parentLoading ? (
+                <div className="animate-pulse text-indigo-600 font-medium">
+                  Excel Dosyası Okunuyor...
+                </div>
+              ) : (
+                <>
+                  <Upload className="mx-auto text-gray-400 mb-3" size={40} />
+                  <p className="font-semibold text-gray-800">Veli Excel dosyasını seçin</p>
+                  <p className="text-xs text-gray-500 mt-2">.xls, .xlsx</p>
+                </>
+              )}
+            </div>
+          </>
+        )}
+        <input
+          ref={parentFileRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+          onChange={(e) => {
+            if (e.target.files?.[0]) handleParentFileSelect(e.target.files[0]);
+          }}
+        />
+
+        {parentPreview && !parentDone && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${filter === 'all' ? 'bg-blue-100 text-blue-800 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                Tümü ({parentPreview.preview.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('matched')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${filter === 'matched' ? 'bg-green-200 text-green-900 shadow-sm' : 'bg-green-100 text-green-800 opacity-70 hover:opacity-100'}`}
+              >
+                {parentPreview.matched} Eşleşen
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('unmatched')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${filter === 'unmatched' ? 'bg-yellow-200 text-yellow-900 shadow-sm' : 'bg-yellow-100 text-yellow-800 opacity-70 hover:opacity-100'}`}
+              >
+                {parentPreview.unmatched} Bulunamayan
+              </button>
+            </div>
+
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg shadow-inner">
+              <table className="min-w-full divide-y divide-gray-200 text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Durum</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veli 1</th>
+                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veli 2</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {filteredPreview.map((r, i) => (
+                    <tr key={i} className={r.matched ? "" : "bg-red-50/50 opacity-60"}>
+                      <td className="px-3 py-2 font-medium">
+                        {r.schoolNumber} - {r.studentName}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {r.matched ? (
+                          <span className="text-green-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-red-500 font-bold">✕</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {r.parent1Name} <br />
+                        <span className="text-gray-500">{r.parent1Phone}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {r.parent2Name} <br />
+                        <span className="text-gray-500">{r.parent2Phone}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                onClick={resetParentModal}
+                className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Farklı Seç
+              </Button>
+              <Button
+                type="button"
+                onClick={handleParentImportConfirm}
+                disabled={parentLoading || parentPreview.matched === 0}
+                variant="primary"
+              >
+                {parentLoading
+                  ? "Aktarılıyor..."
+                  : `${parentPreview.matched} Öğrenci Velisini Aktar`}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {parentDone && (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              ✓
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-6">
+              Veli Aktarımı Tamamlandı
+            </h3>
+
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="text-xl font-bold text-green-600">
+                  {parentDone.parentsCreated}
+                </div>
+                <div className="text-xs text-gray-500">Yeni Veli</div>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="text-xl font-bold text-yellow-600">
+                  {parentDone.parentsUpdated}
+                </div>
+                <div className="text-xs text-gray-500">Güncellenen</div>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="text-xl font-bold text-indigo-600">{parentDone.matched}</div>
+                <div className="text-xs text-gray-500">Eşleşen</div>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div className="text-xl font-bold text-red-600">{parentDone.errors.length}</div>
+                <div className="text-xs text-gray-500">Hata</div>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 w-full"
+            >
+              Kapat
+            </Button>
+          </div>
+        )}
+      </div>
+    </ActionModal>
+  );
+}

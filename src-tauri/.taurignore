@@ -1,0 +1,7 @@
+# Un-ignore backend folders that are needed for production bundle
+!../backend/dist
+!../backend/dist/**
+!../backend/node_modules
+!../backend/node_modules/**
+!../backend/prisma
+!../backend/prisma/**
