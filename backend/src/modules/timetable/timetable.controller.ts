@@ -76,15 +76,7 @@ class TimetableController {
       const { id } = req.params;
       if (!id) throw new AppError('Program ID gereklidir', 400);
 
-      // Aktif programı silmeye çalışıyorsa koru (D2)
-      const timetable = await import('../shared/utils/prisma').then(m => m.default.timetable.findUnique({ where: { id } }));
-      if (timetable?.isActive) {
-        throw new AppError(
-          'Bu program şu an aktif durumdadır. Silmek için önce başka bir programı aktif yapın veya Boş Ders Doldurma önerilerini etkileyeceğini unutmayın.',
-          400
-        );
-      }
-
+      // Aktif program dahil silinebilir (frontend onay ister).
       await timetableService.deleteTimetable(id);
       res.json({ status: 'success', message: 'Program silindi.' });
     } catch (error) {

@@ -196,10 +196,12 @@ export default function TimetablePage() {
   const closeUploadModal = () => { setIsUploadModalOpen(false); setSelectedFile(null); setUploadResult(null); };
   const closeClassUploadModal = () => { setIsClassUploadModalOpen(false); setClassSelectedFile(null); setClassUploadResult(null); };
 
-  const handleDelete = async (id: string) => {
-    const ok = await confirm('Bu ders programını silmek istediğinize emin misiniz?');
+  const handleDelete = async (id: string, isActive = false) => {
+    const ok = await confirm(isActive
+      ? 'Bu program AKTİF durumda. Silerseniz aktif ders programı kalmayacak (Boş Ders Doldurma vb. etkilenir). Yine de silmek istiyor musunuz?'
+      : 'Bu ders programını silmek istediğinize emin misiniz?');
     if (!ok) return;
-    try { await api.delete(`/timetable/${id}`); toast.success('Program silindi.'); fetchBase(); }
+    try { await api.delete(`/timetable/${id}`); toast.success('Program silindi.'); setLoadSummary([]); setViewEntries([]); fetchBase(); }
     catch (error: any) { toast.error(error.response?.data?.message || 'Silinemedi.'); }
   };
 
@@ -491,9 +493,9 @@ export default function TimetablePage() {
                             Aktif Yap
                           </button>
                         )}
-                        <button onClick={() => handleDelete(h.id)} disabled={h.isActive}
-                          className={`p-1.5 rounded transition ${h.isActive ? 'text-slate-300 cursor-not-allowed opacity-70' : 'text-slate-500 hover:text-red-500 hover:bg-red-50'}`}
-                          title={h.isActive ? 'Aktif program silinemez' : 'Sil'}>
+                        <button onClick={() => handleDelete(h.id, h.isActive)}
+                          className="p-1.5 rounded transition text-slate-500 hover:text-red-500 hover:bg-red-50"
+                          title={h.isActive ? 'Aktif programı sil' : 'Sil'}>
                           <Trash2 size={15} />
                         </button>
                       </div>
