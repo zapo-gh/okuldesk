@@ -102,6 +102,9 @@ export async function startServer(): Promise<void> {
       reject(err);
     });
   });
+
+  // Kayıtlı WhatsApp oturumu varsa arka planda otomatik bağlan
+  whatsappService.autoConnect().catch(() => {});
 }
 
 async function gracefulShutdown(signal: string) {
@@ -115,7 +118,7 @@ async function gracefulShutdown(signal: string) {
     }
   });
 
-  await whatsappService.disconnect().catch(() => {});
+  await whatsappService.disconnect(false, true).catch(() => {});
   await prisma.$disconnect();
   process.exit(0);
 }

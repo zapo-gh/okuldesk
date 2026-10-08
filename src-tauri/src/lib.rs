@@ -5,20 +5,34 @@ struct SidecarState(std::sync::Mutex<Option<tauri_plugin_shell::process::Command
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Tek örnek koruması: uygulama zaten açıksa ikinci örnek açılmaz,
+        // mevcut pencere öne getirilir ve focus alır.
+        .plugin(
+            tauri_plugin_single_instance::Builder::new()
+                .callback(|app, _args, _cwd| {
+                    use tauri::Manager;
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            use tauri::Manager;
-            use tauri_plugin_shell::ShellExt;
-
             #[cfg(not(debug_assertions))]
             {
+                use tauri::Manager;
+                use tauri_plugin_shell::ShellExt;
+
                 let resource_dir = app
                     .path()
                     .resource_dir()
                     .expect("Failed to get resource dir");
-                    
+
                 let mut server_js_path = resource_dir.join("backend").join("dist").join("server.js");
                 if !server_js_path.exists() {
                     server_js_path = resource_dir.join("_up_").join("backend").join("dist").join("server.js");
@@ -39,6 +53,10 @@ pub fn run() {
                     }
                 });
             }
+
+            // Debug modunda app kullanılmadığı için derleyici uyarısını bastır
+            #[cfg(debug_assertions)]
+            let _ = app;
 
             Ok(())
         })

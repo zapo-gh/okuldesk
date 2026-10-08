@@ -4,8 +4,6 @@ import sharp from 'sharp';
 import { whatsappService } from './whatsapp.service';
 import { absenteeismService } from '../absenteeism/absenteeism.service';
 import { getFullPageBuffer } from '../absenteeism/pdfPreview.service';
-import { warningsService } from '../warnings/warnings.service';
-import { normalizePhone } from '../notifications/notifications.service';
 import { settingsService } from '../settings/settings.service';
 import prisma from '../shared/utils/prisma';
 
@@ -77,8 +75,29 @@ Milli Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'ne göre; tam 
 {{okulAdi}}`;
 
 function formatDay(val: number | null | undefined): string {
-  if (val == null) return '?';
+  if (val == null || !Number.isFinite(val)) return '?';
   return val % 1 === 0 ? String(val) : val.toFixed(1).replace('.', ',');
+}
+
+/** Gün değerini doğrular: boşsa fallback; geçersiz/negatif ise fallback. */
+function parseDays(raw: unknown, fallback: number | null): number | null {
+  if (raw === undefined || raw === null || raw === '') return fallback;
+  const n = parseFloat(String(raw));
+  return Number.isFinite(n) && n >= 0 && n <= 1000 ? n : fallback;
+}
+
+/** Gövdeden gelen seçili telefonları string dizisine çevirir. */
+function parseSelectedPhones(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.filter((p): p is string => typeof p === 'string');
+}
+
+/** Yüzde değerini 0–100 aralığına sıkıştırır; geçersizse undefined. */
+function parsePercent(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const n = parseFloat(String(raw));
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(100, Math.max(0, n));
 }
 
 function buildAbsenteeismMessage(opts: {
@@ -92,13 +111,14 @@ function buildAbsenteeismMessage(opts: {
   const { template, studentName, warningNumber, excusedDays, unexcusedDays, schoolName } = opts;
   const total = (excusedDays ?? 0) + (unexcusedDays ?? 0);
 
+  // Fonksiyonlu replace: değerlerdeki '$&' gibi dizilerin özel anlam kazanmasını önler
   return template
-    .replace(/\{\{ogrenciAdi\}\}/g, studentName)
-    .replace(/\{\{ozurluGun\}\}/g, formatDay(excusedDays))
-    .replace(/\{\{ozursuzGun\}\}/g, formatDay(unexcusedDays))
-    .replace(/\{\{toplamGun\}\}/g, formatDay(total || null))
-    .replace(/\{\{okulAdi\}\}/g, schoolName)
-    .replace(/\{\{uyariNo\}\}/g, String(warningNumber))
+    .replace(/\{\{ogrenciAdi\}\}/g, () => studentName)
+    .replace(/\{\{ozurluGun\}\}/g, () => formatDay(excusedDays))
+    .replace(/\{\{ozursuzGun\}\}/g, () => formatDay(unexcusedDays))
+    .replace(/\{\{toplamGun\}\}/g, () => formatDay(total))
+    .replace(/\{\{okulAdi\}\}/g, () => schoolName)
+    .replace(/\{\{uyariNo\}\}/g, () => String(warningNumber))
     .trim();
 }
 
@@ -143,7 +163,7 @@ export const whatsappController = {
       }
 
       // Seçili velileri filtrele (frontend'den gelen selectedPhones dizisi)
-      const selectedPhones: string[] | undefined = req.body.selectedPhones;
+      const selectedPhones = parseSelectedPhones(req.body.selectedPhones);
       const filteredParents = (selectedPhones && selectedPhones.length > 0)
         ? parents.filter(p => selectedPhones.includes(p.phone))
         : parents;
@@ -155,7 +175,6 @@ export const whatsappController = {
 
       const pdfPath = await absenteeismService.servePdf(req.params.id);
       const studentName = record.student.fullName;
-      const className = record.student.className;
 
       // Önizleme JPG varsa görsel olarak gönder (WhatsApp'ta inline görünür)
       // Yoksa PDF dosyasını belge olarak gönder (fallback)
@@ -163,12 +182,10 @@ export const whatsappController = {
       const useImage = !!previewPath && fs.existsSync(previewPath);
 
       // Kullanıcı tarafından seçilen kırpma alanı (0–100 arası yüzde değerleri)
-      const cropTopRaw = req.body.cropTop;
-      const cropBottomRaw = req.body.cropBottom;
-      const cropTop = cropTopRaw !== undefined && cropTopRaw !== null ? parseFloat(String(cropTopRaw)) : undefined;
-      const cropBottom = cropBottomRaw !== undefined && cropBottomRaw !== null ? parseFloat(String(cropBottomRaw)) : undefined;
+      const cropTop = parsePercent(req.body.cropTop);
+      const cropBottom = parsePercent(req.body.cropBottom);
       const hasCustomCrop = useImage && cropTop !== undefined && cropBottom !== undefined
-        && !isNaN(cropTop) && !isNaN(cropBottom) && cropBottom > cropTop;
+        && cropBottom > cropTop;
 
       // Şablonu settings'ten al, yoksa varsayılanı kullan; BEP öğrencileri için BEP şablonu
       const settings = await settingsService.get();
@@ -181,14 +198,8 @@ export const whatsappController = {
           ? settings[templateKey] as string
           : DEFAULT_WA_TEMPLATES[Math.min(warningNo, 3)] ?? DEFAULT_WA_TEMPLATES[2];
 
-      const excusedDays: number | null = (() => {
-        const v = req.body.excusedDays;
-        return (v !== undefined && v !== '' && v !== null) ? parseFloat(String(v)) : ((record as any).excusedDays ?? null);
-      })();
-      const unexcusedDays: number | null = (() => {
-        const v = req.body.unexcusedDays;
-        return (v !== undefined && v !== '' && v !== null) ? parseFloat(String(v)) : ((record as any).unexcusedDays ?? null);
-      })();
+      const excusedDays = parseDays(req.body.excusedDays, (record as any).excusedDays ?? null);
+      const unexcusedDays = parseDays(req.body.unexcusedDays, (record as any).unexcusedDays ?? null);
 
       const results: { parent: string; phone: string; ok: boolean; error?: string }[] = [];
 
@@ -211,7 +222,7 @@ export const whatsappController = {
               const imgH = meta.height!;
               const imgW = meta.width!;
               const topPx = Math.max(0, Math.floor(imgH * cropTop! / 100));
-              const heightPx = Math.max(1, Math.floor(imgH * (cropBottom! - cropTop!) / 100));
+              const heightPx = Math.max(1, Math.min(imgH - topPx, Math.floor(imgH * (cropBottom! - cropTop!) / 100)));
               const cropBuf = await sharp(pageBuf)
                 .extract({ left: 0, top: topPx, width: imgW, height: heightPx })
                 .jpeg({ quality: 100 })
@@ -278,17 +289,11 @@ export const whatsappController = {
           ? settings[templateKey] as string
           : DEFAULT_WA_TEMPLATES[Math.min(warningNo, 3)] ?? DEFAULT_WA_TEMPLATES[2];
 
-      const excusedDays: number | null = (() => {
-        const v = req.body.excusedDays;
-        return (v !== undefined && v !== '' && v !== null) ? parseFloat(String(v)) : ((record as any).excusedDays ?? null);
-      })();
-      const unexcusedDays: number | null = (() => {
-        const v = req.body.unexcusedDays;
-        return (v !== undefined && v !== '' && v !== null) ? parseFloat(String(v)) : ((record as any).unexcusedDays ?? null);
-      })();
+      const excusedDays = parseDays(req.body.excusedDays, (record as any).excusedDays ?? null);
+      const unexcusedDays = parseDays(req.body.unexcusedDays, (record as any).unexcusedDays ?? null);
 
       const previewPath: string | null = (record as any).previewPath ?? null;
-      const hasPreviewImage = !!previewPath && require('fs').existsSync(previewPath);
+      const hasPreviewImage = !!previewPath && fs.existsSync(previewPath);
 
       const messages = parents.map(parent => ({
         parent: parent.fullName,
@@ -346,15 +351,15 @@ export const whatsappController = {
         return;
       }
       
-      const parents = parentsRaw.map((p: any) => ({
-        fullName: p.fullName,
-        phone: p.contacts?.[0]?.phone || ''
-      }));
+      // Boş telefon numarası olan velileri dışla
+      const parents = parentsRaw
+        .map((p: any) => ({ fullName: p.fullName, phone: (p.contacts?.[0]?.phone || '') as string }))
+        .filter(p => p.phone.trim().length > 0);
 
       // Seçili velileri filtrele (frontend'den gelen selectedPhones dizisi)
-      const selectedPhones: string[] | undefined = req.body.selectedPhones;
+      const selectedPhones = parseSelectedPhones(req.body.selectedPhones);
       const filteredParents = (selectedPhones && selectedPhones.length > 0)
-        ? parents.filter((p: any) => selectedPhones.includes(p.phone))
+        ? parents.filter(p => selectedPhones.includes(p.phone))
         : parents;
 
       if (filteredParents.length === 0) {
@@ -422,10 +427,10 @@ export const whatsappController = {
         return;
       }
       
-      const parents = parentsRaw.map((p: any) => ({
-        fullName: p.fullName,
-        phone: p.contacts?.[0]?.phone || ''
-      }));
+      // Boş telefon numarası olan velileri dışla
+      const parents = parentsRaw
+        .map((p: any) => ({ fullName: p.fullName, phone: (p.contacts?.[0]?.phone || '') as string }))
+        .filter(p => p.phone.trim().length > 0);
 
       const messages = parents.map((parent: any) => {
         const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
@@ -455,14 +460,28 @@ export const whatsappController = {
   sendConsentRequestToParent: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { parentId } = req.body;
-      const parent = await prisma.parent.findUnique({ where: { id: parentId }, include: { contacts: { where: { isPrimary: true } } } });
-      if (!parent) return res.status(404).json({ message: 'Veli bulunamadı.' });
-      
-      const primaryPhone = parent.contacts[0]?.phone;
-      if (!primaryPhone) return res.status(404).json({ message: 'Veli telefon numarası bulunamadı.' });
+      if (!parentId || typeof parentId !== 'string') {
+        res.status(400).json({ message: 'parentId gerekli.' });
+        return;
+      }
+
+      const parent = await prisma.parent.findUnique({
+        where: { id: parentId },
+        include: { contacts: { where: { isPrimary: true } } },
+      });
+
+      if (!parent || parent.deletedAt) {
+        res.status(404).json({ message: 'Veli bulunamadı.' });
+        return;
+      }
+
+      const primaryPhone = parent.contacts[0]?.phone?.trim();
+      if (!primaryPhone) {
+        res.status(400).json({ message: 'Veli telefon numarası bulunamadı.' });
+        return;
+      }
 
       await whatsappService.sendConsentRequest(primaryPhone);
-      
       res.json({ message: 'Onay isteği gönderildi.' });
     } catch (err) { next(err); }
   },

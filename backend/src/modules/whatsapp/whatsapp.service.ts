@@ -22,6 +22,16 @@ let connectionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 let shuttingDown = false;
 let consecutiveFailures = 0;
 
+// Gönderilen ve henüz yanıtlanmamış onay istekleri (telefonun son 10 hanesi -> zaman damgası).
+const pendingConsent = new Map<string, number>();
+const CONSENT_PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CONSENT_RESEND_MIN_MS = 10 * 60 * 1000;
+
+// Mesajlar arası bekleme (WhatsApp'ın spam algısını azaltmak için)
+let sendQueue: Promise<unknown> = Promise.resolve();
+const SEND_GAP_MIN_MS = 1500;
+const SEND_GAP_MAX_MS = 3000;
+
 import { config } from '../shared/config';
 
 function getAuthDir(): string {
@@ -56,8 +66,64 @@ export function getStatus(): WAState {
   return { ...state };
 }
 
+// ── Telefon yardımcıları ─────────────────────────────────────────────────────
+
+/** Telefonun son 10 hanesi (TR GSM formatı). Geçersizse boş string. */
+function phoneKey(phone: string | null | undefined): string {
+  const digits = String(phone ?? '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+async function findContactsByPhone(phone: string) {
+  const key = phoneKey(phone);
+  if (!key) return [];
+  const all = await prisma.parentContact.findMany({
+    where: { phone: { not: '' }, parent: { deletedAt: null } },
+    select: { id: true, phone: true, waConsentStatus: true },
+  });
+  return all.filter(c => phoneKey(c.phone) === key);
+}
+
+function toJid(phone: string): string {
+  let clean = String(phone ?? '').replace(/\D/g, '');
+  if (clean.startsWith('00')) clean = clean.slice(2);
+  if (clean.startsWith('0')) clean = '90' + clean.slice(1);
+  if (!clean.startsWith('90') && clean.length === 10) clean = '90' + clean;
+  if (clean.length < 11) throw new Error('Geçersiz telefon numarası.');
+  return `${clean}@s.whatsapp.net`;
+}
+
+function enqueueSend<T>(fn: () => Promise<T>): Promise<T> {
+  const run = sendQueue.then(fn);
+  const gap = SEND_GAP_MIN_MS + Math.random() * (SEND_GAP_MAX_MS - SEND_GAP_MIN_MS);
+  sendQueue = run.then(
+    () => new Promise(res => setTimeout(res, gap)),
+    () => new Promise(res => setTimeout(res, gap)),
+  );
+  return run;
+}
+
+function ensureConnected() {
+  if (!socket || state.status !== 'connected' || shuttingDown) {
+    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
+  }
+}
+
+/** Mevcut bir oturum varsa sunucu açılışında otomatik bağlanır. */
+export async function autoConnect(): Promise<void> {
+  try {
+    const dir = getAuthDir();
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length > 0) {
+      await initialize();
+    }
+  } catch (err) {
+    console.error('WhatsApp otomatik bağlanma hatası:', err);
+  }
+}
+
 export async function initialize(): Promise<void> {
   if (shuttingDown) return;
+  // 'qr' durumunda da guard'a tabi değil — QR görünürken yeniden bağlanabilmeli
   if (state.status === 'connected' || state.status === 'connecting' || state.status === 'reconnecting') return;
   
   if (reconnectTimer) {
@@ -101,11 +167,12 @@ export async function initialize(): Promise<void> {
     }
 
     if (socket) {
-       try { socket.end(undefined); } catch {}
-       socket = null;
+       const old = socket;
+       socket = null; // Eski soketin 'close' olayı artık yok sayılır
+       try { old.end(undefined); } catch {}
     }
 
-    socket = makeWASocket({
+    const sock = makeWASocket({
       version,
       logger,
       auth: {
@@ -118,75 +185,88 @@ export async function initialize(): Promise<void> {
       markOnlineOnConnect: false,
       syncFullHistory: false,
     });
+    socket = sock;
 
-    socket.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', saveCreds);
 
     if (connectionTimeoutTimer) clearTimeout(connectionTimeoutTimer);
     connectionTimeoutTimer = setTimeout(() => {
-      if (state.status === 'connecting') {
+      if (socket === sock && (state.status === 'connecting' || state.status === 'reconnecting')) {
          console.error('WhatsApp bağlantı zaman aşımı');
          state = { status: 'disconnected', qrBase64: null, error: 'Bağlantı zaman aşımına uğradı. Lütfen internetinizi kontrol edin.' };
-         if (socket) {
-            try { socket.end(undefined); } catch {}
-            socket = null;
-         }
+         socket = null;
+         try { sock.end(undefined); } catch {}
       }
     }, 20000);
 
-  socket.ev.on('messages.upsert', async (m: any) => {
+  sock.ev.on('messages.upsert', async (m: any) => {
+    if (socket !== sock) return;
+    // Geçmiş senkronizasyonundan gelen eski mesajları işleme
+    if (m.type && m.type !== 'notify') return;
     try {
       for (const msg of m.messages) {
         if (!msg.message || msg.key.fromMe) continue;
-        const remoteJid = msg.key.remoteJid;
-        if (!remoteJid || remoteJid.includes('@g.us')) continue;
+        const remoteJid: string | undefined = msg.key.remoteJid;
+        if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) continue;
 
         // Düğme yanıtı: selectedButtonId öncelikli, selectedDisplayText yedek, düz metin son
-        const buttonId = msg.message.buttonsResponseMessage?.selectedButtonId || '';
+        const buttonId =
+          msg.message.buttonsResponseMessage?.selectedButtonId ||
+          msg.message.templateButtonReplyMessage?.selectedId || '';
         const buttonText = msg.message.buttonsResponseMessage?.selectedDisplayText || '';
         const text = buttonId || msg.message.conversation || msg.message.extendedTextMessage?.text || buttonText || '';
         if (!text) continue;
 
-        const phone = remoteJid.split('@')[0];
-        let cleanPhone = phone;
-        if (cleanPhone.startsWith('90')) cleanPhone = cleanPhone.slice(2);
+        // Telefon numarasını belirle (@lid kimliklerinde gerçek numara ayrı alanda gelir)
+        let phoneJid: string | undefined = remoteJid;
+        if (remoteJid.endsWith('@lid')) {
+          phoneJid = msg.key.remoteJidAlt || msg.key.senderPn || undefined;
+          if (!phoneJid) {
+            try { phoneJid = await sock.signalRepository?.lidMapping?.getPNForLID?.(remoteJid); } catch {}
+          }
+        }
+        if (!phoneJid || !phoneJid.includes('@s.whatsapp.net')) continue;
+        const key = phoneKey(phoneJid.split('@')[0].split(':')[0]);
+        if (!key) continue;
+
+        const upperText = text.trim().toLocaleUpperCase('tr-TR');
+        const requestedAt = pendingConsent.get(key);
+        const hasPending = !!requestedAt && Date.now() - requestedAt < CONSENT_PENDING_TTL_MS;
 
         let newStatus: 'ACCEPTED' | 'DECLINED' | null = null;
-        // Düğme ID kontrolü (buttonId: 'CONSENT_YES' veya 'CONSENT_NO')
         if (buttonId === 'CONSENT_YES') {
           newStatus = 'ACCEPTED';
         } else if (buttonId === 'CONSENT_NO') {
           newStatus = 'DECLINED';
-        } else {
-          // Yazılı yanıt kontrolü (fallback)
-          const upperText2 = text.trim().toLocaleUpperCase('tr-TR');
-          if (['EVET', 'KABUL', '1'].includes(upperText2) || upperText2 === 'ONAYLIYORUM') {
-            newStatus = 'ACCEPTED';
-          } else if (['HAYIR', 'IPTAL', 'İPTAL', 'RET', '2'].includes(upperText2) || upperText2 === 'REDDEDİYORUM' || upperText2 === 'REDDEDIYORUM') {
-            newStatus = 'DECLINED';
-          }
+        } else if (['EVET', 'KABUL', 'ONAYLIYORUM'].includes(upperText)) {
+          newStatus = 'ACCEPTED';
+        } else if (['HAYIR', 'IPTAL', 'İPTAL', 'RET', 'REDDEDİYORUM', 'REDDEDIYORUM', 'DUR', 'STOP'].includes(upperText)) {
+          newStatus = 'DECLINED';
+        } else if (hasPending && upperText === '1') {
+          // "1"/"2" gibi belirsiz yanıtlar yalnızca bekleyen bir onay isteği varken geçerli
+          newStatus = 'ACCEPTED';
+        } else if (hasPending && upperText === '2') {
+          newStatus = 'DECLINED';
         }
 
-        if (newStatus) {
-          const contact = await prisma.parentContact.findFirst({
-            where: {
-              OR: [
-                { phone: { endsWith: cleanPhone } },
-                { phone: { endsWith: `90${cleanPhone}` } }
-              ]
-            }
-          });
+        if (!newStatus) continue;
 
-          if (contact) {
-            await prisma.parentContact.update({
-              where: { id: contact.id },
-              data: { waConsentStatus: newStatus, waConsentDate: new Date() },
-            });
+        const contacts = await findContactsByPhone(key);
+        if (contacts.length === 0) continue;
 
-            const replyText = newStatus === 'ACCEPTED'
-              ? '✅ Okul bilgilendirme mesajları için onayınız alınmıştır. Teşekkür ederiz.'
-              : '❌ Okul bilgilendirme mesajlarını almayı reddettiniz. Size artık WhatsApp üzerinden okul bilgilendirmeleri gönderilmeyecektir.';
+        await prisma.parentContact.updateMany({
+          where: { id: { in: contacts.map(c => c.id) } },
+          data: { waConsentStatus: newStatus, waConsentDate: new Date() },
+        });
+        pendingConsent.delete(key);
 
-            if (socket && !shuttingDown) await socket.sendMessage(remoteJid, { text: replyText });
+        const replyText = newStatus === 'ACCEPTED'
+          ? '✅ Okul bilgilendirme mesajları için onayınız alınmıştır. Teşekkür ederiz.'
+          : '❌ Okul bilgilendirme mesajlarını almayı reddettiniz. Size artık WhatsApp üzerinden okul bilgilendirmeleri gönderilmeyecektir.';
+
+        if (socket === sock && !shuttingDown) {
+          try { await sock.sendMessage(remoteJid, { text: replyText }); } catch (e) {
+            console.warn('Onay yanıtı gönderilemedi:', (e as any)?.message);
           }
         }
       }
@@ -195,8 +275,11 @@ export async function initialize(): Promise<void> {
     }
   });
 
-  socket.ev.on('connection.update', async (update: any) => {
+  sock.ev.on('connection.update', async (update: any) => {
     const { connection, lastDisconnect, qr } = update;
+
+    // Eski (yerini yeni sokete bırakmış) bağlantının olayları yok sayılır
+    if (socket !== sock) return;
 
     if (qr && !shuttingDown) {
       if (connectionTimeoutTimer) clearTimeout(connectionTimeoutTimer);
@@ -244,9 +327,8 @@ export async function initialize(): Promise<void> {
         console.log(`🔄 WhatsApp stream yeniden başlatılıyor (515), deneme: ${consecutiveFailures}...`);
 
         if (consecutiveFailures >= 8) {
-          // Çok fazla deneme — kullanıcıya bildir ve dur
+          // Çok fazla deneme — kullanıcıya bildir ve dur. Oturum dosyaları korunur.
           consecutiveFailures = 0;
-          clearAuthDirWithRetry(getAuthDir()).catch(() => {});
           state = { status: 'disconnected', qrBase64: null, error: 'Bağlantı kurulamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.' };
           console.log('🔴 Çok fazla başarısız deneme, bağlantı durduruldu.');
         } else {
@@ -260,37 +342,63 @@ export async function initialize(): Promise<void> {
           if (reconnectTimer) clearTimeout(reconnectTimer);
           reconnectTimer = setTimeout(() => {
             reconnectTimer = null;
-            if (!shuttingDown) initialize();
+            if (!shuttingDown) {
+              state = { status: 'disconnected', qrBase64: null, error: null };
+              initialize();
+            }
           }, delay);
         }
 
       } else {
-        // Diğer hatalar: bozuk JSON, 500 vb.
+        // Diger hatalar. Yalnizca gercekten bozuk (JSON) auth dosyalari temizlenir;
+        // gecici ag hatalarinda (wsarecv, ECONNRESET, 500 vb.) oturum korunur.
         consecutiveFailures += 1;
-        const shouldCleanAuth = reason === 500 || errMsg.includes('Unexpected token') || errMsg.includes('JSON');
-        if (shouldCleanAuth) {
-          console.log('\ud83d\udd34 Auth dosyaları bozuk, temizleniyor...');
+        const corruptAuth = errMsg.includes('Unexpected token') || errMsg.includes('JSON');
+        const isNetworkDrop = errMsg.includes('wsarecv') || errMsg.includes('ECONNRESET') ||
+          errMsg.includes('ECONNABORTED') || errMsg.includes('ETIMEDOUT') ||
+          errMsg.includes('forcibly closed');
+        if (corruptAuth) {
+          console.log('\ud83d\udd34 Auth dosyalari bozuk, temizleniyor...');
           clearAuthDirWithRetry(getAuthDir()).catch(() => {});
         }
-        const delay = Math.min(5000 * consecutiveFailures, 20000);
+        // Gecici ag kopmasi: daha kisa bekleme ile yeniden baglan
+        const delay = isNetworkDrop
+          ? Math.min(2000 * consecutiveFailures, 8000)
+          : Math.min(5000 * consecutiveFailures, 20000);
         state = { status: 'connecting', qrBase64: null, error: null };
-        console.log(`\ud83d\udd04 WhatsApp yeniden bağlanıyor (${delay}ms sonra)...`);
+        if (isNetworkDrop) {
+          console.log(`\ud83d\udfe1 WhatsApp ag kopmasi, ${delay}ms sonra yeniden baglanıyor... (${errMsg.slice(0, 80)})`);
+        } else {
+          console.log(`\ud83d\udd04 WhatsApp yeniden baglanıyor (${delay}ms sonra)...`);
+        }
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
-          if (!shuttingDown) initialize();
+          if (!shuttingDown) {
+            state = { status: 'disconnected', qrBase64: null, error: null };
+            initialize();
+          }
         }, delay);
       }
     }
   });
   } catch (error: any) {
     console.error('WhatsApp başlatma hatası:', error);
-    clearAuthDirWithRetry(dir).catch(() => {});
-    state = { status: 'disconnected', qrBase64: null, error: error.message || 'Bağlantı başlatılamadı' };
+    // Çalışan oturumu silme; yalnızca dosya bozuksa temizle.
+    const msg: string = error?.message || '';
+    if (msg.includes('Unexpected token') || msg.includes('JSON')) {
+      clearAuthDirWithRetry(dir).catch(() => {});
+    }
+    state = { status: 'disconnected', qrBase64: null, error: msg || 'Bağlantı başlatılamadı' };
   }
 }
 
-export async function disconnect(clearAuth: boolean = false): Promise<void> {
+/**
+ * Bağlantıyı keser.
+ * @param clearAuth true ise WhatsApp oturumu kapatılır ve auth dosyaları silinir.
+ * @param final true ise (sunucu kapanışı) yeniden bağlanma kalıcı olarak engellenir.
+ */
+export async function disconnect(clearAuth: boolean = false, final: boolean = false): Promise<void> {
   shuttingDown = true;
   consecutiveFailures = 0;
   if (reconnectTimer) {
@@ -305,98 +413,90 @@ export async function disconnect(clearAuth: boolean = false): Promise<void> {
   const currentSocket = socket;
   socket = null;
 
-  if (currentSocket) {
-    if (clearAuth) {
-      await currentSocket.logout();
-    } else {
-      currentSocket.end(undefined);
+  try {
+    if (currentSocket) {
+      if (clearAuth) {
+        try { await currentSocket.logout(); } catch (e) {
+          console.warn('WhatsApp logout başarısız (bağlantı zaten kopmuş olabilir):', (e as any)?.message);
+          try { currentSocket.end(undefined); } catch {}
+        }
+      } else {
+        try { currentSocket.end(undefined); } catch {}
+      }
     }
-  }
 
-  if (clearAuth) {
-    await clearAuthDirWithRetry(getAuthDir()).catch(() => {});
+    if (clearAuth) {
+      await clearAuthDirWithRetry(getAuthDir()).catch(() => {});
+    }
+  } finally {
+    state = { status: 'disconnected', qrBase64: null, error: null };
+    // Kullanıcı kaynaklı kesmeden sonra yeniden bağlanabilmek için bayrağı sıfırla.
+    if (!final) shuttingDown = false;
   }
-  state = { status: 'disconnected', qrBase64: null, error: null };
-}
-
-function toJid(phone: string): string {
-  let clean = phone.replace(/\D/g, '');
-  if (clean.startsWith('00')) clean = clean.slice(2);
-  if (clean.startsWith('0')) clean = '90' + clean.slice(1);
-  if (!clean.startsWith('90') && clean.length === 10) clean = '90' + clean;
-  return `${clean}@s.whatsapp.net`;
 }
 
 async function checkConsent(phone: string): Promise<void> {
-  const cleanPhone = phone.replace(/\D/g, '');
-  
-  // Veritabanında telefon numarasının son haneleriyle eşleşen veliyi bul
-  const contact = await prisma.parentContact.findFirst({
-    where: {
-      OR: [
-        { phone: { endsWith: cleanPhone } },
-        { phone: { endsWith: `90${cleanPhone}` } }
-      ]
-    }
-  });
+  if (!phoneKey(phone)) throw new Error('Veli telefon numarası geçersiz veya boş.');
 
-  if (!contact) throw new Error('İlgili telefon numarasına ait veli kaydı bulunamadı.');
-  if (contact.waConsentStatus !== 'ACCEPTED') {
-    throw new Error('Veli WhatsApp bildirimlerini açıkça onaylamadığı için (Durum: ' + (contact.waConsentStatus || 'Bekliyor') + ') mesaj gönderilemedi.');
+  // Aynı numaraya sahip tüm kayıtlar kontrol edilir
+  const contacts = await findContactsByPhone(phone);
+
+  if (contacts.length === 0) throw new Error('İlgili telefon numarasına ait veli kaydı bulunamadı.');
+  const notAccepted = contacts.find(c => c.waConsentStatus !== 'ACCEPTED');
+  if (notAccepted) {
+    throw new Error('Veli WhatsApp bildirimlerini açıkça onaylamadığı için (Durum: ' + (notAccepted.waConsentStatus || 'Bekliyor') + ') mesaj gönderilemedi.');
   }
 }
 
 export async function sendConsentRequest(phone: string): Promise<void> {
-  if (!socket || state.status !== 'connected' || shuttingDown) {
-    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
-  }
+  ensureConnected();
   const jid = toJid(phone);
-  const bodyText =
+  const key = phoneKey(phone);
+
+  const last = pendingConsent.get(key);
+  if (last && Date.now() - last < CONSENT_RESEND_MIN_MS) {
+    throw new Error('Bu veliye onay isteği az önce gönderildi. Lütfen birkaç dakika bekleyin.');
+  }
+
+  const text =
     `Sayın Veli,\n\n` +
     `Okulumuz, *devamsızlık bildirimleri, yazılı uyarılar ve okul bilgilendirmelerini* ` +
     `WhatsApp üzerinden iletmek istemektedir.\n\n` +
-    `Bu bildirimleri almayı kabul ediyor musunuz?`;
+    `Bu bildirimleri almayı kabul ediyor musunuz?\n\n` +
+    `*1️⃣ EVET* — Kabul ediyorum, bildirim almak istiyorum.\n` +
+    `*2️⃣ HAYIR* — Reddediyorum, bildirim almak istemiyorum.\n\n` +
+    `Lütfen yalnızca *1* veya *2* yazarak yanıt veriniz.\n\n` +
+    `_OkulDesk · Okul Yönetim Sistemi_`;
 
-  try {
-    // WhatsApp Business: düğmeli mesaj formatı
-    await (socket as any).sendMessage(jid, {
-      text: bodyText,
-      buttons: [
-        {
-          buttonId: 'CONSENT_YES',
-          buttonText: { displayText: '✅ Evet, Kabul Ediyorum' },
-          type: 1,
-        },
-        {
-          buttonId: 'CONSENT_NO',
-          buttonText: { displayText: '❌ Hayır, Reddediyorum' },
-          type: 1,
-        },
-      ],
-      footer: 'OkulDesk · Okul Yönetim Sistemi',
+  // Not: WhatsApp normal hesaplarda eski "buttons" formatını göstermediği için
+  // her zaman numaralı düz metin kullanılır.
+  await enqueueSend(async () => {
+    ensureConnected();
+    await socket.sendMessage(jid, { text });
+  });
+
+  pendingConsent.set(key, Date.now());
+
+  // Daha önce reddetmiş velinin durumunu tekrar beklemeye al
+  const contacts = await findContactsByPhone(phone);
+  const declined = contacts.filter(c => c.waConsentStatus === 'DECLINED').map(c => c.id);
+  if (declined.length > 0) {
+    await prisma.parentContact.updateMany({
+      where: { id: { in: declined } },
+      data: { waConsentStatus: 'PENDING', waConsentDate: null },
     });
-    console.log(`📤 WhatsApp onay isteği (düğmeli) gönderildi: ${phone}`);
-  } catch (btnErr) {
-    // Fallback: Düğme desteklenmiyorsa numaralı seçenekli düz metin
-    console.warn('Düğmeli mesaj gönderilemedi, düz metin fallback kullanılıyor:', (btnErr as any)?.message);
-    const fallbackText =
-      `${bodyText}\n\n` +
-      `*1️⃣ EVET* — Kabul ediyorum, bildirim almak istiyorum.\n` +
-      `*2️⃣ HAYIR* — Reddediyorum, bildirim almak istemiyorum.\n\n` +
-      `Lütfen yalnızca *1* veya *2* yazarak yanıt veriniz.\n\n` +
-      `_OkulDesk · Okul Yönetim Sistemi_`;
-    await socket.sendMessage(jid, { text: fallbackText });
-    console.log(`📤 WhatsApp onay isteği (metin) gönderildi: ${phone}`);
   }
+  console.log('📤 WhatsApp onay isteği gönderildi.');
 }
 
 export async function sendTextMessage(phone: string, text: string): Promise<void> {
-  if (!socket || state.status !== 'connected' || shuttingDown) {
-    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
-  }
+  ensureConnected();
   await checkConsent(phone);
   const jid = toJid(phone);
-  await socket.sendMessage(jid, { text });
+  await enqueueSend(async () => {
+    ensureConnected();
+    await socket.sendMessage(jid, { text });
+  });
 }
 
 export async function sendMessageWithPDF(
@@ -405,14 +505,15 @@ export async function sendMessageWithPDF(
   pdfPath: string,
   fileName = 'belge.pdf'
 ): Promise<void> {
-  if (!socket || state.status !== 'connected' || shuttingDown) {
-    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
-  }
+  ensureConnected();
   if (!fs.existsSync(pdfPath)) throw new Error('PDF dosyası bulunamadı.');
   await checkConsent(phone);
   const jid = toJid(phone);
   const document = fs.readFileSync(pdfPath);
-  await socket.sendMessage(jid, { document, fileName, mimetype: 'application/pdf', caption: text });
+  await enqueueSend(async () => {
+    ensureConnected();
+    await socket.sendMessage(jid, { document, fileName, mimetype: 'application/pdf', caption: text });
+  });
 }
 
 export async function sendMessageWithImage(
@@ -420,14 +521,15 @@ export async function sendMessageWithImage(
   text: string,
   imagePath: string
 ): Promise<void> {
-  if (!socket || state.status !== 'connected' || shuttingDown) {
-    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
-  }
+  ensureConnected();
   if (!fs.existsSync(imagePath)) throw new Error('Görsel dosyası bulunamadı.');
   await checkConsent(phone);
   const jid = toJid(phone);
   const image = fs.readFileSync(imagePath);
-  await socket.sendMessage(jid, { image, caption: text, mimetype: 'image/jpeg' });
+  await enqueueSend(async () => {
+    ensureConnected();
+    await socket.sendMessage(jid, { image, caption: text, mimetype: 'image/jpeg' });
+  });
 }
 
 export async function sendMessageWithImageBuffer(
@@ -435,16 +537,18 @@ export async function sendMessageWithImageBuffer(
   text: string,
   imageBuffer: Buffer
 ): Promise<void> {
-  if (!socket || state.status !== 'connected' || shuttingDown) {
-    throw new Error('WhatsApp bağlı değil. Lütfen önce QR kodu okutun.');
-  }
+  ensureConnected();
   await checkConsent(phone);
   const jid = toJid(phone);
-  await socket.sendMessage(jid, { image: imageBuffer, caption: text, mimetype: 'image/jpeg' });
+  await enqueueSend(async () => {
+    ensureConnected();
+    await socket.sendMessage(jid, { image: imageBuffer, caption: text, mimetype: 'image/jpeg' });
+  });
 }
 
 export const whatsappService = {
   initialize,
+  autoConnect,
   disconnect,
   getStatus,
   setAuthDir,
