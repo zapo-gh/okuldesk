@@ -143,7 +143,10 @@ export async function initialize(): Promise<void> {
       (globalThis as any).crypto = webcrypto;
     }
 
-    if (!Baileys) Baileys = require('@whiskeysockets/baileys');
+    if (!Baileys) {
+      // TypeScript'in `import()` ifadesini `require()`'a çevirmesini (CJS module resolution) engellemek için
+      Baileys = await eval(`import('@whiskeysockets/baileys')`);
+    }
     if (!QRCode) QRCode = require('qrcode');
 
     const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWebVersion, makeCacheableSignalKeyStore, Browsers } = Baileys as any;
