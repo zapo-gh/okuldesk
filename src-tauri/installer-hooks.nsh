@@ -2,11 +2,14 @@
 ; Aksi halde Prisma query engine DLL'i kilitli kalir ve "Error opening file for writing" hatasi olusur.
 
 !macro NSIS_HOOK_PREINSTALL
-  nsExec::Exec `powershell -NoProfile -WindowStyle Hidden -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
-  Sleep 1500
+  ; Uygulamanin ve node sidecar'in tamamen kapandigindan emin olmak icin taskkill kullanilir
+  nsExec::Exec `taskkill /F /IM okuldesk.exe /T`
+  nsExec::Exec `taskkill /F /IM node.exe /T`
+  Sleep 2000
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  nsExec::Exec `powershell -NoProfile -WindowStyle Hidden -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like '$INSTDIR\*' } | Stop-Process -Force"`
-  Sleep 1500
+  nsExec::Exec `taskkill /F /IM okuldesk.exe /T`
+  nsExec::Exec `taskkill /F /IM node.exe /T`
+  Sleep 2000
 !macroend
