@@ -1,6 +1,6 @@
 {
   "name": "okuldesk-backend",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "OkulDesk - Backend",
   "main": "dist/server.js",
   "bin": "dist/server.js",

@@ -197,7 +197,7 @@ function parseTeacherScheduleFromBlock(teacherData: any[][], dictionary: Map<str
       if (col < dayRow.length) {
         const cellText = String(dayRow[col] || '').trim();
         if (!isEmptyOrFree(cellText)) {
-          const parsed = extractClassSubjectAndRoomFromCell(cellText);
+          const parsed = extractClassSubjectAndRoomFromCell(cellText, dictionary);
           if (parsed) {
             entries.push({
               dayOfWeek,
@@ -259,7 +259,7 @@ function detectPeriodColumns(headerRow: any[]): Record<number, number> {
  * Hücre metninden sınıf, ders ve oda bilgilerini çıkarır.
  * Format: "SINIF DERSKODU" veya "SINIF DERSKODU (ODA)"
  */
-function extractClassSubjectAndRoomFromCell(cell: string): { className: string; subject?: string; room?: string } | null {
+function extractClassSubjectAndRoomFromCell(cell: string, dictionary?: Map<string, string>): { className: string; subject?: string; room?: string } | null {
   if (!cell) return null;
 
   // Oda bilgisini parantez içinden çıkar: örn. "ATP10A FELSEFE (101)" veya "(A-02/D-01)"
@@ -291,6 +291,22 @@ function extractClassSubjectAndRoomFromCell(cell: string): { className: string; 
   
   if (cleanText.length === 0) return null;
 
+  // EGER DICTIONARY VARSA: Ders kodunu sondan eşleştirerek tam sınıf adını koru
+  if (dictionary && dictionary.size > 0) {
+    // En uzun ders kodlarını önce kontrol et (örn. "MESLEKİ GELİŞİM" "GELİŞİM"'den önce eşleşmeli)
+    const knownSubjects = Array.from(dictionary.keys()).sort((a, b) => b.length - a.length);
+    for (const sub of knownSubjects) {
+      if (cleanText.endsWith(' ' + sub) || cleanText === sub) {
+        const subject = sub;
+        const className = cleanText === sub ? '' : cleanText.substring(0, cleanText.length - sub.length).trim().toUpperCase();
+        if (className) {
+          return { className, subject, room };
+        }
+      }
+    }
+  }
+
+  // DICTIONARY YOKSA VEYA EŞLEŞMEDİYSE: Fallback, boşluktan bölerek son kelimeyi ders kodu say
   const parts = cleanText.split(' ');
   
   if (parts.length === 1) {
