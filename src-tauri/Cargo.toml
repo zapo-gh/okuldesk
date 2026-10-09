@@ -1,6 +1,6 @@
 [package]
 name = "okuldesk"
-version = "1.0.16"
+version = "1.0.17"
 description = "OkulDesk - Okul Yönetim Otomasyonu (Tauri v2)"
 authors = ["OkulDesk"]
 license = ""
