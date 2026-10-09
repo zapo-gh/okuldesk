@@ -244,11 +244,11 @@ function detectPeriodColumns(headerRows: any[][]): Record<number, number> {
       if (raw == null) continue;
       const text = String(raw).replace(/\n/g, ' ').trim();
       
-      // Desteklenen formatlar: "(1)", "1.Ders", "1. Ders", "1.DERS"
-      const m = text.match(/^(?:\()?(\d{1,2})(?:\)|\.Ders|\. Ders)/i);
+      // Desteklenen formatlar: "(1)", "1.Ders", "1. Ders", "1.DERS", "1.", "1", "1 08:30-09:10"
+      const m = text.match(/^(?:\()?(\d{1,2})(?:\)|\.|\.Ders|\. Ders)?(?:[\s\d:\-]*)$/i);
       if (m) {
         const periodNum = parseInt(m[1], 10);
-        if (periodNum >= 1 && periodNum <= 12 && mapping[periodNum] == null) {
+        if (periodNum >= 1 && periodNum <= 15 && mapping[periodNum] == null) {
           mapping[periodNum] = col;
         }
       }

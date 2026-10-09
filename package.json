@@ -1,6 +1,6 @@
 {
   "name": "okuldesk",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "OkulDesk - Masaüstü Uygulaması",
   "scripts": {
     "install:backend": "npm --prefix backend install",
