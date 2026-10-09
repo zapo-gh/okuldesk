@@ -117,19 +117,24 @@ function findTeacherNameInRow(row: any[]): string | null {
 function isValidTeacherName(name: string): boolean {
   if (!name || name.length < 2 || name.length > 60) return false;
   
-  const nonTeacherPatterns = [
-    'GÜNLER', 'SAAT', 'DERS', 'PAZARTESI', 'SALI', 'CARSAMBA', 'PERSEMBE', 'CUMA',
-    '...........', 'Table', 'Sheet', 'null', 'undefined'
+  // Sadece bu KESIN kalıplar reddedilmeli — gün adları burada OLMAMALI çünkü
+  // "MEHMET CUMA AÇIKGÖZ" gibi öğretmen isimleri yanlışlıkla eleniyor
+  const strictlyInvalidPatterns = [
+    'GÜNLER', 'GUNLER', '...........', 'undefined', 'null'
   ];
   
-  for (const pattern of nonTeacherPatterns) {
+  for (const pattern of strictlyInvalidPatterns) {
     if (name.toUpperCase().includes(pattern.toUpperCase())) return false;
   }
   
-  // Sadece rakam, boşluk ve nokta içeriyorsa isim değildir
-  if (/^[0-9\s.-]+$/.test(name)) return false;
+  // Eğer metin tamamen büyük rakam/boşluk/nokta/tire ise isim değildir
+  if (/^[0-9\s.\-:]+$/.test(name)) return false;
   
-  // NOT: Tek kelimeli isimler (örn. "Zeynep") artık geçerlidir — boşluk zorunluluğu kaldırıldı
+  // Eğer metin "1.Ders", "2.Ders" gibi bir ders sütun başlığıysa reddet
+  if (/^\d{1,2}\.Ders/i.test(name)) return false;
+
+  // "SAAT", "DERS" kelimeleri SADECE başında ya da tek başına ise reddet
+  if (/^(SAAT|DERS)\s*$/i.test(name.trim())) return false;
   
   return true;
 }
