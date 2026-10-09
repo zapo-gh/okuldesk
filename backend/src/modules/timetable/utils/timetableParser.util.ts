@@ -175,7 +175,11 @@ function parseTeacherScheduleFromBlock(teacherData: any[][], dictionary: Map<str
   const gunlerRowIndex = findGunlerRow(teacherData);
   if (gunlerRowIndex === -1) return [];
 
-  const periodColumns = detectPeriodColumns(teacherData[gunlerRowIndex]);
+  const headerRows = [];
+  if (gunlerRowIndex > 0) headerRows.push(teacherData[gunlerRowIndex - 1]);
+  headerRows.push(teacherData[gunlerRowIndex]);
+
+  const periodColumns = detectPeriodColumns(headerRows);
   const entries: ParsedTimetableEntry[] = [];
 
   for (let dayOffset = 1; dayOffset <= 5; dayOffset++) {
@@ -229,22 +233,29 @@ function findGunlerRow(teacherData: any[][]): number {
   return -1;
 }
 
-function detectPeriodColumns(headerRow: any[]): Record<number, number> {
+function detectPeriodColumns(headerRows: any[][]): Record<number, number> {
   const mapping: Record<number, number> = {};
-  if (!Array.isArray(headerRow)) return mapping;
+  
+  for (const headerRow of headerRows) {
+    if (!Array.isArray(headerRow)) continue;
 
-  for (let col = 0; col < headerRow.length; col++) {
-    const raw = headerRow[col];
-    if (raw == null) continue;
-    const text = String(raw).replace(/\n/g, ' ').trim();
-    
-    // Desteklenen formatlar: "(1)", "1.Ders", "1. Ders", "1.DERS"
-    const m = text.match(/^(?:\()?(\d{1,2})(?:\)|\.Ders|\. Ders)/i);
-    if (m) {
-      const periodNum = parseInt(m[1], 10);
-      if (periodNum >= 1 && periodNum <= 12 && mapping[periodNum] == null) {
-        mapping[periodNum] = col;
+    for (let col = 0; col < headerRow.length; col++) {
+      const raw = headerRow[col];
+      if (raw == null) continue;
+      const text = String(raw).replace(/\n/g, ' ').trim();
+      
+      // Desteklenen formatlar: "(1)", "1.Ders", "1. Ders", "1.DERS"
+      const m = text.match(/^(?:\()?(\d{1,2})(?:\)|\.Ders|\. Ders)/i);
+      if (m) {
+        const periodNum = parseInt(m[1], 10);
+        if (periodNum >= 1 && periodNum <= 12 && mapping[periodNum] == null) {
+          mapping[periodNum] = col;
+        }
       }
+    }
+    // Eğer bir satırda ders saatleri bulduysak diğer satıra bakmaya gerek yok
+    if (Object.keys(mapping).length > 0) {
+      break;
     }
   }
   
