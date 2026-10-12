@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import api from '../../../services/api';
 import { useSettings } from '../../../context/SettingsContext';
 import { useConfirm } from '../../../hooks/useConfirm';
-import { Flag, Edit, Trash2, Plus, Printer, Save, X } from 'lucide-react';
+import { Flag, Edit, Trash2, Plus, Printer, Save, X, Search } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -41,6 +41,8 @@ export default function CommemorativeDaysPage() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [clubList, setClubList] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'info'|'print'>('info');
@@ -263,6 +265,18 @@ export default function CommemorativeDaysPage() {
     }
   ];
 
+  const filteredDays = days.filter(d => {
+    if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      d.name?.toLowerCase().includes(q) ||
+      d.description?.toLowerCase().includes(q) ||
+      d.assignedStaffName?.toLowerCase().includes(q) ||
+      d.assignedClubName?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6 relative">
       <PageHeader 
@@ -290,7 +304,46 @@ export default function CommemorativeDaysPage() {
       />
 
       <div className="print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <DataTable data={days} columns={columns} loading={loading} emptyMessage="Henüz belirli gün/hafta planlaması yapılmamış." />
+        {/* Arama ve Durum Filtre Çubuğu */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text" 
+              placeholder="Program adı, açıklama, kulüp veya öğretmen ara..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 shrink-0">Durum:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              <option value="ALL">Tüm Durumlar ({days.length})</option>
+              <option value="BEKLIYOR">Bekliyor</option>
+              <option value="HAZIRLIK_ASAMASINDA">Hazırlık Aşamasında</option>
+              <option value="TAMAMLANDI">Tamamlandı</option>
+              <option value="IPTAL">İptal</option>
+            </select>
+          </div>
+        </div>
+
+        <DataTable data={filteredDays} columns={columns} loading={loading} emptyMessage="Arama kriterine uygun belirli gün/hafta bulunamadı." />
       </div>
 
       {/* MODAL */}

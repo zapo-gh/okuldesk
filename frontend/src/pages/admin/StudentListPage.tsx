@@ -7,12 +7,16 @@ import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X } from 'lucide-react';
+import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X, Printer } from 'lucide-react';
 import { Student, ParsedStudent, ImportResult, ParentPreviewRow, ParentImportResult } from './students/types';
 import { StudentNewModal } from './students/StudentNewModal';
 import { StudentEditModal } from './students/StudentEditModal';
 import { StudentImportModal } from './students/StudentImportModal';
 import { ParentImportModal } from './students/ParentImportModal';
+import { useReactToPrint } from 'react-to-print';
+import { useSettings } from '../../context/SettingsContext';
+import StudentListPrintTemplate from './students/StudentListPrintTemplate';
+import { formatPhoneNumber } from '../../utils/formatters';
 
 interface Pagination {
   page: number;
@@ -23,12 +27,26 @@ interface Pagination {
 
 export default function StudentListPage() {
   const { confirm, alert, confirmModal } = useConfirm();
+  const { settings } = useSettings();
   const [students, setStudents] = useState<Student[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [search, setSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+
+  // Print State
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printStudents, setPrintStudents] = useState<Student[]>([]);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: 'Ogrenci_Veli_Listesi',
+    pageStyle: `
+      @page { size: A4 portrait !important; margin: 10mm !important; }
+      @media print { body { -webkit-print-color-adjust: exact; } }
+    `
+  });
 
   // Excel import state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -102,6 +120,52 @@ export default function StudentListPage() {
   filteredStudents = filteredStudents.sort((a, b) =>
     a.schoolNumber.localeCompare(b.schoolNumber, undefined, { numeric: true })
   );
+
+  // Grade filter & Compact chips helpers
+  const [selectedGrade, setSelectedGrade] = useState<string>('ALL');
+
+  const getGradeCategory = (className: string) => {
+    const isA = className.toUpperCase().startsWith('A-') || className.toUpperCase().startsWith('A ');
+    if (isA) return 'A';
+    const match = className.match(/^(\d+)/);
+    if (match) return match[1];
+    return 'OTHER';
+  };
+
+  const availableGrades = React.useMemo(() => {
+    const grades = new Set<string>();
+    displayClasses.forEach(c => {
+      grades.add(getGradeCategory(c.name));
+    });
+    const list: { key: string; label: string }[] = [];
+    ['9', '10', '11', '12'].forEach(g => {
+      if (grades.has(g)) list.push({ key: g, label: `${g}. Sınıf` });
+    });
+    if (grades.has('A')) list.push({ key: 'A', label: 'Açık Lise' });
+    if (grades.has('OTHER')) list.push({ key: 'OTHER', label: 'Diğer' });
+    return list;
+  }, [displayClasses]);
+
+  const visibleClasses = React.useMemo(() => {
+    if (selectedGrade === 'ALL') return displayClasses;
+    return displayClasses.filter(c => getGradeCategory(c.name) === selectedGrade);
+  }, [displayClasses, selectedGrade]);
+
+  const handlePrintStudents = () => {
+    const toPrint = selectedIds.size > 0
+      ? filteredStudents.filter(s => selectedIds.has(s.id))
+      : filteredStudents;
+
+    if (toPrint.length === 0) {
+      toast.error('Yazdırılacak öğrenci bulunamadı.');
+      return;
+    }
+
+    setPrintStudents(toPrint);
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
+  };
 
   const fetchClasses = async () => {
     try {
@@ -450,32 +514,33 @@ export default function StudentListPage() {
     },
     {
       header: 'Ad Soyad',
-      className: 'w-64',
+      className: 'w-48',
       render: (s) => <span className="font-bold text-gray-900">{s.fullName}</span>
     },
     {
       header: 'Durum',
-      className: 'w-32',
+      className: 'w-28',
       render: (s) => <StatusBadge status={s.status} />
     },
     {
       header: 'Veli Bilgileri',
+      className: 'min-w-[460px]',
       render: (s) => (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-nowrap">
           {s.parents.length > 0 ? (
             s.parents.map((p, pi) => (
-              <div key={pi} className="text-sm bg-gray-50 border border-gray-100 rounded-lg p-2.5 pr-4">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="font-medium text-gray-800">{p.fullName}</span>
-                  {p.phone && <span className="text-gray-500 text-sm font-mono">{p.phone}</span>}
+              <div key={pi} className="text-xs bg-gray-50 border border-gray-200/80 rounded-lg p-2 shrink-0 min-w-[210px] max-w-[260px]">
+                <div className="flex items-center justify-between gap-2 mb-1.5 whitespace-nowrap">
+                  <span className="font-semibold text-gray-800 text-xs truncate max-w-[130px]" title={p.fullName}>{p.fullName}</span>
+                  {p.phone && <span className="text-gray-500 text-xs font-mono shrink-0">{formatPhoneNumber(p.phone)}</span>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {p.waConsentStatus === 'ACCEPTED' && <StatusBadge status="ACTIVE" customText="Onaylı" />}
                   {p.waConsentStatus === 'DECLINED' && <StatusBadge status="REJECTED" customText="Reddedildi" />}
                   {p.waConsentStatus === 'PENDING' && (
                     <>
                       <StatusBadge status="PENDING" customText="Bekliyor" />
-                      <Button variant="ghost" onClick={() => handleSendConsent(p.id)} className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-2 py-0.5 h-6 text-xs transition-colors rounded" title="Onay İste">
+                      <Button variant="ghost" onClick={() => handleSendConsent(p.id)} className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-1.5 py-0.5 h-5 text-[11px] transition-colors rounded" title="Onay İste">
                         Onay İste
                       </Button>
                     </>
@@ -547,41 +612,105 @@ export default function StudentListPage() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Search & Tabs */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="relative max-w-md mb-4">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <Search size={16} />
+          {/* Arama ve Yazdır Çubuğu */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="relative flex-1 max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Search size={16} />
+              </div>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Öğrenci ara (ad, numara, sınıf)..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="w-full pl-10 pr-10 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm bg-white text-slate-900 placeholder:text-slate-400"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    setPage(1);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  title="Aramayı Temizle"
+                >
+                  <span className="p-1 rounded-full hover:bg-slate-100 flex items-center justify-center">
+                    <X size={15} />
+                  </span>
+                </button>
+              )}
             </div>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Öğrenci ara (ad, numara, sınıf)..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm bg-white text-slate-900 placeholder:text-slate-400"
-            />
-            {search && (
-              <button
+
+            {/* Veli Bilgileriyle Yazdır Butonu (Arama satırının en sağında) */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
                 type="button"
-                onClick={() => {
-                  setSearch('');
-                  setPage(1);
-                  searchInputRef.current?.focus();
-                }}
-                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                title="Aramayı Temizle"
+                onClick={handlePrintStudents}
+                variant="outline"
+                className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-2xs h-9 px-3.5 text-xs font-semibold"
+                title="Seçili veya görüntülenen öğrenci listesini veli bilgileriyle beraber yazdır"
               >
-                <span className="p-1 rounded-full hover:bg-slate-100 flex items-center justify-center">
-                  <X size={15} />
+                <Printer size={15} className="text-indigo-600" />
+                <span>
+                  {selectedIds.size > 0
+                    ? `Seçiliyi Yazdır (${selectedIds.size})`
+                    : `Listeyi Yazdır (${filteredStudents.length})`}
                 </span>
-              </button>
-            )}
+              </Button>
+            </div>
           </div>
 
           {!loading && displayClasses.length > 0 && (
-            <div className="space-y-2 pb-2 px-1 pt-1 -mx-1 -mt-1">
-              {/* Normal Sınıflar */}
-              <div className="flex flex-wrap gap-2 overflow-x-auto">
-                {displayClasses.filter(c => !(c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A '))).map((cls) => {
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              {/* Kademe Filtre Çubuğu */}
+              {availableGrades.length > 1 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Kademe:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGrade('ALL')}
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                      selectedGrade === 'ALL'
+                        ? 'bg-slate-800 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
+                    }`}
+                  >
+                    Tümü ({displayClasses.length})
+                  </button>
+                  {availableGrades.map((g) => {
+                    const gradeCount = displayClasses.filter(c => getGradeCategory(c.name) === g.key).length;
+                    return (
+                      <button
+                        type="button"
+                        key={g.key}
+                        onClick={() => {
+                          setSelectedGrade(g.key);
+                          const firstInGrade = displayClasses.find(c => getGradeCategory(c.name) === g.key);
+                          if (firstInGrade && getGradeCategory(activeClass) !== g.key) {
+                            setActiveClass(firstInGrade.name);
+                            setSelectedIds(new Set());
+                            setPage(1);
+                          }
+                        }}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                          selectedGrade === g.key
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
+                        }`}
+                      >
+                        {g.label} ({gradeCount})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Kompakt Sınıf Chipleri */}
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {visibleClasses.map((cls) => {
                   const isHighlighted = activeClass === cls.name;
 
                   return (
@@ -593,15 +722,15 @@ export default function StudentListPage() {
                         setSelectedIds(new Set()); 
                         setPage(1); 
                       }}
-                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer outline-none focus:outline-none select-none border ${
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium transition-all shrink-0 cursor-pointer outline-none focus:outline-none select-none border ${
                         isHighlighted
-                          ? 'bg-indigo-600 text-white shadow-sm border-indigo-600'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/90 hover:border-slate-300'
+                          ? 'bg-indigo-600 text-white shadow-2xs border-indigo-600 font-bold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
-                      {cls.name}
-                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                        isHighlighted ? 'bg-indigo-700/60 text-indigo-50' : 'bg-slate-100 text-slate-500'
+                      <span>{cls.name}</span>
+                      <span className={`ml-1 text-[10px] px-1 py-0 rounded font-semibold ${
+                        isHighlighted ? 'bg-indigo-700/70 text-indigo-100' : 'bg-slate-100 text-slate-500'
                       }`}>
                         {cls.count}
                       </span>
@@ -609,39 +738,6 @@ export default function StudentListPage() {
                   );
                 })}
               </div>
-
-              {/* A- Sınıfları */}
-              {displayClasses.some(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')) && (
-                <div className="flex flex-wrap gap-2 overflow-x-auto pt-2 border-t border-gray-100">
-                  {displayClasses.filter(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')).map((cls) => {
-                    const isHighlighted = activeClass === cls.name;
-
-                    return (
-                      <button
-                        type="button"
-                        key={cls.name}
-                        onClick={() => { 
-                          setActiveClass(cls.name); 
-                          setSelectedIds(new Set()); 
-                          setPage(1); 
-                        }}
-                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer outline-none focus:outline-none select-none border ${
-                          isHighlighted
-                            ? 'bg-indigo-600 text-white shadow-sm border-indigo-600'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/90 hover:border-slate-300'
-                        }`}
-                      >
-                        {cls.name}
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                          isHighlighted ? 'bg-indigo-700/60 text-indigo-50' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {cls.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -765,7 +861,21 @@ export default function StudentListPage() {
         resetParentModal={resetParentModal}
         handleParentImportConfirm={handleParentImportConfirm}
       />
-      
+
+      {/* Hidden Print Container */}
+      <div className="hidden">
+        <div ref={printRef}>
+          {printStudents.length > 0 && (
+            <StudentListPrintTemplate
+              students={printStudents}
+              activeClass={activeClass}
+              searchQuery={search}
+              settings={settings}
+            />
+          )}
+        </div>
+      </div>
+
       {confirmModal}
     </div>
   );

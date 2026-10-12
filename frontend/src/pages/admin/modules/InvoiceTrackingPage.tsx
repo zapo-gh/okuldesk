@@ -5,6 +5,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import api from '../../../services/api';
 import { Receipt, Plus, Trash2, Edit, AlertCircle, ArrowRightCircle, CheckCircle2, FileUp, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { ActionModal } from '../../../components/ui/ActionModal';
 import { Button } from '../../../components/ui/Button';
 import { useConfirm } from '../../../hooks/useConfirm';
 
@@ -23,6 +24,16 @@ export default function InvoiceTrackingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [statusModal, setStatusModal] = useState<{
+    isOpen: boolean;
+    invoice: any;
+    newStatus: string;
+    title: string;
+    inputLabel: string;
+    inputPlaceholder: string;
+    field: 'mebbisNo' | 'mysNo';
+    value: string;
+  } | null>(null);
 
   const groupedInvoices = useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -114,27 +125,51 @@ export default function InvoiceTrackingPage() {
   };
 
   const advanceStatus = async (invoice: any) => {
-    let newStatus = '';
-    let mebbisNo, mysNo;
-    
     if (invoice.status === 'BEKLEYEN_ODENEK_TALEBI') {
-      mebbisNo = window.prompt('MEBBİS Ödenek Takip Modülü Talep Numarasını Giriniz (Opsiyonel):', '');
-      if (mebbisNo === null) return; 
-      newStatus = 'ODENEK_TALEP_EDILDI';
+      setStatusModal({
+        isOpen: true,
+        invoice,
+        newStatus: 'ODENEK_TALEP_EDILDI',
+        title: 'MEBBİS Ödenek Talebi',
+        inputLabel: 'MEBBİS Talep Numarası (Opsiyonel)',
+        inputPlaceholder: 'Örn: 2026-12345',
+        field: 'mebbisNo',
+        value: invoice.mebbisNo || ''
+      });
     } else if (invoice.status === 'ODENEK_TALEP_EDILDI') {
-      if (!await confirm('Ödeneğin okula ulaştığını onaylıyor musunuz?')) return;
-      newStatus = 'ODENEK_GELDI_MYS_BEKLIYOR';
+      if (!await confirm(`${invoice.companyName} faturası için ödeneğin okula ulaştığını onaylıyor musunuz?`)) return;
+      try {
+        await api.put(`/invoice/${invoice.id}/status`, { status: 'ODENEK_GELDI_MYS_BEKLIYOR' });
+        toast.success('Fatura durumu: MYS ÖEB Bekliyor olarak güncellendi.');
+        fetchData();
+      } catch {
+        toast.error('Durum güncellenemedi.');
+      }
     } else if (invoice.status === 'ODENEK_GELDI_MYS_BEKLIYOR') {
-      mysNo = window.prompt('MYS (HYS) Ödeme Emri Belgesi (ÖEB) Numarasını Giriniz (Opsiyonel):', '');
-      if (mysNo === null) return;
-      newStatus = 'ODENDI';
-    } else {
-      return;
+      setStatusModal({
+        isOpen: true,
+        invoice,
+        newStatus: 'ODENDI',
+        title: 'MYS (HYS) Ödeme Emri Belgesi',
+        inputLabel: 'Ödeme Emri Belgesi (ÖEB) Numarası (Opsiyonel)',
+        inputPlaceholder: 'Örn: 2026-OEB-987',
+        field: 'mysNo',
+        value: invoice.mysNo || ''
+      });
     }
+  };
 
+  const handleStatusSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!statusModal || !statusModal.invoice) return;
+    const { invoice, newStatus, field, value } = statusModal;
     try {
-      await api.put(`/invoice/${invoice.id}/status`, { status: newStatus, mebbisNo, mysNo });
+      const payload: any = { status: newStatus };
+      if (field === 'mebbisNo') payload.mebbisNo = value.trim() || undefined;
+      if (field === 'mysNo') payload.mysNo = value.trim() || undefined;
+      await api.put(`/invoice/${invoice.id}/status`, payload);
       toast.success('Fatura durumu güncellendi.');
+      setStatusModal(null);
       fetchData();
     } catch {
       toast.error('Durum güncellenemedi.');
@@ -438,6 +473,42 @@ export default function InvoiceTrackingPage() {
         </div>
       )}
       
+      {/* Durum İlerletme Modalı (window.prompt yerine modern dialog) */}
+      {statusModal && (
+        <ActionModal
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal(null)}
+          title={statusModal.title}
+          submitText="Onayla ve İlerlet"
+          onSubmit={handleStatusSubmit}
+          width="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-sm text-indigo-900">
+              <span className="font-bold">{statusModal.invoice?.companyName}</span> faturası için işlem aşaması ilerletiliyor.
+              {statusModal.invoice?.amount && (
+                <span className="ml-1 text-indigo-700">({Number(statusModal.invoice.amount).toLocaleString('tr-TR')} ₺)</span>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                {statusModal.inputLabel}
+              </label>
+              <input
+                type="text"
+                value={statusModal.value}
+                onChange={(e) => setStatusModal(prev => prev ? { ...prev, value: e.target.value } : null)}
+                placeholder={statusModal.inputPlaceholder}
+                autoFocus
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+              <span className="text-[11px] text-slate-400 mt-1 block">Numara henüz belli değilse boş bırakarak onaylayabilirsiniz.</span>
+            </div>
+          </div>
+        </ActionModal>
+      )}
+
       {confirmModal}
     </div>
   );

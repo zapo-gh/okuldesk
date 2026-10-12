@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { printPdfBlob } from '../../utils/printPdf';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { FileText, Users, User, Calendar, CheckSquare, Square, Download, AlertTriangle, UserCheck, Loader2, Info, Search } from 'lucide-react';
+import { FileText, Users, User, Calendar, CheckSquare, Square, Download, AlertTriangle, UserCheck, Loader2, Info, Search, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 interface Student {
@@ -196,31 +196,41 @@ export default function ParentNotificationPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   disabled={loadingStudents}
-                  className="w-full pl-11 pr-4 py-4 border-2 border-indigo-100 rounded-xl text-sm font-medium focus:border-indigo-500 focus:ring-0 shadow-sm transition-colors bg-white text-gray-900 placeholder:text-gray-400"
+                  className="w-full pl-11 pr-10 py-3.5 border-2 border-indigo-100 rounded-xl text-sm font-medium focus:border-indigo-500 focus:ring-0 shadow-xs transition-colors bg-white text-gray-900 placeholder:text-gray-400"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                    title="Aramayı Temizle"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
 
-                {/* Dropdown Arama Sonuçları */}
+                {/* Dropdown Arama Sonuçları (Absolute Z-50) */}
                 {searchQuery.length > 0 && (
-                  <div className="mt-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-72 overflow-y-auto animate-in fade-in duration-100">
                     {filteredStudents.length === 0 ? (
                       <div className="p-4 text-center text-sm text-gray-500">Sonuç bulunamadı.</div>
                     ) : (
-                      <div className="p-2 space-y-1">
+                      <div className="p-1.5 space-y-0.5">
                         {filteredStudents.map(s => (
-                          <Button
+                          <button
+                            type="button"
                             key={s.id}
-                            variant="ghost"
                             onClick={() => { selectStudent(s); setSearchQuery(''); }}
-                            className="w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-indigo-50 border border-transparent hover:border-indigo-100"
+                            className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all hover:bg-indigo-50 border border-transparent hover:border-indigo-100 cursor-pointer"
                           >
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold bg-indigo-100 text-indigo-600">
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold bg-indigo-100 text-indigo-700">
                               {s.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm font-bold text-gray-800">{s.fullName}</div>
+                              <div className="text-sm font-bold text-gray-900">{s.fullName}</div>
                               <div className="text-xs text-gray-500">Sınıf: {s.className} · No: {s.schoolNumber}</div>
                             </div>
-                          </Button>
+                          </button>
                         ))}
                       </div>
                     )}

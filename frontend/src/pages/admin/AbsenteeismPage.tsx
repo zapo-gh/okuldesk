@@ -2,9 +2,7 @@ import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import api from '../../services/api';
 import { useConfirm } from '../../hooks/useConfirm';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { FileText, Search, Plus, Filter, RefreshCw, Send, History, Trash2, Smartphone, ShieldAlert, CheckCircle2, Clock, MapPin, Printer, Mail } from 'lucide-react';
-import { printPdfBlob } from '../../utils/printPdf';
+import { FileText, Search, Plus, Filter, RefreshCw, Send, History, Trash2, Smartphone, ShieldAlert, CheckCircle2, Clock, MapPin, Printer, Mail, X } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Student, AbsenteeismRecord } from './absenteeism/types';
 import { AbsenteeismTable } from './absenteeism/AbsenteeismTable';
@@ -304,8 +302,18 @@ export default function AbsenteeismPage() {
               placeholder="Öğrenci ara (ad, numara, sınıf)..."
               value={listSearch}
               onChange={e => setListSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+              className="w-full pl-10 pr-9 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
             />
+            {listSearch && (
+              <button
+                type="button"
+                onClick={() => setListSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { ActionModal } from "../../../components/ui/ActionModal";
-import { FileText, ShieldAlert } from "lucide-react";
+import { FileText, ShieldAlert, X } from "lucide-react";
 import { Student } from "./types";
 import { Button } from '../../../components/ui/Button';
 
@@ -56,6 +56,7 @@ export function AbsenteeismUploadModal({
       title="Yeni Devamsızlık Mektubu Yükle"
       onSubmit={onSubmit}
       submitText="Yükle ve Kaydet"
+      width="lg"
     >
       <div className="space-y-5">
         {uploadError && (
@@ -66,22 +67,38 @@ export function AbsenteeismUploadModal({
 
         <div className="relative">
           <label className="block text-sm font-medium text-gray-700 mb-1">Öğrenci</label>
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={studentSearch}
-            onChange={(e) => {
-              setStudentSearch(e.target.value);
-              setShowStudentDropdown(true);
-              if (!e.target.value) setSelectedStudentId("");
-            }}
-            onFocus={() => setShowStudentDropdown(true)}
-            placeholder="Öğrenci adı veya numarası..."
-            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-            required={!selectedStudentId}
-          />
+          <div className="relative">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={studentSearch}
+              onChange={(e) => {
+                setStudentSearch(e.target.value);
+                setShowStudentDropdown(true);
+                if (!e.target.value) setSelectedStudentId("");
+              }}
+              onFocus={() => setShowStudentDropdown(true)}
+              placeholder="Öğrenci adı veya numarası..."
+              className="w-full pl-3 pr-9 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+              required={!selectedStudentId}
+            />
+            {studentSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStudentSearch('');
+                  setSelectedStudentId('');
+                  setShowStudentDropdown(false);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
           {showStudentDropdown && studentSearch.length > 0 && (
-            <div className="mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 max-h-60 overflow-y-auto divide-y divide-slate-100">
               {students
                 .filter(
                   (s) =>
@@ -90,6 +107,7 @@ export function AbsenteeismUploadModal({
                       .includes(studentSearch.toLocaleLowerCase("tr-TR")) ||
                     s.schoolNumber.includes(studentSearch)
                 )
+                .slice(0, 30)
                 .map((s) => (
                   <div
                     key={s.id}
@@ -99,10 +117,10 @@ export function AbsenteeismUploadModal({
                       setShowStudentDropdown(false);
                       fetchWarningCount(s.id);
                     }}
-                    className="px-4 py-2 text-sm hover:bg-indigo-50 cursor-pointer border-b border-gray-50 last:border-0 transition"
+                    className="px-4 py-2.5 text-sm hover:bg-indigo-50 cursor-pointer transition flex items-center justify-between"
                   >
                     <strong className="text-gray-900">{s.fullName}</strong>
-                    <span className="text-gray-500 ml-2">
+                    <span className="text-gray-500 text-xs bg-slate-100 px-2 py-0.5 rounded-md">
                       {s.schoolNumber} — {s.className}
                     </span>
                   </div>

@@ -3,8 +3,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
 import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
-import { Users, Plus, Edit, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2, Search, X, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
 
@@ -63,6 +64,11 @@ export default function StaffPage() {
   // Bulk Selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Search and Filtering
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
 
   // Excel Import Modal
   const [showImportModal, setShowImportModal] = useState(false);
@@ -198,11 +204,29 @@ export default function StaffPage() {
     }
   };
 
+  const branches = Array.from(new Set(staff.map(s => s.brans).filter(Boolean))) as string[];
+  const roles = Array.from(new Set(staff.map(s => s.unvan || ROLE_LABELS[s.title]).filter(Boolean))) as string[];
+
+  const filteredStaff = staff.filter(s => {
+    if (selectedBranch && s.brans !== selectedBranch) return false;
+    if (selectedRole && (s.unvan !== selectedRole && ROLE_LABELS[s.title] !== selectedRole)) return false;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLocaleLowerCase('tr-TR');
+      const matchName = s.name.toLocaleLowerCase('tr-TR').includes(q);
+      const matchTc = s.tcKimlikNo?.includes(q);
+      const matchBrans = s.brans?.toLocaleLowerCase('tr-TR').includes(q);
+      const matchUnvan = s.unvan?.toLocaleLowerCase('tr-TR').includes(q);
+      const matchClass = s.className?.toLocaleLowerCase('tr-TR').includes(q);
+      if (!matchName && !matchTc && !matchBrans && !matchUnvan && !matchClass) return false;
+    }
+    return true;
+  });
+
   const toggleSelectAll = () => {
-    if (selectedIds.size === staff.length) {
+    if (selectedIds.size === filteredStaff.length && filteredStaff.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(staff.map(s => s.id)));
+      setSelectedIds(new Set(filteredStaff.map(s => s.id)));
     }
   };
 
@@ -212,6 +236,117 @@ export default function StaffPage() {
     else next.add(id);
     setSelectedIds(next);
   };
+
+  const columns: Column<StaffMember>[] = [
+    {
+      header: (
+        <input 
+          type="checkbox" 
+          checked={filteredStaff.length > 0 && selectedIds.size === filteredStaff.length}
+          onChange={toggleSelectAll}
+          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+          aria-label="Tümünü seç"
+        />
+      ),
+      className: 'w-12 text-center',
+      render: (s) => (
+        <input 
+          type="checkbox" 
+          checked={selectedIds.has(s.id)}
+          onChange={() => toggleSelect(s.id)}
+          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+          aria-label={`${s.name} seç`}
+        />
+      ),
+    },
+    {
+      header: 'Ad Soyad',
+      render: (s) => (
+        <div>
+          <span className="font-semibold text-gray-900">{s.name}</span>
+          <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+            {s.tcKimlikNo && <span>TC: {s.tcKimlikNo}</span>}
+            {s.kurumSicilNo && <span>• Sicil: {s.kurumSicilNo}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Unvan & Görev',
+      className: 'hidden md:table-cell',
+      render: (s) => (
+        <div>
+          <div className="font-medium text-gray-800">{s.unvan || ROLE_LABELS[s.title] || '-'}</div>
+          {s.gorev && <div className="text-xs text-gray-500">{s.gorev}</div>}
+        </div>
+      ),
+    },
+    {
+      header: 'Branş',
+      className: 'hidden lg:table-cell',
+      render: (s) => (
+        <span className="text-gray-700 font-medium">{s.brans || '-'}</span>
+      ),
+    },
+    {
+      header: 'Sınıf / Kulüp',
+      render: (s) => (
+        <div className="flex flex-col gap-1 items-start">
+          {s.className && (
+            <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200">
+              Sınıf: {s.className}
+            </span>
+          )}
+          {s.clubName && (
+            <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-xs font-semibold border border-emerald-200">
+              Kulüp: {s.clubName}
+            </span>
+          )}
+          {!s.className && !s.clubName && (
+            <span className="text-gray-400 text-xs italic">- Yok -</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: 'İşlemler',
+      align: 'right',
+      render: (s) => (
+        <div className="flex justify-end gap-1.5">
+          {viewMode === 'active' ? (
+            <>
+              <Button 
+                variant="ghost" 
+                onClick={() => openEdit(s)} 
+                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 h-8 w-8 rounded-lg" 
+                title="Düzenle"
+              >
+                <Edit size={16} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => handleDelete(s.id)} 
+                disabled={deleteId === s.id} 
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 h-8 w-8 rounded-lg disabled:opacity-50" 
+                title="Sil"
+              >
+                <Trash2 size={16} />
+              </Button>
+            </>
+          ) : (
+            <Button 
+              variant="outline" 
+              onClick={() => handleRestore(s.id)} 
+              className="text-indigo-600 border-indigo-300 hover:bg-indigo-50 px-2.5 py-1 text-xs" 
+              title="Geri Al"
+            >
+              Geri Al
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   // EXCEL İÇE AKTAR LOGIC (GELİŞMİŞ SMART MAPPER)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -409,107 +544,89 @@ export default function StaffPage() {
 
       
 
-      {/* TÜM PERSONEL LİSTESİ (Tablo Görünümü) */}
+      {/* TÜM PERSONEL LİSTESİ */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex border-b border-slate-200">
-          <button onClick={() => setViewMode('active')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${viewMode === 'active' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Aktif Personeller</button>
-          <button onClick={() => setViewMode('deleted')} className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${viewMode === 'deleted' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Silinmiş Personeller (Çöp Kutusu)</button>
+        {/* TAB SWITCHER */}
+        <div className="flex border-b border-slate-200 bg-slate-50/50">
+          <button 
+            onClick={() => { setViewMode('active'); setSelectedIds(new Set()); }} 
+            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'active' ? 'border-indigo-600 text-indigo-600 bg-white shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Aktif Personeller
+          </button>
+          <button 
+            onClick={() => { setViewMode('deleted'); setSelectedIds(new Set()); }} 
+            className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'deleted' ? 'border-rose-600 text-rose-600 bg-white shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            Silinmiş Personeller (Çöp Kutusu)
+          </button>
         </div>
-        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">{viewMode === 'active' ? 'Personel Listesi' : 'Silinmiş Personeller'}</h2>
-          <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-gray-200 text-gray-600 rounded-full shadow-sm">
-            Toplam {staff.length} Kişi
-          </span>
+
+        {/* SEARCH & FILTER TOOLBAR */}
+        <div className="p-4 border-b border-slate-200 bg-white flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Ad, TC, unvan, branş veya sınıf ile ara..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {branches.length > 0 && (
+              <select
+                value={selectedBranch}
+                onChange={e => setSelectedBranch(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="">Tüm Branşlar ({branches.length})</option>
+                {branches.sort().map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            )}
+
+            {roles.length > 0 && (
+              <select
+                value={selectedRole}
+                onChange={e => setSelectedRole(e.target.value)}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                <option value="">Tüm Unvanlar ({roles.length})</option>
+                {roles.sort().map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
+
+            <div className="text-xs font-semibold px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg self-center">
+              {filteredStaff.length} / {staff.length} Kişi
+            </div>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white text-gray-500 font-medium border-b border-gray-100">
-              <tr>
-                <th className="w-12 text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
-                  <input 
-                    type="checkbox" 
-                    checked={staff.length > 0 && selectedIds.size === staff.length}
-                    onChange={toggleSelectAll}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Ad Soyad</th>
-                <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Unvan & Görev</th>
-                <th className="hidden lg:table-cell text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branş</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf / Kulüp</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {staff.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
-                    Henüz personel eklenmemiş.
-                  </td>
-                </tr>
-              ) : (
-                staff.map((s) => (
-                  <tr key={s.id} className={`hover:bg-gray-50/50 transition-colors ${selectedIds.has(s.id) ? 'bg-indigo-50/30' : ''}`}>
-                    <td className="px-6 py-3 text-center">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedIds.has(s.id)}
-                        onChange={() => toggleSelect(s.id)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </td>
-                    <td className="px-6 py-3 font-medium text-gray-900">
-                      {s.name}
-                      {s.tcKimlikNo && <div className="text-xs text-gray-400 font-normal">TC: {s.tcKimlikNo}</div>}
-                    </td>
-                    <td className="px-6 py-3 hidden md:table-cell text-gray-600">
-                      <div className="font-medium text-gray-800">{s.unvan || '-'}</div>
-                      <div className="text-xs text-gray-500">{s.gorev || '-'}</div>
-                    </td>
-                    <td className="px-6 py-3 hidden lg:table-cell text-gray-600">
-                      {s.brans || '-'}
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex flex-col gap-1 items-start">
-                        {s.className && (
-                          <span className="inline-flex items-center px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200">
-                            Sınıf: {s.className}
-                          </span>
-                        )}
-                        {s.clubName && (
-                          <span className="inline-flex items-center px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-semibold border border-emerald-200">
-                            Kulüp: {s.clubName}
-                          </span>
-                        )}
-                        {!s.className && !s.clubName && (
-                          <span className="text-gray-400 text-xs italic">- Yok -</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex justify-end gap-2">
-                        {viewMode === 'active' ? (
-                          <>
-                            <Button variant="ghost" onClick={() => openEdit(s)} className="text-blue-600 hover:text-blue-900 px-2 py-1 transition-colors" title="Düzenle">
-                              <Edit size={20} />
-                            </Button>
-                            <Button variant="ghost" onClick={() => handleDelete(s.id)} disabled={deleteId === s.id} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors disabled:opacity-50" title="Sil">
-                              <Trash2 size={20} />
-                            </Button>
-                          </>
-                        ) : (
-                          <Button variant="outline" onClick={() => handleRestore(s.id)} className="text-indigo-600 border-indigo-600 hover:bg-indigo-50 px-2 py-1 text-xs transition-colors" title="Geri Al">
-                            Geri Al
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        <DataTable
+          data={filteredStaff}
+          columns={columns}
+          loading={loading}
+          exportable={true}
+          exportFilename="Personel_Listesi"
+          emptyMessage={searchTerm || selectedBranch || selectedRole ? "Arama veya filtre kriterlerine uygun personel bulunamadı." : "Henüz personel kaydı bulunmuyor."}
+          rowClassName={(s) => selectedIds.has(s.id) ? 'bg-indigo-50/40' : ''}
+        />
       </div>
 
       {/* NORMAL ADD/EDIT MODAL */}

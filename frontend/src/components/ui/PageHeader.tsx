@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { Button } from './Button';
 
@@ -23,9 +24,17 @@ export function PageHeader({
   actions,
   hidePrint = true,
 }: PageHeaderProps) {
-  return (
+  const [, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const headerContent = (
     <div
-      className={`relative flex items-center justify-between gap-4 px-6 py-4 rounded-xl shadow-md mb-6 overflow-hidden ${hidePrint ? 'print:hidden' : ''}`}
+      className={`relative flex items-center justify-between gap-4 px-6 py-4 rounded-xl shadow-md overflow-hidden ${
+        hidePrint ? 'print:hidden' : ''
+      }`}
       style={{
         background: 'linear-gradient(120deg, #1e3a5f 0%, #1d4ed8 60%, #2563eb 100%)',
         minHeight: '72px',
@@ -78,4 +87,12 @@ export function PageHeader({
       ) : null}
     </div>
   );
+
+  const slot = typeof document !== 'undefined' ? document.getElementById('page-header-slot') : null;
+
+  if (slot) {
+    return createPortal(headerContent, slot);
+  }
+
+  return headerContent;
 }

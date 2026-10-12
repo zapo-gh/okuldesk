@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { Activity, Search, RefreshCw, User, Database, Clock } from 'lucide-react';
+import { Activity, Search, RefreshCw, User, Database, Clock, X } from 'lucide-react';
 import api from '../../services/api';
 import { Button } from '../../components/ui/Button';
 
@@ -73,14 +73,24 @@ export default function AuditLogPage() {
       <div className="flex flex-col bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4 bg-gray-50/50">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
               placeholder="İşlem, tablo veya kullanıcı ara..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"
+              className="w-full pl-10 pr-9 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
           <div className="text-sm text-gray-500 font-medium">
             Toplam <span className="text-gray-900">{filteredLogs.length}</span> kayıt gösteriliyor

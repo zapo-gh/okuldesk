@@ -32,6 +32,16 @@ export default function TimetablePage() {
   const [loading, setLoading] = useState(true);
   const [isClassNamesModalOpen, setIsClassNamesModalOpen] = useState(false);
   const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('ALL');
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('ALL');
+
+  const teacherBranches = useMemo(() => {
+    return Array.from(new Set(staffList.map((s: any) => s.brans).filter(Boolean))).sort((a: any, b: any) => a.localeCompare(b, 'tr-TR')) as string[];
+  }, [staffList]);
+
+  const filteredStaffList = useMemo(() => {
+    if (selectedBranchFilter === 'ALL') return staffList;
+    return staffList.filter((s: any) => s.brans === selectedBranchFilter);
+  }, [staffList, selectedBranchFilter]);
 
   const classDisplayMap = useMemo<Record<string, string>>(() => {
     try {
@@ -343,10 +353,13 @@ export default function TimetablePage() {
             {viewMode === 'teacher' ? (
               <div className="flex-1 min-w-[250px]">
                 <SearchableSelect
-                  options={staffList.map((s: any) => ({ value: s.id, label: s.name }))}
+                  options={filteredStaffList.map((s: any) => ({ 
+                    value: s.id, 
+                    label: s.brans ? `${s.name} (${s.brans})` : s.name 
+                  }))}
                   value={selectedStaffId}
                   onChange={(val) => setSelectedStaffId(val)}
-                  placeholder="Öğretmen ara ve seç..."
+                  placeholder={selectedBranchFilter !== 'ALL' ? `${selectedBranchFilter} öğretmeni seç...` : "Öğretmen ara ve seç..."}
                 />
               </div>
             ) : (
@@ -380,6 +393,44 @@ export default function TimetablePage() {
               </Button>
             )}
           </div>
+
+          {/* Öğretmen Modunda Branş Filtre Çipleri */}
+          {viewMode === 'teacher' && teacherBranches.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto pb-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                Branş:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedBranchFilter('ALL')}
+                className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
+                  selectedBranchFilter === 'ALL'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Tümü ({staffList.length})
+              </button>
+              {teacherBranches.map(brans => {
+                const count = staffList.filter((s: any) => s.brans === brans).length;
+                const isSelected = selectedBranchFilter === brans;
+                return (
+                  <button
+                    key={brans}
+                    type="button"
+                    onClick={() => setSelectedBranchFilter(isSelected ? 'ALL' : brans)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {brans} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Sınıf Modunda Kademe Filtre Butonları ve Hızlı Seçim Çipleri */}
           {viewMode === 'class' && (

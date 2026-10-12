@@ -971,26 +971,28 @@ export default function DutySchedulePage() {
       </div>
 
       {/* Sekmeler */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {([
-          { key: 'cizelge',    label: 'Çizelge',          icon: <CalendarRange size={15}/> },
-          { key: 'istatistik', label: 'İstatistik',        icon: <BarChart2 size={15}/> },
-          { key: 'personel',   label: 'Öğretmen Nöbetleri', icon: <Users size={15}/> },
-          { key: 'idareci',    label: 'İdareci Nöbetleri', icon: <Shield size={15}/> },
-          { key: 'yerler',     label: 'Nöbet Yerleri',     icon: <MapPin size={15}/> },
-          { key: 'derslikler', label: 'Derslik Eşleştirme', icon: <Layers size={15}/> },
-          { key: 'ayarlar',    label: 'Ayarlar',           icon: <Settings size={15}/> },
-        ] as { key: typeof activeTab; label: string; icon: React.ReactNode }[]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
-              activeTab === tab.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
+      <div className="overflow-x-auto pb-1 max-w-full">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-max">
+          {([
+            { key: 'cizelge',    label: 'Çizelge',          icon: <CalendarRange size={15}/> },
+            { key: 'istatistik', label: 'İstatistik',        icon: <BarChart2 size={15}/> },
+            { key: 'personel',   label: 'Öğretmen Nöbetleri', icon: <Users size={15}/> },
+            { key: 'idareci',    label: 'İdareci Nöbetleri', icon: <Shield size={15}/> },
+            { key: 'yerler',     label: 'Nöbet Yerleri',     icon: <MapPin size={15}/> },
+            { key: 'derslikler', label: 'Derslik Eşleştirme', icon: <Layers size={15}/> },
+            { key: 'ayarlar',    label: 'Ayarlar',           icon: <Settings size={15}/> },
+          ] as { key: typeof activeTab; label: string; icon: React.ReactNode }[]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap shrink-0 transition ${
+                activeTab === tab.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (

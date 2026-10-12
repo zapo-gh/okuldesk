@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../../services/api';
 import { useSettings } from '../../../context/SettingsContext';
 import { useConfirm } from '../../../hooks/useConfirm';
-import { CalendarOff, Edit, Trash2, Plus, Printer } from 'lucide-react';
+import { CalendarOff, Edit, Trash2, Plus, Printer, Search, X } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
@@ -23,6 +23,7 @@ export default function HolidayPage() {
   const { confirm, confirmModal } = useConfirm();
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<Partial<Holiday>>({});
@@ -201,6 +202,10 @@ export default function HolidayPage() {
     }
   ];
 
+  const filteredHolidays = holidays.filter(h => 
+    searchQuery ? h.name?.toLowerCase().includes(searchQuery.toLowerCase()) : true
+  );
+
   return (
     <div className="space-y-4 relative">
       <PageHeader 
@@ -209,32 +214,59 @@ export default function HolidayPage() {
         icon={<CalendarOff size={24} />}
         actions={
           <>
-                    <div className="flex space-x-3">
-                      <Button
-                        onClick={handlePrint}
-                        className="flex items-center space-x-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm"
-                      >
-                        <Printer className="w-5 h-5" />
-                        <span>Takvimi Yazdır</span>
-                      </Button>
-                      <Button
-                        onClick={openAddModal}
-                        variant="primary"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span>Yeni Tatil Ekle</span>
-                      </Button>
-                    </div>
+            <div className="flex space-x-3">
+              <Button
+                onClick={handlePrint}
+                className="flex items-center space-x-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm"
+              >
+                <Printer className="w-5 h-5" />
+                <span>Takvimi Yazdır</span>
+              </Button>
+              <Button
+                onClick={openAddModal}
+                variant="primary"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Yeni Tatil Ekle</span>
+              </Button>
+            </div>
           </>
         }
       />
 
       <div className="print:hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Arama Çubuğu */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text" 
+              placeholder="Tatil veya anma günü ara..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+          <span className="text-xs font-semibold text-slate-500">
+            Toplam {filteredHolidays.length} Tatil / Gün
+          </span>
+        </div>
+
         <DataTable 
-          data={holidays} 
+          data={filteredHolidays} 
           columns={columns} 
           loading={loading}
-          emptyMessage="Sisteme kayıtlı tatil günü bulunmuyor."
+          emptyMessage="Arama kriterine uygun tatil günü bulunmuyor."
         />
       </div>
 

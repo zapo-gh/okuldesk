@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import api from '../../../services/api';
-import { FileSignature, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { FileSignature, Plus, Trash2, Edit, AlertCircle, Loader2, Save, X, Printer, CheckCircle2, AlertTriangle, Info, Search } from 'lucide-react';
 
 import { useReactToPrint } from 'react-to-print';
 import { ProcurementPrintTemplate } from './print/ProcurementPrintTemplate';
@@ -18,6 +18,7 @@ export default function ProcurementPage() {
   const [staff, setStaff] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   
 
   // Form (Tam Ekran/Geniş Modal State'i)
@@ -344,9 +345,47 @@ export default function ProcurementPage() {
         );
       })()}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <DataTable columns={columns} data={procurements} emptyMessage="Kayıtlı doğrudan temin dosyası bulunamadı." />
-      </div>
+      {(() => {
+        const filteredProcurements = procurements.filter(p => 
+          searchQuery ? (
+            p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            p.procedureType?.toLowerCase().includes(searchQuery.toLowerCase())
+          ) : true
+        );
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Arama Çubuğu */}
+            <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Doğrudan temin konusu veya usulü ara..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                    title="Temizle"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                Toplam {filteredProcurements.length} Dosya
+              </span>
+            </div>
+
+            <DataTable columns={columns} data={filteredProcurements} emptyMessage="Arama kriterine uygun doğrudan temin dosyası bulunamadı." />
+          </div>
+        );
+      })()}
 
       {/* FULL SCREEN MODAL */}
       {isModalOpen && (

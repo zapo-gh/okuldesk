@@ -5,10 +5,10 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
-import { StatusBadge } from '../../components/ui/StatusBadge';
-import { AlertTriangle, Plus, Search, Eye, FileText, Smartphone, Trash2, ShieldAlert, Printer, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Eye, FileText, Smartphone, Trash2, ShieldAlert, Printer, ChevronDown, X } from 'lucide-react';
 import { printPdfBlob } from '../../utils/printPdf';
 import { Button } from '../../components/ui/Button';
+import { formatPhoneNumber } from '../../utils/formatters';
 
 interface StaffMember {
   id: string;
@@ -411,8 +411,18 @@ export default function WarningsPage() {
               placeholder="Öğrenci adı, numarası veya sınıf ile ara..."
               value={listSearch}
               onChange={e => setListSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+              className="w-full pl-10 pr-9 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
             />
+            {listSearch && (
+              <button
+                type="button"
+                onClick={() => setListSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -442,27 +452,43 @@ export default function WarningsPage() {
         submitText={createLoading ? 'Oluşturuluyor...' : 'Uyarı Oluştur & PDF Üret'}
         onSubmit={handleCreate}
         submitDisabled={!selectedStudentId || !selectedBehaviorCode || createLoading}
-        width="md"
+        width="lg"
       >
         <div className="space-y-5">
           {createError && <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100 flex items-center gap-2"><ShieldAlert size={16}/> {createError}</div>}
           
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">1. Öğrenci Seçin</label>
-            <input
-              type="text"
-              placeholder="Öğrenci adı, numarası veya sınıfı ile arayın..."
-              value={studentSearch}
-              onChange={(e) => {
-                setStudentSearch(e.target.value);
-                setShowStudentDropdown(true);
-                setSelectedStudentId('');
-              }}
-              onFocus={() => setShowStudentDropdown(true)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Öğrenci adı, numarası veya sınıfı ile arayın..."
+                value={studentSearch}
+                onChange={(e) => {
+                  setStudentSearch(e.target.value);
+                  setShowStudentDropdown(true);
+                  setSelectedStudentId('');
+                }}
+                onFocus={() => setShowStudentDropdown(true)}
+                className="w-full pl-3 pr-9 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+              />
+              {studentSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentSearch('');
+                    setSelectedStudentId('');
+                    setShowStudentDropdown(false);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                  title="Temizle"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
             {showStudentDropdown && studentSearch && (
-              <div className="mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 max-h-60 overflow-y-auto divide-y divide-slate-100">
                 {filteredStudents.length === 0 ? (
                   <div className="p-3 text-gray-500 text-sm text-center">Öğrenci bulunamadı</div>
                 ) : (
@@ -470,10 +496,10 @@ export default function WarningsPage() {
                     <div
                       key={s.id}
                       onClick={() => handleStudentSelect(s)}
-                      className="px-4 py-2 text-sm hover:bg-indigo-50 cursor-pointer border-b border-gray-50 last:border-0 transition"
+                      className="px-4 py-2.5 text-sm hover:bg-indigo-50 cursor-pointer transition flex items-center justify-between"
                     >
                       <strong className="text-gray-900">{s.fullName}</strong>
-                      <span className="text-gray-500 ml-2">{s.className} - No: {s.schoolNumber}</span>
+                      <span className="text-gray-500 text-xs bg-slate-100 px-2 py-0.5 rounded-md">{s.className} - No: {s.schoolNumber}</span>
                     </div>
                   ))
                 )}
@@ -498,6 +524,16 @@ export default function WarningsPage() {
                     className="w-full pl-9 pr-8 p-2.5 border border-indigo-500 ring-2 ring-indigo-500/20 rounded-lg text-sm bg-white outline-none transition-all"
                     autoFocus
                   />
+                  {behaviorSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setBehaviorSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                      title="Temizle"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <button
@@ -729,7 +765,7 @@ export default function WarningsPage() {
                         />
                         <div>
                           <div className="text-sm font-semibold text-gray-800">{m.parent}</div>
-                          <div className="text-xs text-gray-500">{m.phone}</div>
+                          <div className="text-xs text-gray-500 font-mono">{formatPhoneNumber(m.phone)}</div>
                         </div>
                       </label>
                     ))}
@@ -740,7 +776,7 @@ export default function WarningsPage() {
                   {waPreviewData.messages.filter(m => waSelectedPhones.has(m.phone)).map((m, i) => (
                     <div key={i} className="bg-green-50 rounded-xl border border-green-200 overflow-hidden">
                       <div className="bg-white border-b border-green-100 px-3 py-2 text-xs font-semibold text-gray-600 flex items-center gap-2">
-                        <Smartphone size={14} className="text-green-600" /> {m.parent} ({m.phone})
+                        <Smartphone size={14} className="text-green-600" /> {m.parent} ({formatPhoneNumber(m.phone)})
                       </div>
                       <div className="p-3">
                         <pre className="text-[13px] font-sans text-gray-800 whitespace-pre-wrap break-words m-0 leading-relaxed">{m.message}</pre>

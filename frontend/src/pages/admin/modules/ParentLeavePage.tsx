@@ -97,13 +97,46 @@ export default function ParentLeavePage() {
     setDateRanges(dateRanges.filter((_, i) => i !== index));
   };
 
+  // Recent leaves history
+  const [recentLeaves, setRecentLeaves] = useState<StudentLeave[]>(() => {
+    try {
+      const saved = localStorage.getItem('okuldesk_recent_leaves');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveRecentLeave = (leave: StudentLeave) => {
+    try {
+      const updated = [leave, ...recentLeaves.filter(item => item.id !== leave.id)].slice(0, 5);
+      setRecentLeaves(updated);
+      localStorage.setItem('okuldesk_recent_leaves', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePrintRecent = (leave: StudentLeave) => {
+    setPrintData(leave);
+    setTimeout(() => {
+      handlePrint();
+    }, 50);
+  };
+
+  const clearRecentLeaves = () => {
+    setRecentLeaves([]);
+    localStorage.removeItem('okuldesk_recent_leaves');
+    toast.success('Geçmiş temizlendi');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) return toast.error('Lütfen bir öğrenci seçin');
     if (dateRanges.length === 0) return toast.error('Lütfen en az bir izin tarihi ekleyin');
     
     const newLeave: StudentLeave = {
-      id: 'temp-' + Date.now(),
+      id: 'leave-' + Date.now(),
       studentId: selectedStudent.id,
       student: selectedStudent,
       dateRanges: JSON.stringify(dateRanges),
@@ -113,6 +146,7 @@ export default function ParentLeavePage() {
     };
     
     setPrintData(newLeave);
+    saveRecentLeave(newLeave);
     setTimeout(() => {
       handlePrint();
       resetForm();
@@ -136,6 +170,8 @@ export default function ParentLeavePage() {
     s.className.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 5);
 
+  const schoolName = settings?.schoolName || '................................................... LİSESİ';
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -144,141 +180,276 @@ export default function ParentLeavePage() {
         icon={<FileSignature size={28} />}
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-3xl">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
-          <FileSignature className="text-indigo-600" size={20} /> İzin Belgesi Formu
-        </h2>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6">
-            
-            {/* Öğrenci Seçimi */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Öğrenci Seçimi</label>
-              {selectedStudent ? (
-                <div className="flex justify-between items-center px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-sm">
-                  <span className="font-semibold text-indigo-900">{selectedStudent.schoolNumber} - {selectedStudent.fullName} ({selectedStudent.className})</span>
-                  <button type="button" onClick={() => setSelectedStudent(null)} className="text-indigo-500 hover:text-indigo-700">Değiştir</button>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* SOL KOLON: FORM */}
+        <div className="xl:col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
+            <FileSignature className="text-indigo-600" size={20} /> İzin Belgesi Formu
+          </h2>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-6">
+              
+              {/* Öğrenci Seçimi */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Öğrenci Seçimi</label>
+                {selectedStudent ? (
+                  <div className="flex justify-between items-center px-3 py-2 border border-indigo-200 bg-indigo-50 rounded-lg text-sm">
+                    <span className="font-semibold text-indigo-900">{selectedStudent.schoolNumber} - {selectedStudent.fullName} ({selectedStudent.className})</span>
+                    <button type="button" onClick={() => setSelectedStudent(null)} className="text-indigo-600 hover:text-indigo-800 font-medium">Değiştir</button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Öğrenci adı, no veya sınıf ara..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                        title="Temizle"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                    {searchQuery && (
+                      <div className="absolute z-50 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100">
+                        {filteredStudents.length > 0 ? (
+                          filteredStudents.map(s => (
+                            <div 
+                              key={s.id} 
+                              onClick={() => { setSelectedStudent(s); setSearchQuery(''); }} 
+                              className="px-4 py-2.5 hover:bg-indigo-50 cursor-pointer text-sm transition flex items-center justify-between"
+                            >
+                              <span className="font-semibold text-slate-800">{s.fullName}</span>
+                              <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">No: {s.schoolNumber} • {s.className}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Öğrenci bulunamadı</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Tarih Ekleme */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">İzin Tarihi Ekle</label>
+                
+                {/* Yarım Gün Seçeneği */}
+                <div className="flex items-center gap-2 mb-3">
+                  <input type="checkbox" id="isHalfDay" checked={isHalfDay} onChange={(e) => setIsHalfDay(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" />
+                  <label htmlFor="isHalfDay" className="text-sm font-medium text-slate-700 cursor-pointer">Bu tarih yarım gün</label>
                 </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Öğrenci adı, no veya sınıf ara..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  {searchQuery && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {filteredStudents.length > 0 ? (
-                        filteredStudents.map(s => (
-                          <div key={s.id} onClick={() => { setSelectedStudent(s); setSearchQuery(''); }} className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm border-b border-slate-100 last:border-0">
-                            <span className="font-bold text-slate-700">{s.schoolNumber}</span> - {s.fullName} <span className="text-xs text-slate-500 ml-2">({s.className})</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-4 py-3 text-sm text-slate-500 text-center">Öğrenci bulunamadı</div>
-                      )}
+
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs text-slate-500 mb-1">{isHalfDay ? 'Tarih' : 'Başlangıç Tarihi'}</label>
+                    <input type="date" value={tempStartDate} onChange={(e) => { setTempStartDate(e.target.value); setTempEndDate(e.target.value); }} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                  </div>
+                  {!isHalfDay && (
+                    <div className="flex-1">
+                      <label className="block text-xs text-slate-500 mb-1">Bitiş Tarihi</label>
+                      <input type="date" value={tempEndDate} onChange={(e) => setTempEndDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-
-            {/* Tarih Ekleme */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">İzin Tarihi Ekle</label>
-              
-              {/* Yarım Gün Seçeneği */}
-              <div className="flex items-center gap-2 mb-3">
-                <input type="checkbox" id="isHalfDay" checked={isHalfDay} onChange={(e) => setIsHalfDay(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" />
-                <label htmlFor="isHalfDay" className="text-sm font-medium text-slate-700 cursor-pointer">Bu tarih yarım gün</label>
-              </div>
-
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">{isHalfDay ? 'Tarih' : 'Başlangıç Tarihi'}</label>
-                  <input type="date" value={tempStartDate} onChange={(e) => { setTempStartDate(e.target.value); setTempEndDate(e.target.value); }} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                </div>
-                {!isHalfDay && (
-                  <div className="flex-1">
-                    <label className="block text-xs text-slate-500 mb-1">Bitiş Tarihi</label>
-                    <input type="date" value={tempEndDate} onChange={(e) => setTempEndDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                  </div>
-                )}
-                {isHalfDay && (
-                  <div className="shrink-0">
-                    <label className="block text-xs text-slate-500 mb-1">Zaman Dilimi</label>
-                    <div className="flex bg-slate-200/80 p-0.5 rounded-lg h-[38px] items-center border border-slate-200">
-                      <button
-                        type="button"
-                        onClick={() => setHalfDayPeriod('morning')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                          halfDayPeriod === 'morning'
-                            ? 'bg-white text-indigo-700 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Öğleden Önce
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHalfDayPeriod('afternoon')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                          halfDayPeriod === 'afternoon'
-                            ? 'bg-white text-indigo-700 shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Öğleden Sonra
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <Button type="button" onClick={handleAddDate} className="bg-slate-800 text-white hover:bg-slate-900 shrink-0">
-                  <Plus size={16} className="mr-1" /> Ekle
-                </Button>
-              </div>
-
-              {/* Eklenen Tarihler */}
-              {dateRanges.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {dateRanges.map((range, idx) => {
-                    const s = new Date(range.startDate).toLocaleDateString('tr-TR');
-                    const e = range.endDate ? new Date(range.endDate).toLocaleDateString('tr-TR') : s;
-                    const label = s === e ? s : `${s} - ${e}`;
-                    const typeLabel = range.isHalfDay
-                      ? `(Yarım Gün - ${range.halfDayPeriod === 'morning' ? 'Öğleden Önce' : 'Öğleden Sonra'})`
-                      : '(Tam Gün)';
-                    return (
-                      <div key={idx} className="flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-full text-sm font-medium text-slate-700 shadow-sm">
-                        {label} <span className="text-xs text-indigo-600 font-semibold">{typeLabel}</span>
-                        <button type="button" onClick={() => handleRemoveDate(idx)} className="text-slate-400 hover:text-red-500 ml-1 focus:outline-none">
-                          <X size={14} />
+                  {isHalfDay && (
+                    <div className="shrink-0">
+                      <label className="block text-xs text-slate-500 mb-1">Zaman Dilimi</label>
+                      <div className="flex bg-slate-200/80 p-0.5 rounded-lg h-[38px] items-center border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setHalfDayPeriod('morning')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                            halfDayPeriod === 'morning'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Öğleden Önce
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHalfDayPeriod('afternoon')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                            halfDayPeriod === 'afternoon'
+                              ? 'bg-white text-indigo-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Öğleden Sonra
                         </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+                  <Button type="button" onClick={handleAddDate} className="bg-slate-800 text-white hover:bg-slate-900 shrink-0">
+                    <Plus size={16} className="mr-1" /> Ekle
+                  </Button>
                 </div>
-              )}
+
+                {/* Eklenen Tarihler */}
+                {dateRanges.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {dateRanges.map((range, idx) => {
+                      const s = new Date(range.startDate).toLocaleDateString('tr-TR');
+                      const e = range.endDate ? new Date(range.endDate).toLocaleDateString('tr-TR') : s;
+                      const label = s === e ? s : `${s} - ${e}`;
+                      const typeLabel = range.isHalfDay
+                        ? `(Yarım Gün - ${range.halfDayPeriod === 'morning' ? 'Öğleden Önce' : 'Öğleden Sonra'})`
+                        : '(Tam Gün)';
+                      return (
+                        <div key={idx} className="flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-full text-sm font-medium text-slate-700 shadow-sm">
+                          {label} <span className="text-xs text-indigo-600 font-semibold">{typeLabel}</span>
+                          <button type="button" onClick={() => handleRemoveDate(idx)} className="text-slate-400 hover:text-red-500 ml-1 focus:outline-none">
+                            <X size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Mazeret */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Mazeret Nedeni (Opsiyonel)</label>
+                <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Örn: Ailevi nedenler, hastalık vb." rows={3} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none" />
+              </div>
+            </div>
+            
+            <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-100">
+              <Button type="button" variant="ghost" onClick={resetForm}>Temizle</Button>
+              <Button type="submit" disabled={!selectedStudent || dateRanges.length === 0} className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                <Printer size={18} /> Yazdır
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        {/* SAĞ KOLON: CANLI A5 ÖNİZLEME */}
+        <div className="xl:col-span-6 space-y-4">
+          <div className="bg-slate-100/90 rounded-xl border border-slate-200/80 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Canlı Belge Önizlemesi (A5 Yatay)
+              </span>
+              <span className="text-xs text-slate-500">MEB Yönetmelik Md. 36/7</span>
             </div>
 
-            {/* Mazeret */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Mazeret Nedeni (Opsiyonel)</label>
-              <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Örn: Ailevi nedenler, hastalık vb." rows={3} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none" />
+            {/* Minyatür A5 Kağıt */}
+            <div className="bg-white rounded-lg shadow-md border border-slate-300/80 p-5 text-slate-800 font-serif text-[11px] leading-relaxed transition-all">
+              <div className="text-center font-bold text-xs uppercase mb-3 text-slate-900 border-b pb-2 border-slate-100">
+                {schoolName} MÜDÜRLÜĞÜNE
+              </div>
+
+              <p className="text-justify indent-4 mb-3 leading-normal">
+                Velisi bulunduğum okulunuz{' '}
+                <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                  {selectedStudent ? selectedStudent.className : '......'}
+                </strong>{' '}
+                sınıfı,{' '}
+                <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                  {selectedStudent ? selectedStudent.schoolNumber : '......'}
+                </strong>{' '}
+                numaralı{' '}
+                <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                  {selectedStudent ? selectedStudent.fullName : '...........................................'}
+                </strong>{' '}
+                isimli öğrencinin, aşağıda belirtilen tarihlerde
+                {reason ? (
+                  <span> <strong className="text-slate-900">{reason}</strong> mazereti nedeniyle </span>
+                ) : (
+                  ' geçerli mazereti nedeniyle '
+                )}
+                okula devam edemeyeceğini bildirir; <strong>Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 36 ncı maddesinin 7 nci fıkrası</strong> hükmü uyarınca belirtilen tarihlerde <strong>izinli sayılması</strong> ve devamsızlığının <strong>özürlü devamsızlık</strong> olarak işlenmesini arz ederim.
+              </p>
+
+              <div className="bg-slate-50 border border-slate-200 rounded p-2.5 my-2.5">
+                <div className="font-bold text-[10px] text-slate-600 uppercase tracking-wider mb-1">İzin İstenilen Tarihler:</div>
+                {dateRanges.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {dateRanges.map((r, i) => {
+                      const s = new Date(r.startDate).toLocaleDateString('tr-TR');
+                      const e = r.endDate ? new Date(r.endDate).toLocaleDateString('tr-TR') : s;
+                      const label = s === e ? s : `${s} - ${e}`;
+                      const typeLabel = r.isHalfDay
+                        ? `(Yarım Gün - ${r.halfDayPeriod === 'morning' ? 'ÖÖ' : 'ÖS'})`
+                        : '(Tam Gün)';
+                      return (
+                        <span key={i} className="bg-white border border-slate-300 px-2 py-0.5 rounded text-[10px] font-semibold text-slate-700">
+                          {label} <span className="text-indigo-600 font-normal">{typeLabel}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-slate-400 italic text-[10px]">Henüz tarih eklenmedi (Formdan tarih ekleyin)</span>
+                )}
+              </div>
+
+              <div className="flex justify-between items-end mt-4 pt-2 border-t border-slate-100 text-[10px]">
+                <div>
+                  <div className="font-bold text-slate-700">Veli İletişim Bilgileri:</div>
+                  <div className="text-slate-500">Adres: ................................................................</div>
+                  <div className="text-slate-500">Telefon: .............................................................</div>
+                </div>
+                <div className="text-center min-w-[120px]">
+                  <div className="text-slate-500 mb-1">{new Date().toLocaleDateString('tr-TR')}</div>
+                  <div className="font-bold text-slate-800">Veli Adı Soyadı / İmza</div>
+                  <div className="text-slate-400 mt-2">.......................................</div>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-100">
-            <Button type="button" variant="ghost" onClick={resetForm}>Temizle</Button>
-            <Button type="submit" className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700">
-              <Printer size={18} /> Yazdır
-            </Button>
-          </div>
-        </form>
+
+          {/* HIZLI GEÇMİŞ (SON YAZDIRILANLAR) */}
+          {recentLeaves.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-700">Son Oluşturulan İzin Dilekçeleri ({recentLeaves.length})</span>
+                <button
+                  type="button"
+                  onClick={clearRecentLeaves}
+                  className="text-[11px] text-slate-400 hover:text-red-600 transition"
+                >
+                  Geçmişi Temizle
+                </button>
+              </div>
+              <div className="space-y-2">
+                {recentLeaves.map(leave => (
+                  <div key={leave.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-indigo-50/50 border border-slate-200 text-xs transition">
+                    <div>
+                      <div className="font-bold text-slate-800">
+                        {leave.student.schoolNumber} - {leave.student.fullName} ({leave.student.className})
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {new Date(leave.createdAt).toLocaleString('tr-TR')} {leave.reason ? `• ${leave.reason}` : ''}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrintRecent(leave)}
+                      className="text-xs gap-1 py-1 h-7 border-slate-300"
+                    >
+                      <Printer size={13} /> Yeniden Yazdır
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Hidden Print Area */}

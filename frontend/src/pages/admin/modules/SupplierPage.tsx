@@ -4,7 +4,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { ActionModal } from '../../../components/ui/ActionModal';
 import api from '../../../services/api';
-import { Building2, Plus, Trash2, Edit, AlertCircle, Loader2 } from 'lucide-react';
+import { Building2, Plus, Trash2, Edit, AlertCircle, Loader2, Search, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useConfirm } from '../../../hooks/useConfirm';
 
@@ -12,6 +12,8 @@ export default function SupplierPage() {
   const { confirm, confirmModal } = useConfirm();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -138,6 +140,19 @@ export default function SupplierPage() {
     );
   }
 
+  const filteredSuppliers = suppliers.filter(s => {
+    if (statusFilter === 'ACTIVE' && !s.isActive) return false;
+    if (statusFilter === 'INACTIVE' && s.isActive) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      s.name?.toLowerCase().includes(q) ||
+      s.taxNumber?.includes(q) ||
+      s.phone?.includes(q) ||
+      s.contactPerson?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -146,21 +161,79 @@ export default function SupplierPage() {
         icon={<Building2 size={24} />}
         actions={
           <>
-                    <Button
-                      onClick={openAddModal}
-                      variant="primary"
-                    >
-                      <Plus className="w-5 h-5" />
-                      <span>Yeni Firma</span>
-                    </Button>
+            <Button
+              onClick={openAddModal}
+              variant="primary"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Yeni Firma</span>
+            </Button>
           </>
         }
       />
 
-      
-
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <DataTable columns={columns} data={suppliers} emptyMessage="Kayıtlı firma bulunamadı." />
+        {/* Arama & Durum Filtre Çubuğu */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input 
+              type="text" 
+              placeholder="Firma adı, vergi no, kişi veya telefon ara..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-200/80 p-0.5 rounded-lg border border-slate-200 text-xs">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                statusFilter === 'ALL'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tümü ({suppliers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ACTIVE')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                statusFilter === 'ACTIVE'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Aktif ({suppliers.filter(s => s.isActive).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('INACTIVE')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                statusFilter === 'INACTIVE'
+                  ? 'bg-white text-rose-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Pasif ({suppliers.filter(s => !s.isActive).length})
+            </button>
+          </div>
+        </div>
+
+        <DataTable columns={columns} data={filteredSuppliers} emptyMessage="Arama kriterine uygun firma bulunamadı." />
       </div>
 
       <ActionModal

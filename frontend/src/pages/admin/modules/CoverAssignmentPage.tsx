@@ -117,6 +117,7 @@ export default function CoverAssignmentPage() {
   const [activeTab, setActiveTab] = useState<TabType>('absences');
 
   // Rules
+  const [isRulesExpanded, setIsRulesExpanded] = useState(false);
   const [rulePreventConsecutive, setRulePreventConsecutive] = useState(true);
   const [ruleMaxPerHour, setRuleMaxPerHour] = useState(1);
   const [ruleMaxPerDay, setRuleMaxPerDay] = useState(6);
@@ -787,53 +788,76 @@ export default function CoverAssignmentPage() {
       {/* ─── TAB CONTENT: PLANNING ─── */}
       {activeTab === 'planning' && (
         <div className="space-y-6">
-          {/* Rules Engine */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row gap-6">
-            <div className="flex-1 border-r border-slate-100 pr-6">
-              <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4">Atama Kuralları</h4>
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
-                  rulePreventConsecutive ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 group-hover:border-slate-400 bg-white'
-                }`}>
-                  {rulePreventConsecutive && <Check size={14} className="text-white" />}
+          {/* Rules Engine (Collapsible Accordion) */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsRulesExpanded(prev => !prev)}
+              className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Otomatik Atama Kuralları & Limitler
+                </span>
+                <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                  ({rulePreventConsecutive ? 'Ardışık Görev Engelli' : 'Ardışık Serbest'} • Saatte max {ruleMaxPerHour} • Günde max {ruleMaxPerDay})
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-indigo-600 font-semibold">
+                <span>{isRulesExpanded ? 'Gizle' : 'Ayarları Düzenle'}</span>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${isRulesExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isRulesExpanded && (
+              <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row gap-6">
+                <div className="flex-1 border-r border-slate-200 pr-6">
+                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3">Atama Kuralları</h4>
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                      rulePreventConsecutive ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 group-hover:border-slate-400 bg-white'
+                    }`}>
+                      {rulePreventConsecutive && <Check size={14} className="text-white" />}
+                    </div>
+                    <input type="checkbox" checked={rulePreventConsecutive} onChange={e => setRulePreventConsecutive(e.target.checked)} className="hidden" />
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-800">Ardışık Görevi Engelle</span>
+                      <span className="text-xs text-slate-500">Öğretmene art arda saatlerde görev verilmesini önler.</span>
+                    </div>
+                  </label>
                 </div>
-                <input type="checkbox" checked={rulePreventConsecutive} onChange={e => setRulePreventConsecutive(e.target.checked)} className="hidden" />
-                <div>
-                  <span className="block text-sm font-semibold text-slate-800">Ardışık Görevi Engelle</span>
-                  <span className="text-xs text-slate-500">Öğretmene art arda saatlerde görev verilmesini önler.</span>
-                </div>
-              </label>
-            </div>
-            <div className="flex-1 flex gap-6">
-              <div>
-                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4">Aynı Saatte Max Görev</h4>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={ruleMaxPerHour}
-                    onChange={e => setRuleMaxPerHour(parseInt(e.target.value) || 1)}
-                    className="w-16 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-center text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                  <span className="text-xs text-slate-500">Bir öğretmene aynı saatte<br/>en fazla kaç görev verilebileceği.</span>
+                <div className="flex-1 flex gap-6">
+                  <div>
+                    <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3">Aynı Saatte Max Görev</h4>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="5"
+                        value={ruleMaxPerHour}
+                        onChange={e => setRuleMaxPerHour(parseInt(e.target.value) || 1)}
+                        className="w-16 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-center text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="text-xs text-slate-500">Bir öğretmene aynı saatte<br/>en fazla kaç görev verilebileceği.</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3">Günlük Max Görev</h4>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={ruleMaxPerDay}
+                        onChange={e => setRuleMaxPerDay(parseInt(e.target.value) || 6)}
+                        className="w-16 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-center text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <span className="text-xs text-slate-500">Tüm öğretmenlerin günlük<br/>görev limitini topluca günceller.</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-4">Günlük Max Görev</h4>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={ruleMaxPerDay}
-                    onChange={e => setRuleMaxPerDay(parseInt(e.target.value) || 6)}
-                    className="w-16 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-center text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  />
-                  <span className="text-xs text-slate-500">Tüm öğretmenlerin günlük<br/>görev limitini topluca günceller.</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Planning Table */}

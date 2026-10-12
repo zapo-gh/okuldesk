@@ -129,7 +129,11 @@ export default function ClassTeachersPage() {
 
   const classTeachers = allStaff
     .filter(s => s.role === 'SINIF_REHBER_OGRETMEN' || s.className)
-    .filter(s => searchClass ? s.className?.toLowerCase().includes(searchClass.toLowerCase()) : true)
+    .filter(s => {
+      if (!searchClass) return true;
+      const q = searchClass.toLowerCase();
+      return (s.className?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q));
+    })
     .sort((a, b) => (a.className ?? '').localeCompare(b.className ?? '', 'tr', { numeric: true }));
 
   const openAdd = () => {
@@ -241,14 +245,24 @@ export default function ClassTeachersPage() {
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="font-semibold text-gray-800">Atanmış Sınıflar ve Öğretmenler</h2>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Sınıf Ara (Örn: 9-A)"
+              placeholder="Sınıf veya Öğretmen Ara..."
               value={searchClass}
               onChange={e => setSearchClass(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
+              className="pl-9 pr-9 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full sm:w-64"
             />
+            {searchClass && (
+              <button
+                type="button"
+                onClick={() => setSearchClass('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                title="Temizle"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
         </div>
 

@@ -2,12 +2,13 @@ import toast from 'react-hot-toast';
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { GraduationCap, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { GraduationCap, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === '1');
   
   const [loading, setLoading] = useState(false);
@@ -61,37 +62,39 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-5" >
-      <div className="py-9 px-10 w-full max-w-[410px] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" >
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden p-5">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="py-9 px-10 w-full max-w-[420px] bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative z-10">
         
-        <div className="text-center mb-7" >
-          <div className="w-[52px] h-[52px] bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-3.5 shadow-[0_4px_12px_rgba(59,130,246,0.3)]" >
-            <GraduationCap className="text-white"  size={28}  />
+        <div className="text-center mb-8">
+          <div className="w-[56px] h-[56px] bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3.5 shadow-lg shadow-indigo-500/25">
+            <GraduationCap className="text-white" size={30} />
           </div>
-          <h1 className="text-xl font-bold text-slate-900 m-0 tracking-tight" >
+          <h1 className="text-2xl font-bold text-slate-900 m-0 tracking-tight">
             OkulDesk
           </h1>
-          <p className="text-sm text-slate-500 mt-1" >
+          <p className="text-sm text-slate-500 mt-1">
             Yönetim Sistemine Giriş Yapın
           </p>
         </div>
 
-        
-
         {slowWarning && (
-          <div className="text-xs px-3.5 py-2.5 rounded-lg mb-4 bg-yellow-50 text-yellow-700 border border-yellow-200" >
-            ⏳ Sunucu uyandırılıyor, lütfen bekleyin (ilk girişte 20–40 saniye sürebilir)...
+          <div className="text-xs px-3.5 py-2.5 rounded-lg mb-4 bg-yellow-50 text-yellow-700 border border-yellow-200">
+            ⏳ Sunucu hazırlanıyor, lütfen bekleyin...
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4" >
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5" >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-800 mb-1.5">
               Kullanıcı Adı
             </label>
-            <div className="relative" >
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" >
-                <User size={16} />
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <User size={17} />
               </span>
               <input
                 type="text"
@@ -100,57 +103,62 @@ export default function LoginPage() {
                 placeholder="Kullanıcı adınızı giriniz"
                 required
                 ref={usernameRef}
-                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full py-2.5 pr-3.5 pl-10 rounded-xl border border-slate-300 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
               />
             </div>
           </div>
 
-          <div className="mb-6" >
-            <label className="block text-sm font-semibold text-slate-900 mb-1.5" >
+          <div>
+            <label className="block text-sm font-semibold text-slate-800 mb-1.5">
               Şifre
             </label>
-            <div className="relative" >
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" >
-                <Lock size={16} />
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <Lock size={17} />
               </span>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Şifrenizi giriniz"
                 required
                 ref={passwordRef}
-                className="w-full py-2.5 pr-3 pl-9 rounded-lg border border-slate-200 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="w-full py-2.5 pr-11 pl-10 rounded-xl border border-slate-300 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors p-0.5 rounded cursor-pointer"
+                title={showPassword ? 'Şifreyi Gizle' : 'Şifreyi Göster'}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-5" >
-            <div className="flex items-center gap-2" >
+          <div className="flex items-center justify-between pt-1 pb-2">
+            <div className="flex items-center gap-2">
               <input
                 id="rememberMe"
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 cursor-pointer accent-blue-600"
+                className="w-4 h-4 cursor-pointer accent-indigo-600 rounded"
               />
-              <label className="text-sm text-slate-900 cursor-pointer select-none"
-                htmlFor="rememberMe"
-                
-              >
+              <label className="text-sm text-slate-700 cursor-pointer select-none font-medium" htmlFor="rememberMe">
                 Beni hatırla
               </label>
             </div>
-            <div className="flex items-center gap-1 text-slate-500 text-xs" >
-              <ShieldCheck size={14} />
+            <div className="flex items-center gap-1 text-slate-400 text-xs">
+              <ShieldCheck size={14} className="text-emerald-500" />
               <span>Güvenli Oturum</span>
             </div>
           </div>
 
-          <Button className="w-full py-2.5 px-4 text-sm rounded-lg flex items-center justify-center gap-2 bg-blue-600 text-white font-medium transition-colors hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 disabled:opacity-70 disabled:cursor-not-allowed"
+          <Button
+            className="w-full py-3 px-4 text-sm rounded-xl flex items-center justify-center gap-2 bg-indigo-600 text-white font-semibold transition-all hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-100 shadow-md shadow-indigo-600/20 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             type="submit"
             disabled={loading}
-            
           >
             <span>
               {loading
@@ -159,7 +167,7 @@ export default function LoginPage() {
                   : 'Giriş yapılıyor...'
                 : 'Giriş Yap'}
             </span>
-            {!loading && <ArrowRight size={16} />}
+            {!loading && <ArrowRight size={17} />}
           </Button>
         </form>
       </div>

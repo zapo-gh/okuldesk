@@ -3,6 +3,7 @@ import api from '../../../services/api';
 import toast from 'react-hot-toast';
 import { Printer, FileText } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
+import { DataTable, Column } from '../../../components/ui/DataTable';
 import { useReactToPrint } from 'react-to-print';
 import { AttendanceSheetPrintTemplate } from './print/AttendanceSheetPrintTemplate';
 
@@ -76,6 +77,69 @@ export default function AttendanceSheetPage() {
     documentTitle: 'Personel_Imza_Sirkusu'
   });
 
+  const getManagementRank = (person: Staff) => {
+    const text = ((person.unvan || '') + ' ' + (person.gorev || '') + ' ' + (person.role || '')).toLowerCase();
+    if (text.includes('başyardımcı') || (text.includes('müdür') && text.includes('baş'))) return 1;
+    if (text.includes('müdür') && text.includes('yardımcı')) return 2;
+    return 3;
+  };
+
+  const displayStaff = staff
+    .filter(person => {
+      const rank = getManagementRank(person);
+      if (rank < 3) return true;
+      return selectedUnvans.includes(person.unvan || 'Belirtilmemiş');
+    })
+    .sort((a, b) => {
+      const rankA = getManagementRank(a);
+      const rankB = getManagementRank(b);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name, 'tr');
+    })
+    .map((s, index) => ({ ...s, rowIndex: index + 1 }));
+
+  const columns: Column<Staff & { rowIndex: number }>[] = [
+    {
+      header: 'S.N',
+      className: 'w-16 text-center',
+      align: 'center',
+      render: (person) => <span className="font-semibold text-slate-500">{person.rowIndex}</span>,
+    },
+    {
+      header: 'Adı Soyadı',
+      render: (person) => (
+        <span className="font-semibold text-slate-900">{person.name}</span>
+      ),
+    },
+    {
+      header: 'Unvanı / Branşı',
+      render: (person) => {
+        const rank = getManagementRank(person);
+        let unvanStr = person.brans || '-';
+        if (rank === 1) {
+          unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Başyardımcısı';
+        } else if (rank === 2) {
+          unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Yardımcısı';
+        }
+        return (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${rank < 3 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'text-slate-700'}`}>
+            {unvanStr}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'İmza Alanı',
+      align: 'center',
+      className: 'w-48 text-center',
+      render: () => (
+        <div className="h-7 border border-dashed border-slate-300 rounded-md bg-slate-50/50 flex items-center justify-center text-xs text-slate-400">
+          İmza
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <PageHeader 
@@ -113,9 +177,12 @@ export default function AttendanceSheetPage() {
 
         {/* Unvan Filtreleri */}
         {staff.length > 0 && (
-          <div className="border-t pt-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Gösterilecek Unvanlar</label>
-            <div className="flex flex-wrap gap-4">
+          <div className="border-t border-slate-200 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-slate-700">Gösterilecek Unvanlar</label>
+              <span className="text-xs text-slate-500 font-medium">Seçili: {selectedUnvans.length} unvan</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {Array.from(new Set(staff.map(s => s.unvan || 'Belirtilmemiş')))
                 .sort((a, b) => {
                   const aIsTeacher = a.toLowerCase().includes('öğretmen') ? 0 : 1;
@@ -123,139 +190,81 @@ export default function AttendanceSheetPage() {
                   if (aIsTeacher !== bIsTeacher) return aIsTeacher - bIsTeacher;
                   return a.localeCompare(b, 'tr');
                 })
-                .map(unvan => (
-                <label key={unvan} className="flex items-center gap-2 text-sm cursor-pointer hover:text-indigo-600 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedUnvans.includes(unvan)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedUnvans(prev => [...prev, unvan]);
-                      } else {
-                        setSelectedUnvans(prev => prev.filter(u => u !== unvan));
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  />
-                  {unvan}
-                </label>
-              ))}
+                .map(unvan => {
+                  const isChecked = selectedUnvans.includes(unvan);
+                  return (
+                    <button
+                      key={unvan}
+                      type="button"
+                      onClick={() => {
+                        if (isChecked) setSelectedUnvans(prev => prev.filter(u => u !== unvan));
+                        else setSelectedUnvans(prev => [...prev, unvan]);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        isChecked 
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs' 
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {isChecked ? '✓ ' : '+ '}{unvan}
+                    </button>
+                  );
+                })}
             </div>
           </div>
         )}
 
         {/* İmza Sahipleri */}
-        <div className="border-t pt-4 flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Müdür Yardımcısı</label>
-            <input
-              type="text"
-              list="vp-list"
+        <div className="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Müdür Yardımcısı</label>
+            <select
               value={selectedVicePrincipal}
               onChange={(e) => setSelectedVicePrincipal(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 transition-shadow"
-              placeholder="Müdür Yardımcısı Seçiniz"
-            />
-            <datalist id="vp-list">
+              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 transition-shadow outline-none"
+            >
+              <option value="">— Müdür Yardımcısı Seçiniz —</option>
               {staff.filter(s => {
-                const text = (s.unvan || '') + ' ' + (s.gorev || '');
-                const lower = text.toLowerCase();
-                return lower.includes('müdür') && lower.includes('yardımcı');
+                const text = ((s.unvan || '') + ' ' + (s.gorev || '') + ' ' + (s.role || '')).toLowerCase();
+                return text.includes('müdür') && text.includes('yardımcı');
               }).map(vp => (
-                <option key={vp.id} value={vp.name} />
+                <option key={vp.id} value={vp.name}>{vp.name} ({vp.unvan || vp.gorev || 'Müdür Yrd.'})</option>
               ))}
-            </datalist>
+            </select>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Okul Müdürü</label>
-            <input
-              type="text"
-              list="principal-list"
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Okul Müdürü</label>
+            <select
               value={selectedPrincipal}
               onChange={(e) => setSelectedPrincipal(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 transition-shadow"
-              placeholder="Okul Müdürü Adı"
-            />
-            <datalist id="principal-list">
+              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 transition-shadow outline-none"
+            >
+              <option value="">— Okul Müdürü Seçiniz —</option>
               {staff.filter(s => {
-                const text = (s.unvan || '') + ' ' + (s.gorev || '');
-                const lower = text.toLowerCase();
-                return lower.includes('müdür') && !lower.includes('yardımcı');
+                const text = ((s.unvan || '') + ' ' + (s.gorev || '') + ' ' + (s.role || '')).toLowerCase();
+                return text.includes('müdür') && !text.includes('yardımcı');
               }).map(p => (
-                <option key={p.id} value={p.name} />
+                <option key={p.id} value={p.name}>{p.name} ({p.unvan || 'Okul Müdürü'})</option>
               ))}
-            </datalist>
+            </select>
           </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="p-8 text-center text-gray-500 animate-pulse">Yükleniyor...</div>
-      ) : (
-        <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <table className="w-full border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-center w-12 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">S.N</th>
-                <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Adı Soyadı</th>
-                <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Branşı</th>
-                <th className="text-center w-1/4 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İmza</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const getManagementRank = (person: Staff) => {
-                  const text = ((person.unvan || '') + ' ' + (person.gorev || '') + ' ' + (person.role || '')).toLowerCase();
-                  if (text.includes('başyardımcı') || (text.includes('müdür') && text.includes('baş'))) return 1; // Müdür Başyardımcısı
-                  if (text.includes('müdür') && text.includes('yardımcı')) return 2; // Müdür Yardımcısı
-                  return 3; // Diğer
-                };
-
-                const displayStaff = staff
-                  .filter(person => {
-                    const rank = getManagementRank(person);
-                    // İdareciler filtreye takılmadan hep listelensin
-                    if (rank < 3) return true;
-                    return selectedUnvans.includes(person.unvan || 'Belirtilmemiş');
-                  })
-                  .sort((a, b) => {
-                    const rankA = getManagementRank(a);
-                    const rankB = getManagementRank(b);
-                    if (rankA !== rankB) return rankA - rankB;
-                    return a.name.localeCompare(b.name, 'tr');
-                  });
-
-                return displayStaff.map((person, index) => {
-                  let unvanStr = person.brans || '-';
-                  const rank = getManagementRank(person);
-                  
-                  if (rank === 1) {
-                    unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Başyardımcısı';
-                  } else if (rank === 2) {
-                    unvanStr = (person.brans ? person.brans + ' / ' : '') + 'Müdür Yardımcısı';
-                  }
-
-                  return (
-                    <tr key={person.id} className="hover:bg-gray-50/50">
-                      <td className="border border-gray-300 p-1.5 text-center font-medium">{index + 1}</td>
-                      <td className="border border-gray-300 p-1.5 font-semibold">{person.name}</td>
-                      <td className="border border-gray-300 p-1.5 text-gray-800">{unvanStr}</td>
-                      <td className="border border-gray-300 p-1.5 h-10"></td>
-                    </tr>
-                  );
-                });
-              })()}
-              {staff.filter(person => selectedUnvans.includes(person.unvan || 'Belirtilmemiş')).length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    Sisteme kayıtlı personel bulunmuyor.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800 text-sm">Sirkü Önizleme Tablosu</h3>
+          <span className="text-xs font-semibold px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-full shadow-xs">
+            Toplam {displayStaff.length} Personel
+          </span>
         </div>
-      )}
+        <DataTable
+          data={displayStaff}
+          columns={columns}
+          loading={loading}
+          emptyMessage="Seçili unvan kriterlerine uygun personel bulunmuyor."
+        />
+      </div>
 
       {/* GİZLİ YAZDIRMA ŞABLONU */}
       <div className="hidden">

@@ -149,8 +149,7 @@ export default function SettingsPage() {
         description="Okul bilgileri, mesaj şablonları ve hesap güvenliğini yönetin."
         icon={<Settings size={28} />}
         actions={
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Button 
               variant="outline"
               onClick={async () => {
@@ -169,15 +168,15 @@ export default function SettingsPage() {
                 }
               }}
             >
-              <Save size={18} /> Veritabanı Yedeği İndir
+              <Save size={16} /> Veritabanı Yedeği İndir
             </Button>
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={isRestoring}
-              className="gap-2 border-amber-300 text-amber-50 hover:bg-amber-500/20"
+              className="gap-2 border-amber-300 text-amber-800 bg-amber-50/80 hover:bg-amber-100 font-medium"
             >
-              {isRestoring ? <span className="animate-spin text-lg">⚙️</span> : <UploadCloud size={18} />}
+              {isRestoring ? <span className="animate-spin text-sm">⚙️</span> : <UploadCloud size={16} />}
               Yedeği Geri Yükle
             </Button>
             <input
@@ -187,34 +186,32 @@ export default function SettingsPage() {
               accept=".db,.sqlite"
               className="hidden"
             />
-          </div>
-          
-          <Button
-            variant="outline"
-            className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 mt-2"
-            onClick={async () => {
-              try {
-                const { check } = await import('@tauri-apps/plugin-updater');
-                const toastId = toast.loading('Güncellemeler kontrol ediliyor...');
-                const update = await check();
-                if (update) {
-                  toast.success(`Yeni sürüm (${update.version}) bulundu! İndiriliyor...`, { id: toastId });
-                  await update.downloadAndInstall((event) => {
-                    if (event.event === 'Finished') {
-                      toast.success('Güncelleme indirildi. Kurulum başlatılıyor...', { id: toastId, duration: 8000 });
-                    }
-                  });
-                } else {
-                  toast.success('Sisteminiz güncel. En son sürümü kullanıyorsunuz.', { id: toastId });
+            <Button
+              variant="outline"
+              className="text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
+              onClick={async () => {
+                try {
+                  const { check } = await import('@tauri-apps/plugin-updater');
+                  const toastId = toast.loading('Güncellemeler kontrol ediliyor...');
+                  const update = await check();
+                  if (update) {
+                    toast.success(`Yeni sürüm (${update.version}) bulundu! İndiriliyor...`, { id: toastId });
+                    await update.downloadAndInstall((event) => {
+                      if (event.event === 'Finished') {
+                        toast.success('Güncelleme indirildi. Kurulum başlatılıyor...', { id: toastId, duration: 8000 });
+                      }
+                    });
+                  } else {
+                    toast.success('Sisteminiz güncel. En son sürümü kullanıyorsunuz.', { id: toastId });
+                  }
+                } catch (error: any) {
+                  toast.error('Güncelleme kontrolü başarısız: ' + error.toString());
                 }
-              } catch (error: any) {
-                toast.error('Güncelleme kontrolü başarısız: ' + error.toString());
-              }
-            }}
-          >
-            🔄 Güncellemeleri Kontrol Et
-          </Button>
-        </div>
+              }}
+            >
+              🔄 Güncellemeleri Denetle
+            </Button>
+          </div>
         }
       />
 

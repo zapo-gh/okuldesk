@@ -92,7 +92,7 @@ export default function DashboardPage() {
     { icon: Briefcase,     value: data.commissionsCount,               label: 'Aktif Komisyon',    color: 'text-orange-600',  bg: 'bg-orange-50',  path: '/admin/commission' },
     { icon: Clock,         value: data.dutyCount,                      label: 'Nöbet Yeri',        color: 'text-purple-600',  bg: 'bg-purple-50',  path: '/admin/duty-schedule' },
     { icon: FileText,      value: data.absenteeism.total,              label: 'Devamsızlık Kaydı', color: 'text-cyan-600',    bg: 'bg-cyan-50',    path: '/admin/absenteeism' },
-    { icon: AlertTriangle, value: data.warnings.total,                 label: 'Yazılı Uyardı',    color: 'text-amber-600',   bg: 'bg-amber-50',   path: '/admin/warnings' },
+    { icon: AlertTriangle, value: data.warnings.total,                 label: 'Yazılı Uyarı',      color: 'text-amber-600',   bg: 'bg-amber-50',   path: '/admin/warnings' },
     { icon: ShieldAlert,   value: data.violations.confirmedViolations, label: 'Onaylı İhlal',     color: 'text-red-600',     bg: 'bg-red-50',     path: '/admin/violations' },
   ];
 
@@ -103,17 +103,17 @@ export default function DashboardPage() {
         description={`${data.schoolName || 'OkulDesk Yönetim Paneli'}${data.principalName ? ` · Müdür: ${data.principalName}` : ''}`}
         icon={<LayoutDashboard size={28} />}
         actions={
-          <>
+          <div className="flex items-center gap-2">
             <Link
               to="/admin/settings"
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 text-slate-700"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 text-slate-700 shadow-xs transition"
             >
               <Settings size={15} /> Ayarlar
             </Link>
             <Button variant="outline" size="sm" onClick={load} className="flex items-center gap-1.5 px-3.5 py-2 text-sm">
               <RefreshCw size={15} /> Yenile
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -137,15 +137,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+      <section className="mb-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
         {cards.map(({ icon: Icon, value, label, color, bg, path }) => (
           <Link
             key={label}
             to={path}
-            className="flex min-h-[108px] items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="flex min-h-[96px] items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300"
           >
-            <div><div className="mb-1 text-xs font-medium text-slate-500">{label}</div><div className={`text-2xl font-bold ${color}`}>{value}</div></div>
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}><Icon size={20} className={color} /></div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-slate-500">{label}</div>
+              <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            </div>
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${bg}`}><Icon size={20} className={color} /></div>
           </Link>
         ))}
       </section>
@@ -156,7 +159,7 @@ export default function DashboardPage() {
           <MiniStat value={data.absenteeism.sentCount} label="Gönderildi" className="text-green-600" />
           <MiniStat value={data.absenteeism.total} label="Toplam" className="text-indigo-600" />
         </DetailCard>
-        <DetailCard title="Yazılı Uyardılar" icon={AlertTriangle} to="/admin/warnings" cols={2}>
+        <DetailCard title="Yazılı Uyarılar" icon={AlertTriangle} to="/admin/warnings" cols={2}>
           <MiniStat value={data.warnings.total} label="Toplam" className="text-amber-600" />
           <MiniStat value={data.warnings.studentsWithWarnings} label="Öğrenci" className="text-purple-600" />
         </DetailCard>

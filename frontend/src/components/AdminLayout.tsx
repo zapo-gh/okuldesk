@@ -1,8 +1,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import {
   LayoutDashboard,
+  Search,
   Users,
   UserCheck,
   Mail,
@@ -79,6 +81,7 @@ function NavItem({ to, icon: Icon, label, onClick, collapsed, end }: NavItemProp
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobil drawer için
   const [collapsed, setCollapsed] = useState(false); // Masaüstü yan menü daraltma
@@ -199,7 +202,7 @@ export default function AdminLayout() {
         </div>
 
         {/* Menü Öğeleri */}
-        <nav className={`flex-1 overflow-y-auto flex flex-col ${collapsed ? 'py-3 px-2' : 'py-3 px-2.5'}`}>
+        <nav className={`flex-1 overflow-y-auto flex flex-col scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 ${collapsed ? 'py-3 px-2' : 'py-3 px-2.5'}`}>
           {/* Genel */}
           {!collapsed && <span className="text-xs font-bold text-cyan-300/80 uppercase tracking-wider mb-2 mt-1 px-3">Genel</span>}
           {collapsed && <div className="h-2" />}
@@ -310,18 +313,58 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 h-screen flex flex-col transform translate-x-0 bg-slate-200 print:h-auto print:bg-white print:p-0 print:transform-none">
+      <main className="flex-1 h-screen flex flex-col transform translate-x-0 bg-slate-100/75 print:h-auto print:bg-white print:p-0 print:transform-none">
+        {/* Sabit Başlık Alanı (Kaydırma dışı, asla yukarı kaymaz ve içerik altına girmez) */}
+        <div id="page-header-slot" className="shrink-0 px-4 md:px-6 pt-3 pb-1 empty:hidden print:hidden" />
+
         <div className="flex-1 overflow-y-auto print:overflow-visible">
           <Suspense fallback={
-            <div className="flex h-full w-full items-center justify-center min-h-screen bg-slate-200">
+            <div className="flex h-full w-full items-center justify-center min-h-screen bg-slate-100/75">
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent opacity-60" />
             </div>
           }>
-            <div className="p-6 md:p-8 print:p-0">
+            <div className="px-4 md:px-6 pt-2 pb-6 print:p-0">
               <Outlet />
             </div>
           </Suspense>
         </div>
+
+        {/* Alt Bilgi / Durum Çubuğu (Yarı Yükseklik h-8) */}
+        <footer className="h-8 px-4 md:px-6 border-t border-slate-200/80 bg-white/90 backdrop-blur-md flex items-center justify-between shrink-0 z-20 print:hidden select-none">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="text-slate-800 font-bold text-xs truncate max-w-[280px] sm:max-w-md">
+              {settings?.schoolName || 'OkulDesk'}
+            </span>
+            {settings?.academicYear && (
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold border border-slate-200 shrink-0">
+                {settings.academicYear}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+              }}
+              className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50/90 hover:bg-white hover:border-slate-300 text-slate-500 hover:text-slate-800 text-[11px] font-medium transition cursor-pointer"
+              title="Hızlı Arama ve Komut Paleti (Ctrl + K)"
+            >
+              <Search size={12} className="text-slate-400" />
+              <span>Hızlı Arama...</span>
+              <kbd className="ml-1 px-1 py-0 text-[9px] font-mono bg-white border border-slate-200 rounded text-slate-500">
+                Ctrl K
+              </kbd>
+            </button>
+
+            <div className="hidden lg:flex items-center gap-1.5 text-[11px] font-medium text-slate-500 pl-2.5 border-l border-slate-200">
+              <CalendarDays size={12} className="text-indigo-600" />
+              <span>{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' }).format(new Date())}</span>
+            </div>
+          </div>
+        </footer>
       </main>
     </div>
   );

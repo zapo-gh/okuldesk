@@ -180,39 +180,55 @@ export default function MatbuEvraklarPage() {
                   setIsDropdownOpen(true);
                 }}
                 onFocus={() => setIsDropdownOpen(true)}
-                onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
               />
               
+              {(selectedStudentId || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStudentId('');
+                    setSearchQuery('');
+                    setIsDropdownOpen(false);
+                  }}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                  title="Seçimi Temizle"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              
               {isDropdownOpen && (
-                <div className="w-full mt-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-64 overflow-y-auto animate-in fade-in duration-100">
                   <div 
-                    className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 cursor-pointer"
+                    className="px-4 py-2.5 text-xs font-semibold text-slate-400 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => {
                       setSelectedStudentId('');
                       setSearchQuery('');
                       setIsDropdownOpen(false);
                     }}
                   >
-                    -- Öğrenci Seçimini Temizle --
+                    ✕ Öğrenci Seçimini Temizle (Boş Form)
                   </div>
                   {Array.isArray(students) && students
                     .filter(s => `${s.className || ''} ${s.schoolNumber || ''} ${s.fullName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .slice(0, 30)
                     .map(s => (
                     <div 
                       key={s.id} 
-                      className="px-4 py-2 text-sm hover:bg-indigo-50 cursor-pointer text-gray-700"
+                      className="px-4 py-2.5 text-sm hover:bg-indigo-50 cursor-pointer text-slate-700 border-b border-slate-50 last:border-0 transition-colors"
                       onClick={() => {
                         setSelectedStudentId(s.id);
                         setSearchQuery('');
                         setIsDropdownOpen(false);
                       }}
                     >
-                      {s.className ? `${s.className} - ` : ''} {s.schoolNumber} - {s.fullName}
+                      <span className="font-semibold text-indigo-900">{s.className ? `${s.className} - ` : ''}{s.schoolNumber}</span>
+                      <span className="ml-2 font-medium text-slate-800">{s.fullName}</span>
                     </div>
                   ))}
                   {Array.isArray(students) && students.filter(s => `${s.className || ''} ${s.schoolNumber || ''} ${s.fullName || ''}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                    <div className="px-4 py-2 text-sm text-gray-500 italic">
+                    <div className="px-4 py-3 text-sm text-slate-500 italic text-center">
                       Öğrenci bulunamadı.
                     </div>
                   )}

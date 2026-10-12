@@ -372,11 +372,11 @@ export default function CommissionPage() {
                      </Button>
                   </div>
                   {formData.roles.map((item: any, idx: number) => (
-                    <div key={item.id} className="p-4 flex items-center space-x-4 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div key={item.id} className="group p-4 flex items-center space-x-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-slate-300 transition-colors">
                       
                       <div className="flex-1">
                         <label className="block text-xs font-medium text-slate-500 mb-1">Görev Adı</label>
-                        <input type="text" value={item.roleName} onChange={(e) => updateRole(item.id, 'roleName', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Örn: Başkan" />
+                        <input type="text" value={item.roleName} onChange={(e) => updateRole(item.id, 'roleName', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: Başkan" />
                       </div>
                       <div className="flex-1">
                         <label className="block text-xs font-medium text-slate-500 mb-1">Personel Seçimi veya Harici Üye</label>
@@ -385,7 +385,7 @@ export default function CommissionPage() {
                           list={`staff-list-${item.id}`}
                           value={item.staffName} 
                           onChange={(e) => updateRole(item.id, 'staffName', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
                           placeholder="Listeden seçin veya adını yazın..."
                         />
                         <datalist id={`staff-list-${item.id}`}>
@@ -393,9 +393,14 @@ export default function CommissionPage() {
                         </datalist>
                       </div>
 
-                      <Button onClick={() => removeRole(item.id)} className="mt-5 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => removeRole(item.id)}
+                        className="mt-5 p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        title="Görevi/Üyeyi Kaldır"
+                      >
                         <X className="w-5 h-5" />
-                      </Button>
+                      </button>
                     </div>
                   ))}
                   {formData.roles.length === 0 && (

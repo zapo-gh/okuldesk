@@ -4,7 +4,7 @@ import api from '../../services/api';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
 import { printPdfBlob } from '../../utils/printPdf';
-import { FileSignature, CheckSquare, Square, Download, Users, Calendar, BookOpen, UserCheck, Search, Loader2, Printer } from 'lucide-react';
+import { FileSignature, CheckSquare, Square, Download, Users, Calendar, BookOpen, UserCheck, Search, Loader2, Printer, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export default function ParentMeetingPage() {
@@ -108,14 +108,24 @@ export default function ParentMeetingPage() {
             
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input 
                   type="text" 
                   placeholder="Sınıf Ara..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 w-full sm:w-48"
+                  className="pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full sm:w-48"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+                    title="Temizle"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button 
