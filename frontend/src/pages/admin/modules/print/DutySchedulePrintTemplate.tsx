@@ -43,11 +43,35 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
   ({ stations, staffList, assignments, staffConfigs = [], monthName = 'Aylık', year, workDays = [] }, ref) => {
     const { settings } = useSettings();
 
-    const getStaffName = (stationId: string, dayOfWeek: number, weekNum: number) => {
-      const a = assignments.find(a => a.stationId === stationId && a.dayOfWeek === dayOfWeek && a.weekNumber === weekNum);
-      if (!a) return '';
-      const s = staffList.find(s => s.id === a.staffId);
-      return s ? s.name : '';
+    const getStaffNames = (stationId: string, dayOfWeek: number, weekNum: number) => {
+      const cellAsgns = assignments.filter(a => {
+        const aWeek = a.weekNumber !== undefined && a.weekNumber !== null ? Number(a.weekNumber) : 0;
+        return a.stationId === stationId && a.dayOfWeek === dayOfWeek && aWeek === Number(weekNum);
+      });
+      if (cellAsgns.length === 0) return '';
+      return cellAsgns
+        .map(a => {
+          const s = staffList.find(st => st.id === a.staffId);
+          return s ? s.name : '';
+        })
+        .filter(Boolean)
+        .join(', ');
+    };
+
+    const getWeekFingerprint = (weekNum: number) => {
+      return stations.map(st => {
+        return DAYS.map(d => {
+          const staffIds = assignments
+            .filter(a => {
+              const aWeek = a.weekNumber !== undefined && a.weekNumber !== null ? Number(a.weekNumber) : 0;
+              return a.stationId === st.id && a.dayOfWeek === d.val && aWeek === Number(weekNum);
+            })
+            .map(a => a.staffId)
+            .sort()
+            .join(',');
+          return `${st.id}_${d.val}:${staffIds}`;
+        }).join(';');
+      }).join('|');
     };
 
     // Haftalara böl
@@ -58,11 +82,50 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
     });
     const weekList = weeks.filter(Boolean).filter(week => {
       // Sadece en az bir atama içeren haftaları tut
-      return assignments.some(a => a.weekNumber === week[0].weekNum);
+      return assignments.some(a => Number(a.weekNumber ?? 0) === Number(week[0].weekNum));
+    });
+
+    // Hafta grupları: Ardışık aynı nöbet dağılımına sahip haftaları birleştir
+    interface WeekGroup {
+      weekIndices: number[]; // 1-tabanlı hafta sırası (ör. [1, 2])
+      weekNums: number[];
+      weeks: WorkDay[][];
+      firstDay: WorkDay;
+      lastDay: WorkDay;
+      fingerprint: string;
+    }
+
+    const weekGroups: WeekGroup[] = [];
+
+    weekList.forEach((week, idx) => {
+      const weekNum = week[0].weekNum;
+      const fp = getWeekFingerprint(weekNum);
+      const displayIdx = idx + 1;
+
+      const prevGroup = weekGroups[weekGroups.length - 1];
+      if (prevGroup && prevGroup.fingerprint === fp) {
+        prevGroup.weekIndices.push(displayIdx);
+        prevGroup.weekNums.push(weekNum);
+        prevGroup.weeks.push(week);
+        prevGroup.lastDay = week[week.length - 1];
+      } else {
+        weekGroups.push({
+          weekIndices: [displayIdx],
+          weekNums: [weekNum],
+          weeks: [week],
+          firstDay: week[0],
+          lastDay: week[week.length - 1],
+          fingerprint: fp,
+        });
+      }
     });
 
     // Eski mod (workDays yok)
     const legacyMode = workDays.length === 0;
+
+    // Ay içerisinde nöbet yerleri değişmiyor mu?
+    // Eğer tüm haftaların dağılımı aynıysa (en fazla 1 grup varsa) nöbet yeri değişmiyordur.
+    const isUniformMonth = !legacyMode && weekGroups.length <= 1;
 
     return (
       <PrintableDocument ref={ref} landscape={true}>
@@ -79,12 +142,12 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
 
         {legacyMode ? (
           /* Eski haftalık mod */
-          <table className="w-full border-collapse border border-black text-xs text-center">
+          <table className="w-full border-collapse border border-black text-xs text-center" style={{ pageBreakInside: 'avoid' }}>
             <thead>
               <tr className="bg-gray-100">
-                <th className="w-36 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Nöbet Yeri</th>
+                <th className="w-44 text-left px-3 py-2 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border border-black">Nöbet Yeri</th>
                 {DAYS.map(d => (
-                  <th key={d.val} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">{d.label}</th>
+                  <th key={d.val} className="text-center px-3 py-2 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border border-black">{d.label}</th>
                 ))}
               </tr>
             </thead>
@@ -94,68 +157,106 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
                   <td className="border border-black p-2 font-bold text-left">{st.name}</td>
                   {DAYS.map(d => (
                     <td key={d.val} className="border border-black p-2">
-                      {getStaffName(st.id, d.val, 0)}
+                      {getStaffNames(st.id, d.val, 0)}
                     </td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
-        ) : (
-          /* Aylık mod — haftalara göre bölünmüş */
-          weekList.map((week, wIdx) => (
-            <div key={wIdx} className={wIdx > 0 ? 'mt-4' : ''}>
-              <div className="bg-gray-100 px-3 py-1 text-xs font-bold uppercase text-gray-600 border border-black border-b-0">
-                {(() => {
-                  const firstDay = week[0];
-                  const lastDay = week[week.length - 1];
-                  const mNameFirst = firstDay.monthName || monthName;
-                  const mNameLast = lastDay.monthName || monthName;
-                  if (mNameFirst !== mNameLast) {
-                    return `${wIdx + 1}. Hafta — ${firstDay.dayNum} ${mNameFirst} - ${lastDay.dayNum} ${mNameLast} ${year}`;
-                  }
-                  return `${wIdx + 1}. Hafta — ${firstDay.dayNum}-${lastDay.dayNum} ${mNameFirst} ${year}`;
-                })()}
-              </div>
-              <table className="w-full border-collapse border border-black text-xs text-center">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="w-36 text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Nöbet Yeri</th>
-                    {DAYS.map(day => {
-                      const d = week.find(w => w.dayOfWeek === day.val);
-                      return (
-                        <th key={day.val} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
-                          <div>{day.label}</div>
-                          <div className="font-bold text-gray-700">{d ? d.dayNum : '-'}</div>
-                        </th>
-                      );
-                    })}
+        ) : isUniformMonth ? (
+          /* Ay içerisinde nöbet yeri değişmiyorsa: Sadece 1 tablo, ayın gününü belirtmeden */
+          <div style={{ pageBreakInside: 'avoid' }}>
+            <table className="w-full border-collapse border border-black text-xs text-center">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="w-44 text-left px-3 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-100 border border-black">
+                    Nöbet Yeri
+                  </th>
+                  {DAYS.map(day => (
+                    <th key={day.val} className="text-center px-3 py-2.5 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-100 border border-black">
+                      {day.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {stations.map(st => (
+                  <tr key={st.id}>
+                    <td className="border border-black p-2 font-bold text-left pl-2">{st.name}</td>
+                    {DAYS.map(day => (
+                      <td key={`cell-${day.val}`} className="border border-black p-2 font-medium">
+                        {getStaffNames(st.id, day.val, weekGroups[0]?.weekNums[0] ?? 0)}
+                      </td>
+                    ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {stations.map(st => (
-                    <tr key={st.id}>
-                      <td className="border border-black p-1.5 font-bold text-left pl-2">{st.name}</td>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* Ay içerisinde rotasyon olup yerler değişiyorsa: Değişen nöbet dönemlerini göster */
+          weekGroups.map((group, gIdx) => {
+            const firstDay = group.firstDay;
+            const lastDay = group.lastDay;
+            const mNameFirst = firstDay.monthName || monthName;
+            const mNameLast = lastDay.monthName || monthName;
+            const dateRangeStr = mNameFirst !== mNameLast
+              ? `${firstDay.dayNum} ${mNameFirst} - ${lastDay.dayNum} ${mNameLast} ${year}`
+              : `${firstDay.dayNum}-${lastDay.dayNum} ${mNameFirst} ${year}`;
+            
+            const weekLabel = group.weekIndices.length === 1
+              ? `${group.weekIndices[0]}. HAFTA`
+              : group.weekIndices.length === 2
+                ? `${group.weekIndices[0]}. VE ${group.weekIndices[1]}. HAFTA`
+                : `${group.weekIndices[0]}. - ${group.weekIndices[group.weekIndices.length - 1]}. HAFTA`;
+
+            const isSingleWeek = group.weeks.length === 1;
+
+            return (
+              <div key={gIdx} className={`${gIdx > 0 ? 'mt-4' : ''}`} style={{ pageBreakInside: 'avoid' }}>
+                <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold uppercase text-gray-700 border border-black border-b-0">
+                  {weekLabel} — {dateRangeStr}
+                </div>
+                <table className="w-full border-collapse border border-black text-xs text-center">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="w-44 text-left px-3 py-2 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border border-black">
+                        Nöbet Yeri
+                      </th>
                       {DAYS.map(day => {
-                        const d = week.find(w => w.dayOfWeek === day.val);
+                        const d = isSingleWeek ? group.weeks[0]?.find(w => w.dayOfWeek === day.val) : null;
                         return (
-                          <td key={`cell-${day.val}`} className="border border-black p-1.5">
-                            {d ? getStaffName(st.id, d.dayOfWeek, d.weekNum) : '-'}
-                          </td>
+                          <th key={day.val} className="text-center px-3 py-2 text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border border-black">
+                            <div>{day.label}</div>
+                            {d && <div className="font-bold text-gray-800 text-[11px]">{d.dayNum}</div>}
+                          </th>
                         );
                       })}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))
+                  </thead>
+                  <tbody>
+                    {stations.map(st => (
+                      <tr key={st.id}>
+                        <td className="border border-black p-1.5 font-bold text-left pl-2">{st.name}</td>
+                        {DAYS.map(day => (
+                          <td key={`cell-${day.val}`} className="border border-black p-1.5 font-medium">
+                            {getStaffNames(st.id, day.val, group.weekNums[0])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })
         )}
 
 
 
         {/* Görev notu */}
-        <div className="mt-5 text-xs text-justify">
+        <div className="mt-5 text-xs text-justify" style={{ pageBreakInside: 'avoid' }}>
           <p>
             <strong>Nöbetçi Öğretmenlerin Görevleri:</strong><br />
             1. Nöbet görevi, ilk dersten 15 dakika önce başlar, son ders bitiminden 15 dakika sonra biter.<br />
@@ -175,15 +276,15 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
             .filter(c => c.name);
           if (exemptStaff.length === 0) return null;
           return (
-            <div className="mt-4 border border-gray-300 rounded p-3 text-xs">
+            <div className="mt-4 border border-gray-300 rounded p-3 text-xs" style={{ pageBreakInside: 'avoid' }}>
               <p className="font-bold text-xs uppercase mb-2">Nöbet Muaf Personel Listesi</p>
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Personel</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Muafiyet Gerekçesi</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Bitiş Tarihi</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Not</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Personel</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Muafiyet Gerekçesi</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Bitiş Tarihi</th>
+                    <th className="text-left px-4 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Not</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,14 +299,14 @@ export const DutySchedulePrintTemplate = forwardRef<HTMLDivElement, DutySchedule
                 </tbody>
               </table>
               <p className="mt-1 text-gray-500" style={{fontSize:'9px'}}>
-                * MEB Ortaoğretim Kurumları Yönetmeliği gereğince nöbet muafiyeti tanınmıştır.
+                * MEB Ortaöğretim Kurumları Yönetmeliği gereğince nöbet muafiyeti tanınmıştır.
               </p>
             </div>
           );
         })()}
 
         {/* İmza */}
-        <table className="w-full text-center border-none mt-6">
+        <table className="w-full text-center border-none mt-6" style={{ pageBreakInside: 'avoid' }}>
           <tbody>
             <tr>
               <td className="border-none w-1/2 align-bottom h-20">

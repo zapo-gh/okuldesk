@@ -7,7 +7,7 @@ import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert } from 'lucide-react';
+import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X } from 'lucide-react';
 import { Student, ParsedStudent, ImportResult, ParentPreviewRow, ParentImportResult } from './students/types';
 import { StudentNewModal } from './students/StudentNewModal';
 import { StudentEditModal } from './students/StudentEditModal';
@@ -26,6 +26,7 @@ export default function StudentListPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [search, setSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
@@ -52,7 +53,7 @@ export default function StudentListPage() {
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [editForm, setEditForm] = useState({ fullName: '', className: '', status: 'ACTIVE', schoolNumber: '' });
   const [editParents, setEditParents] = useState<{ id: string; fullName: string; phone: string }[]>([]);
-  const [newEditParent, setNewEditParent] = useState<{ fullName: string; phone: string } | null>(null);
+  const [newEditParents, setNewEditParents] = useState<{ tempId: string; fullName: string; phone: string }[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -326,7 +327,7 @@ export default function StudentListPage() {
       schoolNumber: student.schoolNumber,
     });
     setEditParents(student.parents.map((p) => ({ ...p })));
-    setNewEditParent(null);
+    setNewEditParents([]);
     setEditError('');
     setShowEditModal(true);
   };
@@ -338,32 +339,66 @@ export default function StudentListPage() {
     setEditError('');
 
     try {
+      const trimmedNumber = editForm.schoolNumber.trim();
+      const trimmedName = editForm.fullName.trim();
+      const trimmedClass = editForm.className.trim();
+
       await api.put(`/students/${editStudent.id}`, {
-        fullName: editForm.fullName,
-        className: editForm.className,
+        schoolNumber: trimmedNumber,
+        fullName: trimmedName,
+        className: trimmedClass,
         status: editForm.status,
       });
+
+      // Optimistik güncelleme ile arayüz anında güncellensin
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.id === editStudent.id
+            ? {
+                ...s,
+                schoolNumber: trimmedNumber,
+                fullName: trimmedName,
+                className: trimmedClass,
+                status: editForm.status,
+              }
+            : s
+        )
+      );
 
       for (const p of editParents) {
         if (p.id) {
           await api.put(`/students/parents/${p.id}`, {
-            fullName: p.fullName,
-            phone: p.phone,
+            fullName: p.fullName.trim(),
+            phone: p.phone.trim(),
           });
         }
       }
 
-      if (newEditParent && newEditParent.fullName.trim() && newEditParent.phone.trim()) {
-        const response = await api.post(`/students/${editStudent.id}/parents`, {
-          fullName: newEditParent.fullName.trim(),
-          phone: newEditParent.phone.trim(),
-        });
+      // Yeni eklenen tüm velileri sırayla kaydet
+      for (const np of newEditParents) {
+        if (np.fullName.trim() && np.phone.trim()) {
+          const response = await api.post(`/students/${editStudent.id}/parents`, {
+            fullName: np.fullName.trim(),
+            phone: np.phone.trim(),
+          });
 
-        if (response.data?.data?.generatedPassword) {
-          toast(`✅ Yeni veli hesabı oluşturuldu.\n\nGeçici Şifre: ${response.data.data.generatedPassword}\n\nLütfen bu şifreyi veliye iletin. Veli ilk girişinde şifresini değiştirmek zorundadır.`);
-        } else if (response.data?.data?.isExistingUser) {
-          toast(`ℹ️ Bu telefon numarası zaten sistemde kayıtlı.\n\nVeli mevcut hesabıyla bağlandı. Şifre değiştirilmedi.`);
+          if (response.data?.data?.generatedPassword) {
+            toast(`✅ ${np.fullName.trim()} için yeni veli hesabı oluşturuldu.\n\nGeçici Şifre: ${response.data.data.generatedPassword}\n\nLütfen bu şifreyi veliye iletin. Veli ilk girişinde şifresini değiştirmek zorundadır.`);
+          } else if (response.data?.data?.isExistingUser) {
+            toast(`ℹ️ ${np.fullName.trim()} (${np.phone.trim()}) zaten kayıtlı.\nVeli mevcut hesabıyla bağlandı. Şifre değiştirilmedi.`);
+          }
         }
+      }
+
+      const isNumberChanged = trimmedNumber !== editStudent.schoolNumber;
+      toast.success(
+        isNumberChanged
+          ? `Öğrenci okul numarası (${trimmedNumber}) ve bilgileri başarıyla güncellendi.`
+          : 'Öğrenci bilgileri güncellendi.'
+      );
+
+      if (trimmedClass !== editStudent.className) {
+        fetchClasses();
       }
 
       setShowEditModal(false);
@@ -512,14 +547,34 @@ export default function StudentListPage() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Search & Tabs */}
         <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="max-w-md mb-4">
+          <div className="relative max-w-md mb-4">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search size={16} />
+            </div>
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Öğrenci ara (ad, numara, sınıf)..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm"
+              className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm bg-white text-slate-900 placeholder:text-slate-400"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setPage(1);
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                title="Aramayı Temizle"
+              >
+                <span className="p-1 rounded-full hover:bg-slate-100 flex items-center justify-center">
+                  <X size={15} />
+                </span>
+              </button>
+            )}
           </div>
 
           {!loading && displayClasses.length > 0 && (
@@ -527,25 +582,30 @@ export default function StudentListPage() {
               {/* Normal Sınıflar */}
               <div className="flex flex-wrap gap-2 overflow-x-auto">
                 {displayClasses.filter(c => !(c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A '))).map((cls) => {
-                  const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
+                  const isHighlighted = activeClass === cls.name;
 
                   return (
-                    <Button
+                    <button
+                      type="button"
                       key={cls.name}
-                      variant={isHighlighted ? 'primary' : 'outline'}
-                      size="sm"
                       onClick={() => { 
                         setActiveClass(cls.name); 
                         setSelectedIds(new Set()); 
                         setPage(1); 
                       }}
-                      className="rounded-full shrink-0"
+                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer outline-none focus:outline-none select-none border ${
+                        isHighlighted
+                          ? 'bg-indigo-600 text-white shadow-sm border-indigo-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/90 hover:border-slate-300'
+                      }`}
                     >
                       {cls.name}
-                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                        isHighlighted ? 'bg-indigo-700/60 text-indigo-50' : 'bg-slate-100 text-slate-500'
+                      }`}>
                         {cls.count}
                       </span>
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
@@ -554,25 +614,30 @@ export default function StudentListPage() {
               {displayClasses.some(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')) && (
                 <div className="flex flex-wrap gap-2 overflow-x-auto pt-2 border-t border-gray-100">
                   {displayClasses.filter(c => c.name.toUpperCase().startsWith('A-') || c.name.toUpperCase().startsWith('A ')).map((cls) => {
-                    const isHighlighted = search ? activeClass === cls.name : activeClass === cls.name;
+                    const isHighlighted = activeClass === cls.name;
 
                     return (
-                      <Button
+                      <button
+                        type="button"
                         key={cls.name}
-                        variant={isHighlighted ? 'primary' : 'outline'}
-                        size="sm"
                         onClick={() => { 
                           setActiveClass(cls.name); 
                           setSelectedIds(new Set()); 
                           setPage(1); 
                         }}
-                        className="rounded-full shrink-0"
+                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all shrink-0 cursor-pointer outline-none focus:outline-none select-none border ${
+                          isHighlighted
+                            ? 'bg-indigo-600 text-white shadow-sm border-indigo-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/90 hover:border-slate-300'
+                        }`}
                       >
                         {cls.name}
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${isHighlighted ? 'bg-indigo-700/50 text-indigo-50' : 'bg-gray-100 text-gray-500'}`}>
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                          isHighlighted ? 'bg-indigo-700/60 text-indigo-50' : 'bg-slate-100 text-slate-500'
+                        }`}>
                           {cls.count}
                         </span>
-                      </Button>
+                      </button>
                     );
                   })}
                 </div>
@@ -666,9 +731,10 @@ export default function StudentListPage() {
         setEditForm={setEditForm}
         editParents={editParents}
         setEditParents={setEditParents}
-        newEditParent={newEditParent}
-        setNewEditParent={setNewEditParent}
+        newEditParents={newEditParents}
+        setNewEditParents={setNewEditParents}
         handleRemoveParent={handleRemoveParent}
+        originalSchoolNumber={editStudent?.schoolNumber || ''}
       />
 
       {/* Excel Import Modal */}

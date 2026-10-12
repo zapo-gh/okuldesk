@@ -17,6 +17,8 @@ const updateSchema = z.object({
   dutyRotationFreq: z.string().optional(),
   dutyRotationDates: z.string().optional(),
   dutyStartDate: z.string().nullable().optional(),
+  dutyRoomStationMap: z.string().optional(),
+  classDisplayMap: z.string().optional(),
   lastRotationDate: z.string().nullable().optional(),
 });
 

@@ -15,6 +15,7 @@ const createStudentSchema = z.object({
 });
 
 const updateStudentSchema = z.object({
+  schoolNumber: z.string().trim().min(1, 'Okul numarası boş bırakılamaz.').optional(),
   fullName: z.string().trim().min(1).optional(),
   className: z.string().trim().min(1).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
@@ -60,7 +61,7 @@ export class StudentsController {
     try {
       const parsed = updateStudentSchema.safeParse(req.body);
       if (!parsed.success) throw new AppError(parsed.error.errors[0].message, 400);
-      res.json({ success: true, data: await studentsService.update(req.params.id, parsed.data) });
+      res.json({ success: true, data: await studentsService.update(req.params.id, parsed.data, req.user?.userId) });
     } catch (error) { next(error); }
   }
 

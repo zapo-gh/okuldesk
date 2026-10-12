@@ -24,6 +24,8 @@ class SettingsService {
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
       dutyRotationDates: settings.dutyRotationDates ?? '[]',
       dutyStartDate: settings.dutyStartDate ?? null,
+      dutyRoomStationMap: (settings as any).dutyRoomStationMap ?? '{}',
+      classDisplayMap: (settings as any).classDisplayMap ?? '{}',
       lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
     };
   }
@@ -38,6 +40,8 @@ class SettingsService {
     dutyRotationFreq?: string;
     dutyRotationDates?: string;
     dutyStartDate?: string | null;
+    dutyRoomStationMap?: string;
+    classDisplayMap?: string;
     lastRotationDate?: string | null;
   }) {
     const settings = await prisma.schoolSettings.upsert({
@@ -53,7 +57,9 @@ class SettingsService {
         dutyRotationFreq: data.dutyRotationFreq ?? 'weekly',
         dutyRotationDates: data.dutyRotationDates ?? '[]',
         dutyStartDate: data.dutyStartDate ?? null,
-      },
+        dutyRoomStationMap: data.dutyRoomStationMap ?? '{}',
+        classDisplayMap: data.classDisplayMap ?? '{}',
+      } as any,
       update: {
         ...(data.schoolName !== undefined && { schoolName: data.schoolName }),
         ...(data.principalName !== undefined && { principalName: data.principalName }),
@@ -64,10 +70,12 @@ class SettingsService {
         ...(data.dutyRotationFreq !== undefined && { dutyRotationFreq: data.dutyRotationFreq }),
         ...(data.dutyRotationDates !== undefined && { dutyRotationDates: data.dutyRotationDates }),
         ...(data.dutyStartDate !== undefined && { dutyStartDate: data.dutyStartDate }),
+        ...(data.dutyRoomStationMap !== undefined && { dutyRoomStationMap: data.dutyRoomStationMap }),
+        ...(data.classDisplayMap !== undefined && { classDisplayMap: data.classDisplayMap }),
         ...(data.lastRotationDate !== undefined && {
           lastRotationDate: data.lastRotationDate ? new Date(data.lastRotationDate) : null,
         }),
-      },
+      } as any,
     });
 
     return {
@@ -80,6 +88,8 @@ class SettingsService {
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
       dutyRotationDates: settings.dutyRotationDates ?? '[]',
       dutyStartDate: settings.dutyStartDate ?? null,
+      dutyRoomStationMap: (settings as any).dutyRoomStationMap ?? '{}',
+      classDisplayMap: (settings as any).classDisplayMap ?? '{}',
       lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
     };
   }

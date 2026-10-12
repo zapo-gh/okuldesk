@@ -44,6 +44,7 @@ const ParentLeavePage = React.lazy(() => import('./pages/admin/modules/ParentLea
 const PetitionsPage = React.lazy(() => import('./pages/admin/modules/PetitionsPage'));
 const TimetablePage = React.lazy(() => import('./pages/admin/modules/TimetablePage'));
 const CoverAssignmentPage = React.lazy(() => import('./pages/admin/modules/CoverAssignmentPage'));
+const FolderSpinePage = React.lazy(() => import('./pages/admin/modules/FolderSpinePage'));
 
 const PageLoader = () => <div className="flex h-full w-full items-center justify-center min-h-[300px]"><div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent opacity-70" /></div>;
 
@@ -133,6 +134,7 @@ function App() {
       <Route path="supplier" element={<SupplierPage />} />
       <Route path="procurement" element={<ProcurementPage />} />
       <Route path="invoice-tracking" element={<InvoiceTrackingPage />} />
+      <Route path="folder-spines" element={<FolderSpinePage />} />
       <Route path="audit-logs" element={<AuditLogPage />} />
       <Route path="settings" element={<SettingsPage />} />
     </Route>

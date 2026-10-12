@@ -7,16 +7,18 @@ import { useReactToPrint } from 'react-to-print';
 import {
   CalendarDays, UploadCloud, AlertTriangle, CheckCircle,
   Trash2, History, Printer, RefreshCw, BookOpen, Users,
-  BarChart2, ChevronDown, ChevronUp, ExternalLink
+  BarChart2, ChevronDown, ChevronUp, ExternalLink, Tag
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { ActionModal } from '../../../components/ui/ActionModal';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 import TimetableGrid from '../../../components/ui/TimetableGrid';
+import { ClassNamesModal } from './components/ClassNamesModal';
+import { parseAndStandardizeClass, groupClassesByGrade } from '../../../utils/classNameFormatter';
 
 export default function TimetablePage() {
-  const { settings } = useSettings();
+  const { settings, refreshSettings } = useSettings();
   const { confirm, confirmModal } = useConfirm();
   const academicYear = settings?.academicYear || '2025-2026';
   const schoolName = settings?.schoolName || 'Okul Adı';
@@ -28,6 +30,38 @@ export default function TimetablePage() {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [classNames, setClassNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isClassNamesModalOpen, setIsClassNamesModalOpen] = useState(false);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<string>('ALL');
+
+  const classDisplayMap = useMemo<Record<string, string>>(() => {
+    try {
+      return JSON.parse(settings?.classDisplayMap || '{}');
+    } catch {
+      return {};
+    }
+  }, [settings?.classDisplayMap]);
+
+  // Tüm sınıfların meta listesi (alfabetik ve şubeye göre sıralı)
+  const allClassMetas = useMemo(() => {
+    return classNames
+      .map(c => parseAndStandardizeClass(c, classDisplayMap))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'tr-TR'));
+  }, [classNames, classDisplayMap]);
+
+  // Seçili kademeye göre filtrelenmiş sınıflar
+  const filteredClassMetas = useMemo(() => {
+    if (selectedGradeFilter === 'ALL') return allClassMetas;
+    return allClassMetas.filter(m => m.grade === selectedGradeFilter);
+  }, [allClassMetas, selectedGradeFilter]);
+
+  // Kademe sayıları
+  const gradeCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: allClassMetas.length };
+    allClassMetas.forEach(m => {
+      counts[m.grade] = (counts[m.grade] || 0) + 1;
+    });
+    return counts;
+  }, [allClassMetas]);
 
   const [viewMode, setViewMode] = useState<'teacher' | 'class'>('teacher');
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -104,11 +138,12 @@ export default function TimetablePage() {
         const res = await api.get(`/timetable/class/${encoded}?academicYear=${academicYear}`);
         setViewEntries(res.data.data || []);
         setViewTeacherDetails(null);
-        setViewTitle(`${className} Sınıfı — Haftalık Ders Programı`);
+        const displayCls = parseAndStandardizeClass(className, classDisplayMap).displayName;
+        setViewTitle(`${displayCls} Sınıfı — Haftalık Ders Programı`);
       }
     } catch { toast.error('Ders programı yüklenemedi.'); }
     finally { setViewLoading(false); }
-  }, [viewMode, selectedStaffId, selectedClass, academicYear, staffList]);
+  }, [viewMode, selectedStaffId, selectedClass, academicYear, staffList, classDisplayMap]);
 
   useEffect(() => { if (viewMode === 'teacher' && selectedStaffId) handleView(selectedStaffId); }, [selectedStaffId, handleView, viewMode]);
   useEffect(() => { if (viewMode === 'class' && selectedClass) handleView(undefined, selectedClass); }, [selectedClass, handleView, viewMode]);
@@ -123,7 +158,8 @@ export default function TimetablePage() {
         const encoded = encodeURIComponent(group.classNames[0]);
         const res = await api.get(`/timetable/class/${encoded}?academicYear=${academicYear}`);
         setCrossEntries(res.data.data || []);
-        setCrossTitle(`${group.classNames[0]} Sınıfı — Haftalık Program`);
+        const displayCls = parseAndStandardizeClass(group.classNames[0], classDisplayMap).displayName;
+        setCrossTitle(`${displayCls} Sınıfı — Haftalık Program`);
         setCrossMode('class');
       } else if (viewMode === 'class' && group.staffNames?.[0]) {
         const staff = staffList.find((s: any) => s.name === group.staffNames[0]);
@@ -135,7 +171,7 @@ export default function TimetablePage() {
       } else { setIsCrossOpen(false); }
     } catch { toast.error('Program yüklenemedi.'); setIsCrossOpen(false); }
     finally { setCrossLoading(false); }
-  }, [viewMode, academicYear, staffList]);
+  }, [viewMode, academicYear, staffList, classDisplayMap]);
 
   const toggleLoadPanel = useCallback(async () => {
     if (!showLoadPanel && loadSummary.length === 0) {
@@ -304,13 +340,37 @@ export default function TimetablePage() {
                 <BookOpen size={16} /> Sınıf
               </button>
             </div>
-            <div className="flex-1 min-w-[250px]">
-              {viewMode === 'teacher' ? (
-                <SearchableSelect options={staffList.map((s: any) => ({ value: s.id, label: s.name }))} value={selectedStaffId} onChange={(val) => setSelectedStaffId(val)} placeholder="Öğretmen ara ve seç..." />
-              ) : (
-                <SearchableSelect options={classNames.map((c) => ({ value: c, label: c }))} value={selectedClass} onChange={(val) => setSelectedClass(val)} placeholder="Sınıf ara ve seç..." />
-              )}
-            </div>
+            {viewMode === 'teacher' ? (
+              <div className="flex-1 min-w-[250px]">
+                <SearchableSelect
+                  options={staffList.map((s: any) => ({ value: s.id, label: s.name }))}
+                  value={selectedStaffId}
+                  onChange={(val) => setSelectedStaffId(val)}
+                  placeholder="Öğretmen ara ve seç..."
+                />
+              </div>
+            ) : (
+              <div className="flex-1 min-w-[280px] flex items-center gap-2">
+                <div className="flex-1">
+                  <SearchableSelect
+                    options={filteredClassMetas.map((c) => ({ value: c.raw, label: c.displayName }))}
+                    value={selectedClass}
+                    onChange={(val) => setSelectedClass(val)}
+                    placeholder={selectedGradeFilter !== 'ALL' ? `${selectedGradeFilter}. Sınıf ara ve seç...` : "Sınıf ara ve seç..."}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsClassNamesModalOpen(true)}
+                  className="gap-1.5 text-xs text-slate-700 hover:text-indigo-600 hover:border-indigo-300 shrink-0 h-[38px]"
+                  title="Sınıf isimlerini standartlaştır ve düzenle"
+                >
+                  <Tag size={13} className="text-indigo-500" /> Sınıf İsimlerini Düzenle
+                </Button>
+              </div>
+            )}
             <Button onClick={() => handleView()} disabled={isViewDisabled} className="gap-2">
               <RefreshCw size={16} className={viewLoading ? 'animate-spin' : ''} /> Yenile
             </Button>
@@ -320,6 +380,77 @@ export default function TimetablePage() {
               </Button>
             )}
           </div>
+
+          {/* Sınıf Modunda Kademe Filtre Butonları ve Hızlı Seçim Çipleri */}
+          {viewMode === 'class' && (
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+              {/* Kademe Sekmeleri */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                  Kademe:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedGradeFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
+                    selectedGradeFilter === 'ALL'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tümü ({gradeCounts['ALL'] || 0})
+                </button>
+                {['9', '10', '11', '12', 'Özel'].map(grade => {
+                  const count = gradeCounts[grade] || 0;
+                  if (count === 0) return null;
+                  const isSelected = selectedGradeFilter === grade;
+                  return (
+                    <button
+                      key={grade}
+                      type="button"
+                      onClick={() => setSelectedGradeFilter(grade)}
+                      className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {grade === 'Özel' ? 'Özel Eğitim' : `${grade}. Sınıf`} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Hızlı Sınıf Çipleri (Tek Tıkla Seçim) */}
+              {filteredClassMetas.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/70 rounded-xl border border-slate-200/70 max-h-36 overflow-y-auto">
+                  {filteredClassMetas.map(meta => {
+                    const isSelected = selectedClass === meta.raw;
+                    return (
+                      <button
+                        key={meta.raw}
+                        type="button"
+                        onClick={() => setSelectedClass(meta.raw)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-150 flex items-center gap-1.5 border ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200 scale-[1.02]'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50'
+                        }`}
+                        title={`Ham Ad: ${meta.raw}`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            isSelected ? 'bg-amber-300' : meta.program === 'ATP' ? 'bg-amber-400' : 'bg-indigo-400'
+                          }`}
+                        />
+                        <span>{meta.displayName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {summaryStats && (
             <div className="mt-3 flex flex-wrap gap-4 px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
@@ -382,7 +513,14 @@ export default function TimetablePage() {
             <h2 className="text-lg font-bold mt-1 text-black">{viewTitle}</h2>
             <p className="text-black text-sm mt-1 font-medium">{academicYear} EĞİTİM ÖĞRETİM YILI — Yazdır: {new Date().toLocaleDateString('tr-TR')}</p>
           </div>
-          <TimetableGrid entries={viewEntries} viewMode={viewMode} todayDow={todayDow} getPeriodTime={getPeriodTime} onCellClick={handleCellClick} />
+          <TimetableGrid
+            entries={viewEntries}
+            viewMode={viewMode}
+            todayDow={todayDow}
+            getPeriodTime={getPeriodTime}
+            onCellClick={handleCellClick}
+            classDisplayMap={classDisplayMap}
+          />
           
           {/* Ders Listesi Özeti (Sadece Çıktıda Görünebilir veya Hep Görünebilir) */}
           <div className="mt-8 px-4 print:px-1">
@@ -430,7 +568,9 @@ export default function TimetablePage() {
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-semibold">{item.subjectName}</td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center text-slate-600 print:text-black"></td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-bold text-slate-800 print:text-black">{item.count}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{viewMode === 'teacher' ? item.className : item.staffName}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">
+                          {viewMode === 'teacher' ? parseAndStandardizeClass(item.className, classDisplayMap).displayName : item.staffName}
+                        </td>
                         <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-xs uppercase text-slate-600 print:text-black">{item.roomStr}</td>
                       </tr>
                     ));
@@ -452,7 +592,13 @@ export default function TimetablePage() {
         {crossLoading ? (
           <div className="p-12 flex justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" /></div>
         ) : (
-          <TimetableGrid entries={crossEntries} viewMode={crossMode} todayDow={todayDow} getPeriodTime={getPeriodTime} />
+          <TimetableGrid
+            entries={crossEntries}
+            viewMode={crossMode}
+            todayDow={todayDow}
+            getPeriodTime={getPeriodTime}
+            classDisplayMap={classDisplayMap}
+          />
         )}
       </ActionModal>
 
@@ -607,6 +753,17 @@ export default function TimetablePage() {
           )}
         </div>
       </ActionModal>
+
+      <ClassNamesModal
+        isOpen={isClassNamesModalOpen}
+        onClose={() => setIsClassNamesModalOpen(false)}
+        rawClassNames={classNames}
+        currentMap={classDisplayMap}
+        onSave={async (newMap) => {
+          await api.put('/settings', { classDisplayMap: JSON.stringify(newMap) });
+          await refreshSettings();
+        }}
+      />
 
       {confirmModal}
     </div>

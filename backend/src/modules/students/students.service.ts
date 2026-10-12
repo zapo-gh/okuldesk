@@ -91,9 +91,31 @@ export class StudentsService {
     });
   }
 
-  async update(id: string, data: { fullName?: string; className?: string; status?: 'ACTIVE' | 'INACTIVE' }) {
+  async update(
+    id: string,
+    data: { schoolNumber?: string; fullName?: string; className?: string; status?: 'ACTIVE' | 'INACTIVE' },
+    userId?: string
+  ) {
     const student = await prisma.student.findUnique({ where: { id } });
     if (!student) throw new AppError('Öğrenci bulunamadı.', 404);
+
+    if (data.schoolNumber && data.schoolNumber !== student.schoolNumber) {
+      const existing = await prisma.student.findUnique({ where: { schoolNumber: data.schoolNumber } });
+      if (existing && existing.id !== id) {
+        throw new AppError(
+          `'${data.schoolNumber}' okul numarası zaten başka bir öğrencide (${existing.fullName} - ${existing.className}) kayıtlıdır.`,
+          409
+        );
+      }
+      if (userId) {
+        await AuditService.log(userId, 'UPDATE_STUDENT_NUMBER', 'Student', id, {
+          oldNumber: student.schoolNumber,
+          newNumber: data.schoolNumber,
+          studentName: student.fullName,
+        });
+      }
+    }
+
     return prisma.student.update({ where: { id }, data });
   }
 

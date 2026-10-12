@@ -175,7 +175,9 @@ model SchoolSettings {
   waTemplate3       String?   @default("")
   dutyRotationFreq  String    @default("weekly") // none, weekly, biweekly, monthly, custom
   dutyRotationDates String?   @default("[]") // JSON string array of dates for custom rotation
-  dutyStartDate     String? // "YYYY-MM-DD" â€” nÃ¶bet baÅŸlangÄ±Ã§ tarihi (null = kÄ±sÄ±tsÄ±z)
+  dutyStartDate     String? // "YYYY-MM-DD" — nöbet başlangıç tarihi (null = kısıtsız)
+  dutyRoomStationMap String?  @default("{}") // JSON string: { [room: string]: stationId }
+  classDisplayMap   String?   @default("{}") // JSON string: { [rawClassName: string]: displayName }
   lastRotationDate  DateTime?
   updatedAt         DateTime  @updatedAt
 }

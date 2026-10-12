@@ -36,7 +36,8 @@ import {
   FileSignature,
   Building2,
   FileBox,
-  Receipt
+  Receipt,
+  FolderArchive
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { CommandPalette } from './ui/CommandPalette';
@@ -224,10 +225,15 @@ export default function AdminLayout() {
           <NavItem to="/admin/duty-schedule" icon={CalendarRange} label="Nöbet Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/timetable" icon={CalendarDays} label="Ders Programı" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/cover-assignments" icon={UserCheck} label="Boş Ders Doldurma" onClick={closeSidebar} collapsed={collapsed} />
+          {/* [GELECEKTE GELİŞTİRİLECEK] Öğretmenler Kurulu
           <NavItem to="/admin/board-meeting" icon={UsersRound} label="Öğretmenler Kurulu" onClick={closeSidebar} collapsed={collapsed} />
+          */}
+          {/* [GELECEKTE GELİŞTİRİLECEK] Sosyal Etkinlik Planı
           <NavItem to="/admin/social-activity" icon={PartyPopper} label="Sosyal Etkinlik Planı" onClick={closeSidebar} collapsed={collapsed} />
+          */}
           <NavItem to="/admin/student-club" icon={Trophy} label="Öğrenci Kulüpleri" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/class-teachers" icon={UsersRound} label="Sınıf Rehber Öğretmenleri" onClick={closeSidebar} collapsed={collapsed} />
+          <NavItem to="/admin/folder-spines" icon={FolderArchive} label="Klasör Sırtlığı" onClick={closeSidebar} collapsed={collapsed} />
 
           {/* Personel & İnsan Kaynakları */}
           {!collapsed && <span className="text-xs font-bold text-blue-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Personel & İnsan Kayn.</span>}
@@ -235,7 +241,9 @@ export default function AdminLayout() {
           <NavItem to="/admin/staff" icon={UserCheck} label="Personel Havuzu" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/attendance-sheet" icon={FileSignature} label="Personel İmza Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/teblig" icon={FileCheck} label="Tebliğ – Tebellüğ Belgesi" onClick={closeSidebar} collapsed={collapsed} />
+          {/* [GELECEKTE GELİŞTİRİLECEK] Personel Nakil Bildirimi
           <NavItem to="/admin/staff-transfer" icon={ArrowRightLeft} label="Personel Nakil Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
+          */}
 
           {/* Kurullar & Planlama */}
           {!collapsed && <span className="text-xs font-bold text-orange-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Kurullar & Planlama</span>}
@@ -243,7 +251,9 @@ export default function AdminLayout() {
 
           <NavItem to="/admin/commission" icon={Network} label="Kurul ve Komisyonlar" onClick={closeSidebar} collapsed={collapsed} />
 
+          {/* [GELECEKTE GELİŞTİRİLECEK] Okul Gezi Planı
           <NavItem to="/admin/field-trip" icon={Bus} label="Okul Gezi Planı" onClick={closeSidebar} collapsed={collapsed} />
+          */}
           <NavItem to="/admin/commemorative-days" icon={Flag} label="Belirli Gün ve Haftalar" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/holidays" icon={CalendarOff} label="Resmi Tatiller" onClick={closeSidebar} collapsed={collapsed} />
 
@@ -251,8 +261,12 @@ export default function AdminLayout() {
           {!collapsed && <span className="text-xs font-bold text-rose-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Satın Alma & Mali İşler</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
           <NavItem to="/admin/invoice-tracking" icon={Receipt} label="Fatura & Ödenek Takip" onClick={closeSidebar} collapsed={collapsed} />
+          {/* [GELECEKTE GELİŞTİRİLECEK] Doğrudan Temin (22/d)
           <NavItem to="/admin/procurement" icon={FileSignature} label="Doğrudan Temin (22/d)" onClick={closeSidebar} collapsed={collapsed} />
+          */}
+          {/* [GELECEKTE GELİŞTİRİLECEK] Firma Rehberi
           <NavItem to="/admin/supplier" icon={Building2} label="Firma Rehberi" onClick={closeSidebar} collapsed={collapsed} />
+          */}
 
           {/* Sistem */}
           {!collapsed && <span className="text-xs font-bold text-teal-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Sistem</span>}

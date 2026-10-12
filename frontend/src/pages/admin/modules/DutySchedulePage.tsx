@@ -4,13 +4,14 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import { useSettings } from '../../../context/SettingsContext';
 import {
   CalendarRange, Save, Trash2, MapPin, Users, BarChart2,
-  Settings, Printer, Zap, Plus, Edit, ChevronLeft, ChevronRight, X, Shield, UploadCloud
+  Settings, Printer, Zap, Plus, Edit, ChevronLeft, ChevronRight, X, Shield, UploadCloud, Copy, Layers
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import toast from 'react-hot-toast';
 import { useReactToPrint } from 'react-to-print';
 import { DutySchedulePrintTemplate } from './print/DutySchedulePrintTemplate';
 import { Button } from '../../../components/ui/Button';
+import { RoomStationMappingView } from './components/RoomStationMappingView';
 
 // ──────────────────────────────────────────────
 // Sabitler
@@ -119,7 +120,7 @@ export default function DutySchedulePage() {
     return activeDay ? activeDay.weekNum : (days.length > 0 ? days[days.length - 1].weekNum : 0);
   });
 
-  const [activeTab, setActiveTab] = useState<'cizelge' | 'istatistik' | 'personel' | 'idareci' | 'yerler' | 'ayarlar'>('cizelge');
+  const [activeTab, setActiveTab] = useState<'cizelge' | 'istatistik' | 'personel' | 'idareci' | 'yerler' | 'derslikler' | 'ayarlar'>('cizelge');
 
   // Data state
   const [stations,    setStations]    = useState<any[]>([]);
@@ -268,6 +269,157 @@ export default function DutySchedulePage() {
     }
   };
 
+  // ── Yardımcılar & Takvim Mantığı ──
+  const toDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const workDays = getWorkDays(selectedYear, selectedMonth);
+  const monthName = MONTHS.find(m => m.val === selectedMonth)?.label || '';
+
+  // Haftalara böl
+  const weeks: typeof workDays[] = [];
+  workDays.forEach(d => {
+    if (!weeks[d.weekNum]) weeks[d.weekNum] = [];
+    weeks[d.weekNum].push(d);
+  });
+  const weekList = weeks.filter(Boolean);
+
+  const dutyRotationFreq = settings?.dutyRotationFreq || 'weekly';
+
+  // Tüm akademik yılın haftaları kronolojik olarak
+  const allAcademicWeeks = React.useMemo(() => {
+    const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+    const parts = academicYear.split('-');
+    const resWeeks: {
+      year: number;
+      month: number;
+      weekNum: number;
+      absIndex: number;
+      days: ReturnType<typeof getWorkDays>;
+    }[] = [];
+    let absIdx = 0;
+    for (const m of academicMonths) {
+      const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
+      const mDays = getWorkDays(y, m);
+      const weekNums = [...new Set(mDays.map(d => d.weekNum))].sort((a, b) => a - b);
+      for (const wn of weekNums) {
+        resWeeks.push({
+          year: y,
+          month: m,
+          weekNum: wn,
+          absIndex: absIdx++,
+          days: mDays.filter(d => d.weekNum === wn)
+        });
+      }
+    }
+    return resWeeks;
+  }, [academicYear]);
+
+  const monthStartWeekIndices = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const w of allAcademicWeeks) {
+      const key = `${w.year}-${w.month}`;
+      if (map[key] === undefined) {
+        map[key] = w.absIndex;
+      }
+    }
+    return map;
+  }, [allAcademicWeeks]);
+
+  // Rotasyon sıfır noktası: dutyStartDate varsa o tarihin haftası, yoksa ilk hafta
+  const absoluteBaseWeekNum = React.useMemo(() => {
+    const dutyStartDate = settings?.dutyStartDate;
+    if (dutyStartDate && allAcademicWeeks.length > 0) {
+      const sdStr = toDateStr(new Date(dutyStartDate));
+      const entry = allAcademicWeeks.find(w => w.days.some(d => toDateStr(d.date) >= sdStr));
+      if (entry) return entry.absIndex;
+    }
+    const parts = academicYear.split('-');
+    const startYear = Number(parts[0]);
+    return monthStartWeekIndices[`${startYear}-9`] ?? 0;
+  }, [academicYear, monthStartWeekIndices, allAcademicWeeks, settings?.dutyStartDate]);
+
+  // Etkili geçiş tarihleri (Nöbet başlangıç tarihinden sonrakiler)
+  const effectiveTransitionDates = React.useMemo(() => {
+    const baseWeek = allAcademicWeeks.find(w => w.absIndex === absoluteBaseWeekNum);
+    const baseStartStr = baseWeek && baseWeek.days.length > 0 ? toDateStr(baseWeek.days[0].date) : '';
+    const dutySDStr = settings?.dutyStartDate ? toDateStr(new Date(settings.dutyStartDate)) : baseStartStr;
+    const threshold = dutySDStr || baseStartStr;
+    return rotationDates.filter(d => !threshold || d > threshold).sort();
+  }, [rotationDates, allAcademicWeeks, absoluteBaseWeekNum, settings?.dutyStartDate]);
+
+  // Bir haftanın rotasyon geçiş haftası olup olmadığını tespit et
+  const isTransitionWeek = useCallback((wAbsIdx: number) => {
+    if (wAbsIdx <= absoluteBaseWeekNum || wAbsIdx >= allAcademicWeeks.length) return false;
+    const w = allAcademicWeeks[wAbsIdx];
+    const prevW = allAcademicWeeks[wAbsIdx - 1];
+    if (!w || !prevW || w.days.length === 0 || prevW.days.length === 0) return false;
+    const currMondayStr = toDateStr(w.days[0].date);
+    const prevMondayStr = toDateStr(prevW.days[0].date);
+    return effectiveTransitionDates.some(t => currMondayStr >= t && prevMondayStr < t);
+  }, [absoluteBaseWeekNum, allAcademicWeeks, effectiveTransitionDates]);
+
+  // Bu haftadan sonra gelen follower (kopyalanacak aynı döngü) hafta sayısı
+  const getFollowerWeeksCount = useCallback((wAbsIdx: number) => {
+    if (dutyRotationFreq === 'weekly') return 0;
+    if (dutyRotationFreq === 'biweekly') return 1;
+    if (dutyRotationFreq === 'fourweekly' || dutyRotationFreq === 'monthly') return 3;
+    if (dutyRotationFreq === 'none') return Math.max(0, allAcademicWeeks.length - 1 - wAbsIdx);
+    if (dutyRotationFreq === 'custom') {
+      let count = 0;
+      for (let i = wAbsIdx + 1; i < allAcademicWeeks.length; i++) {
+        if (isTransitionWeek(i)) break;
+        count++;
+      }
+      return count;
+    }
+    return 0;
+  }, [dutyRotationFreq, allAcademicWeeks.length, isTransitionWeek]);
+
+  const currWeekNum = weekList[selectedWeek]?.[0]?.weekNum;
+  const currAbsWeekNum = (currWeekNum !== undefined && monthStartWeekIndices[`${selectedYear}-${selectedMonth}`] !== undefined)
+    ? monthStartWeekIndices[`${selectedYear}-${selectedMonth}`] + currWeekNum
+    : undefined;
+
+  let isNewCycle = false;
+  let isCopyCycle = false;
+
+  if (absoluteBaseWeekNum !== undefined && currAbsWeekNum !== undefined) {
+    const diff = currAbsWeekNum - absoluteBaseWeekNum;
+    if (diff > 0) {
+      if (dutyRotationFreq === 'none') {
+        isCopyCycle = true;
+      } else if (dutyRotationFreq === 'weekly') {
+        isNewCycle = true;
+      } else if (dutyRotationFreq === 'biweekly') {
+        if (diff % 2 === 0) isNewCycle = true;
+        else isCopyCycle = true;
+      } else if (dutyRotationFreq === 'fourweekly' || dutyRotationFreq === 'monthly') {
+        if (diff % 4 === 0) isNewCycle = true;
+        else isCopyCycle = true;
+      } else if (dutyRotationFreq === 'custom') {
+        if (isTransitionWeek(currAbsWeekNum)) {
+          isNewCycle = true;
+        } else {
+          isCopyCycle = true;
+        }
+      }
+    }
+  }
+
+  // Seçili haftanın nöbet başlangıç tarihinden önce olup olmadığını kontrol et
+  const isBeforeStartDate = React.useMemo(() => {
+    const dutyStartDate = settings?.dutyStartDate;
+    if (!dutyStartDate || !weekList[selectedWeek]) return false;
+    const sd = new Date(dutyStartDate); sd.setHours(0, 0, 0, 0);
+    const lastDayOfWeek = weekList[selectedWeek][weekList[selectedWeek].length - 1];
+    return lastDayOfWeek.date < sd;
+  }, [settings?.dutyStartDate, weekList, selectedWeek]);
+
   // ── Atama değiştir ──
   const handleAssignmentChange = (stationId: string, dayOfWeek: number, weekNum: number, slotIdx: number, staffId: string) => {
     setAssignments(prev => {
@@ -387,48 +539,97 @@ export default function DutySchedulePage() {
   // Follower haftalara kopyalama (UI tabanlı manuel işlemler için)
   const replicateToFollowerWeeks = (currentAssignments: any[], baseWeekNum: number, baseNewAssignments: any[]) => {
     let result = [...currentAssignments];
-    const numWeeks = rotationWeeks || 1;
-    if (numWeeks <= 1) return result;
-    
-    const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
-    const parts = academicYear.split('-');
-    const allAcademicWeeks: { year: number; month: number; weekNum: number; days: any[] }[] = [];
-    
-    for (const m of academicMonths) {
-      const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
-      const mDays = getWorkDays(y, m);
-      const weekNums = [...new Set(mDays.map(d => d.weekNum))].sort((a, b) => a - b);
-      for (const wn of weekNums) {
-        allAcademicWeeks.push({ year: y, month: m, weekNum: wn, days: mDays.filter(d => d.weekNum === wn) });
-      }
-    }
-    
     const baseIdx = allAcademicWeeks.findIndex(w => w.year === selectedYear && w.month === selectedMonth && w.weekNum === baseWeekNum);
-    
-    if (baseIdx !== -1) {
-      for (let i = 1; i < numWeeks; i++) {
-        const followerIdx = baseIdx + i;
-        if (followerIdx >= allAcademicWeeks.length) break;
-        const fw = allAcademicWeeks[followerIdx];
-        
-        // Remove existing for this follower week
-        result = result.filter(a => !(a.year === fw.year && a.month === fw.month && a.weekNumber === fw.weekNum));
-        
-        const fWeekDayNums = fw.days.map(d => d.dayOfWeek);
-        
-        for (const baseA of baseNewAssignments) {
-           if (fWeekDayNums.includes(baseA.dayOfWeek)) {
-             result.push({
-               ...baseA,
-               year: fw.year,
-               month: fw.month,
-               weekNumber: fw.weekNum
-             });
-           }
+    if (baseIdx === -1) return result;
+
+    const followerCount = getFollowerWeeksCount(baseIdx);
+    if (followerCount <= 0) return result;
+
+    for (let i = 1; i <= followerCount; i++) {
+      const followerIdx = baseIdx + i;
+      if (followerIdx >= allAcademicWeeks.length) break;
+      const fw = allAcademicWeeks[followerIdx];
+
+      // Remove existing for this follower week
+      result = result.filter(a => !(a.year === fw.year && a.month === fw.month && a.weekNumber === fw.weekNum));
+
+      const fWeekDayNums = fw.days.map(d => d.dayOfWeek);
+
+      for (const baseA of baseNewAssignments) {
+        if (fWeekDayNums.includes(baseA.dayOfWeek)) {
+          result.push({
+            ...baseA,
+            year: fw.year,
+            month: fw.month,
+            weekNumber: fw.weekNum,
+            academicYear
+          });
         }
       }
     }
     return result;
+  };
+
+  // ── Sonraki Rotasyona Kadar / Dönem Boyunca Uygula ──
+  const handleApplyToFollowerWeeks = async () => {
+    if (currAbsWeekNum === undefined) return;
+    const followerCount = getFollowerWeeksCount(currAbsWeekNum);
+    if (followerCount <= 0) {
+      toast('Bu haftadan sonra kopyalanacak takip eden hafta bulunmuyor.');
+      return;
+    }
+
+    const currWeekNumLocal = weekList[selectedWeek]?.[0]?.weekNum;
+    if (currWeekNumLocal === undefined) return;
+
+    const baseAssignments = assignments.filter(a =>
+      a.year === selectedYear && a.month === selectedMonth && a.weekNumber === currWeekNumLocal
+    );
+
+    if (baseAssignments.length === 0) {
+      toast.error('Bu haftada kopyalanacak atama bulunamadı.');
+      return;
+    }
+
+    const currMondayStr = weekList[selectedWeek]?.[0] ? toDateStr(weekList[selectedWeek][0].date) : '';
+    const nextTransition = effectiveTransitionDates.find(t => t > currMondayStr);
+
+    const targetDesc = nextTransition
+      ? `sonraki rotasyon tarihine (${new Date(nextTransition).toLocaleDateString('tr-TR')}) kadar olan ${followerCount} haftaya`
+      : `takip eden ${followerCount} haftaya`;
+
+    const ok = await confirm(`Bu haftanın (${selectedWeek + 1}. Hafta) nöbet atamaları, ${targetDesc} kopyalanacak. Devam etmek istiyor musunuz?`);
+    if (!ok) return;
+
+    try {
+      setLoading(true);
+      const updatedAssignments = replicateToFollowerWeeks(assignments, currWeekNumLocal, baseAssignments);
+      setAssignments(updatedAssignments);
+
+      // Save to backend across all affected months
+      await api.post('/duty-schedule/assignments', {
+        academicYear,
+        year: selectedYear,
+        month: selectedMonth,
+        assignments: updatedAssignments.map(a => ({
+          staffId: a.staffId,
+          stationId: a.stationId,
+          dayOfWeek: a.dayOfWeek,
+          weekNumber: a.weekNumber ?? 0,
+          year: a.year,
+          month: a.month
+        }))
+      });
+
+      toast.success(`Çizelge ${followerCount} haftaya başarıyla uygulandı!`);
+      setIsDirty(false);
+      fetchAll();
+    } catch (err) {
+      console.error(err);
+      toast.error('Atamalar kopyalanamadı.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Rotasyon Yap ──
@@ -652,18 +853,6 @@ export default function DutySchedulePage() {
   };
 
 
-  // ── Yardımcılar ──
-  const workDays = getWorkDays(selectedYear, selectedMonth);
-  const monthName = MONTHS.find(m => m.val === selectedMonth)?.label || '';
-
-  // Haftalara böl
-  const weeks: typeof workDays[] = [];
-  workDays.forEach(d => {
-    if (!weeks[d.weekNum]) weeks[d.weekNum] = [];
-    weeks[d.weekNum].push(d);
-  });
-  const weekList = weeks.filter(Boolean);
-
   // Boş slot sayacı (seçili hafta için)
   const emptySlots = (() => {
     if (!weekList[selectedWeek]) return 0;
@@ -684,79 +873,9 @@ export default function DutySchedulePage() {
     return count;
   })();
 
-  // ── Yeni Rotasyon Mantığı ──
-  const dutyRotationFreq = settings?.dutyRotationFreq || 'weekly';
-  const rotationWeeks = dutyRotationFreq === 'weekly' ? 1 :
-                        dutyRotationFreq === 'biweekly' ? 2 :
-                        dutyRotationFreq === 'fourweekly' ? 4 :
-                        dutyRotationFreq === 'monthly' ? 4 :
-                        dutyRotationFreq === 'custom' ? 1 : 0;
-  
-  const monthStartWeekIndices = React.useMemo(() => {
-    const map: Record<string, number> = {};
-    let currentAbsoluteWeek = 0;
-    const months = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
-    for (const m of months) {
-        const parts = academicYear.split('-');
-        const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
-        map[`${y}-${m}`] = currentAbsoluteWeek;
-        const w = getWorkDays(y, m);
-        const maxWeekNum = w.length > 0 ? Math.max(...w.map(d => d.weekNum)) : 0;
-        currentAbsoluteWeek += (maxWeekNum + 1);
-    }
-    return map;
-  }, [academicYear]);
-
-  // Rotasyon sıfır noktası: dutyStartDate varsa o tarihın hıftasi, yoksa Eylül 1. haftası
-  const absoluteBaseWeekNum = React.useMemo(() => {
-    const dutyStartDate = settings?.dutyStartDate;
-    if (dutyStartDate) {
-      // Başlangıç tarihinin düştüğü (yıl, ay, weekNum) ülçgeni bul
-      const sd = new Date(dutyStartDate); sd.setHours(0, 0, 0, 0);
-      const sdYear = sd.getFullYear();
-      const sdMonth = sd.getMonth() + 1;
-      const monthDays = getWorkDays(sdYear, sdMonth);
-      // Başlangıç tarihinin o aydaki hafta numarasını bul
-      const startDayEntry = monthDays.find(d => d.date >= sd);
-      const startWeekNum = startDayEntry?.weekNum ?? 0;
-      return (monthStartWeekIndices[`${sdYear}-${sdMonth}`] ?? 0) + startWeekNum;
-    }
-    // Varsayılan: Eylül 1. haftası (her zaman 0)
-    const parts = academicYear.split('-');
-    const startYear = Number(parts[0]);
-    return monthStartWeekIndices[`${startYear}-9`] ?? 0;
-  }, [academicYear, monthStartWeekIndices, settings?.dutyStartDate]);
-
-  const currWeekNum = weekList[selectedWeek]?.[0]?.weekNum;
-  const currAbsWeekNum = currWeekNum !== undefined ? monthStartWeekIndices[`${selectedYear}-${selectedMonth}`] + currWeekNum : undefined;
-
-  let isNewCycle = false;
-  let isCopyCycle = false;
-  
-  if (absoluteBaseWeekNum !== undefined && currAbsWeekNum !== undefined && rotationWeeks > 0) {
-    const diff = currAbsWeekNum - absoluteBaseWeekNum;
-    if (diff > 0) {
-      if (diff % rotationWeeks === 0) {
-        isNewCycle = true;
-      } else {
-        isCopyCycle = true;
-      }
-    }
-  }
-
   const thisMonthAssignments = assignments.filter(a => a.year === selectedYear && a.month === selectedMonth);
   const thisWeekAssignments = currWeekNum !== undefined ? thisMonthAssignments.filter(a => a.weekNumber === currWeekNum) : [];
   const thisWeekIsEmpty = thisWeekAssignments.length === 0;
-
-  // Seçili haftanın nöbet başlangıç tarihinden önce olup olmadığını kontrol et
-  const isBeforeStartDate = React.useMemo(() => {
-    const dutyStartDate = settings?.dutyStartDate;
-    if (!dutyStartDate || !weekList[selectedWeek]) return false;
-    const sd = new Date(dutyStartDate); sd.setHours(0, 0, 0, 0);
-    // Haftanın son gününü al — haftanın herhangi bir günü başlangıçtan önce mi?
-    const lastDayOfWeek = weekList[selectedWeek][weekList[selectedWeek].length - 1];
-    return lastDayOfWeek.date < sd;
-  }, [settings?.dutyStartDate, weekList, selectedWeek]);
 
 
 
@@ -859,6 +978,7 @@ export default function DutySchedulePage() {
           { key: 'personel',   label: 'Öğretmen Nöbetleri', icon: <Users size={15}/> },
           { key: 'idareci',    label: 'İdareci Nöbetleri', icon: <Shield size={15}/> },
           { key: 'yerler',     label: 'Nöbet Yerleri',     icon: <MapPin size={15}/> },
+          { key: 'derslikler', label: 'Derslik Eşleştirme', icon: <Layers size={15}/> },
           { key: 'ayarlar',    label: 'Ayarlar',           icon: <Settings size={15}/> },
         ] as { key: typeof activeTab; label: string; icon: React.ReactNode }[]).map(tab => (
           <button
@@ -935,10 +1055,20 @@ export default function DutySchedulePage() {
                           >
                             <Zap size={15} /> {thisWeekIsEmpty ? 'Otomatik Dağıt' : 'Yeniden Dağıt'}
                           </button>
+                          {!thisWeekIsEmpty && dutyRotationFreq !== 'weekly' && (
+                            <button
+                              onClick={handleApplyToFollowerWeeks}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-sm font-semibold transition border border-indigo-200"
+                              title="Bu haftanın nöbet atamalarını bir sonraki rotasyon tarihine kadar olan tüm haftalara kopyalar"
+                            >
+                              <Copy size={15} /> Sonraki Rotasyona Kadar Uygula
+                            </button>
+                          )}
                           {(currAbsWeekNum !== undefined && currAbsWeekNum > 0) && isNewCycle && (
                             <button
                               onClick={handleRotate}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-lg text-sm font-semibold transition border border-sky-200"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-semibold transition shadow-sm"
+                              title="Rotasyon tarihi geldi: Bir önceki haftanın atamaları 1 sıra kaydırılarak bu haftaya kopyalanır"
                             >
                               <Zap size={15} /> Rotasyon Yap
                             </button>
@@ -992,7 +1122,19 @@ export default function DutySchedulePage() {
                         <div className="px-4 py-2.5 bg-sky-50 border-b border-sky-100 flex items-center justify-between gap-4">
                           <div className="flex items-center gap-2 text-sm text-sky-700">
                             <Zap size={14} className="text-sky-500 flex-shrink-0" />
-                            <span>Rotasyon kuralına göre bu haftanın çizelgesi önceki haftanın <strong>aynısı</strong> olmalıdır.</span>
+                            <span>
+                              Rotasyon kuralına göre bu haftanın çizelgesi önceki haftanın <strong>aynısı</strong> olmalıdır.
+                              {dutyRotationFreq === 'custom' && effectiveTransitionDates.length > 0 && (
+                                <span className="ml-1 text-xs text-sky-600 font-medium">
+                                  (Sonraki rotasyon:{' '}
+                                  {(() => {
+                                    const currMondayStr = weekList[selectedWeek]?.[0] ? toDateStr(weekList[selectedWeek][0].date) : '';
+                                    const nextT = effectiveTransitionDates.find(t => t > currMondayStr);
+                                    return nextT ? new Date(nextT).toLocaleDateString('tr-TR') : 'Dönem sonu';
+                                  })()})
+                                </span>
+                              )}
+                            </span>
                           </div>
                           <button
                             onClick={handleCopyPrev}
@@ -1626,6 +1768,13 @@ export default function DutySchedulePage() {
             </div>
           )}
 
+          {/* ── DERSLİK - NÖBET YERİ EŞLEŞTİRME ── */}
+          {activeTab === 'derslikler' && (
+            <div>
+              <RoomStationMappingView academicYear={academicYear} />
+            </div>
+          )}
+
           {/* ── AYARLAR ── */}
           {activeTab === 'ayarlar' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1764,11 +1913,26 @@ export default function DutySchedulePage() {
                           const localDate = new Date(y, m - 1, d);
                           return (
                             <li key={dateStr} className="flex justify-between items-center px-4 py-3 bg-white hover:bg-slate-50 transition text-sm">
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2.5 flex-wrap">
                                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex-shrink-0">{idx + 1}</span>
                                 <span className="font-semibold text-slate-800">
                                   {localDate.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </span>
+                                {(() => {
+                                  const startStr = settings?.dutyStartDate || '';
+                                  if (startStr && dateStr <= startStr) {
+                                    return (
+                                      <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                                        Başlangıç / Baz Hafta
+                                      </span>
+                                    );
+                                  }
+                                  return (
+                                    <span className="text-[11px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
+                                      Rotasyon Geçişi
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <button
                                 onClick={() => handleDeleteRotationDate(dateStr)}
@@ -1783,6 +1947,14 @@ export default function DutySchedulePage() {
                       </ul>
                     </div>
                   )}
+
+                  <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
+                    <p className="font-semibold">💡 İpucu: Nöbet Başlangıç Tarihi ve Rotasyon Geçişleri</p>
+                    <p>
+                      Nöbet Başlangıç Tarihi zaten 1. haftanın başlangıcıdır.
+                      Bu listeye başlangıç tarihini eklemenize gerek yoktur; yalnızca <strong>nöbet yerlerinin kaydırılacağı</strong> ara tatil veya 2. dönem başlangıç tarihlerini eklemeniz yeterlidir. İki geçiş tarihi arasındaki tüm haftalar otomatik olarak aynı döngüyü korur.
+                    </p>
+                  </div>
                 </div>
               )}
 

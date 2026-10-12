@@ -1,6 +1,87 @@
 import prisma from '../../shared/utils/prisma';
 import { dutyScheduleService } from '../dutySchedule.service';
 
+/**
+ * Nöbet yerinin veya dersliğin kat seviyesini tespit eder.
+ * Zemin / A Katı = 0
+ * 1. Kat / B Katı = 1
+ * 2. Kat / C Katı = 2
+ * 3. Kat / D Katı = 3
+ * 4. Kat / E Katı = 4
+ * Bodrum = -1
+ * Bahçe / Açık Alan / İdareci = null
+ */
+export function getStationFloorLevel(text?: string | null): number | null {
+  if (!text) return null;
+  const name = text.toLocaleLowerCase('tr-TR').trim();
+
+  // Bahçe, dış alan, atölye çevresi vb. kat değildir
+  if (
+    name.includes('bahçe') ||
+    name.includes('bahce') ||
+    name.includes('dış') ||
+    name.includes('dis') ||
+    name.includes('atölye çevresi') ||
+    name.includes('atolye cevresi')
+  ) {
+    return null;
+  }
+
+  // İdareci nöbet yeri kat değildir
+  if (name.includes('idare') || name.includes('müdür') || name.includes('mudur')) {
+    return null;
+  }
+
+  // Bodrum
+  if (name.includes('bodrum') || name.includes('-1')) {
+    return -1;
+  }
+
+  // Zemin / Giriş kat
+  if (name.includes('zemin') || name.includes('giriş') || name.includes('giris')) {
+    return 0;
+  }
+
+  // Açıkça rakam içeren katlar: "1. kat", "2. kat", "3.kat", "kat 1", "kat 2", vb.
+  const numMatch = name.match(/(\d+)\s*\.?\s*kat/i) || name.match(/kat\s*(\d+)/i);
+  if (numMatch && numMatch[1]) {
+    return parseInt(numMatch[1], 10);
+  }
+
+  // Harf bazlı blok/kat eşleşmesi:
+  // "A- ZEMİN KAT", "A-01", "B - 1. KAT", "B-03", "C - 2. KAT", "C-02", "D - 3. KAT", "D-05"
+  const letterMatch = name.match(/^([a-zğüşıöç])\s*[-–—]/i) || name.match(/^([a-zğüşıöç])\s+kat/i);
+  if (letterMatch && letterMatch[1]) {
+    const letter = letterMatch[1].toUpperCase();
+    const letterMap: Record<string, number> = {
+      'A': 0, // A - Zemin Kat
+      'B': 1, // B - 1. Kat
+      'C': 2, // C - 2. Kat
+      'D': 3, // D - 3. Kat
+      'E': 4, // E - 4. Kat
+      'F': 5  // F - 5. Kat
+    };
+    if (letterMap[letter] !== undefined) {
+      return letterMap[letter];
+    }
+  }
+
+  return null;
+}
+
+export function isOutdoorStation(stationName?: string | null): boolean {
+  if (!stationName) return false;
+  const name = stationName.toLocaleLowerCase('tr-TR').trim();
+  return (
+    name.includes('bahçe') ||
+    name.includes('bahce') ||
+    name.includes('dış') ||
+    name.includes('dis') ||
+    name.includes('atölye çevresi') ||
+    name.includes('atolye cevresi')
+  );
+}
+
 export class CoverAssignmentService {
   // ── Absences ──
 
@@ -251,6 +332,18 @@ export class CoverAssignmentService {
       }
     });
 
+    // Kayıtlı Derslik - Nöbet Yeri Haritasını ve Nöbet Yerlerini çek
+    const [schoolSettings, allDutyStations] = await Promise.all([
+      prisma.schoolSettings.findUnique({ where: { id: 'singleton' } }),
+      prisma.dutyStation.findMany({ where: { isActive: true } })
+    ]);
+    let roomStationMap: Record<string, string> = {};
+    try {
+      roomStationMap = JSON.parse((schoolSettings as any)?.dutyRoomStationMap || '{}');
+    } catch {
+      roomStationMap = {};
+    }
+
     const isStaffAbsentForPeriod = (staffId: string, period: number) => {
       const abs = absences.find(a => a.staffId === staffId);
       if (!abs) return false;
@@ -294,7 +387,6 @@ export class CoverAssignmentService {
         );
         if (isAlreadyCovered) {
           // Zaten bir nöbetçi atanmış ve DB'ye kaydedilmişse bunu yeni öneri olarak getirme
-          // (Not: frontend bunları farklı bir listeden gösterebilir veya gizleyebilir)
         }
 
         let currentCoTeachers: any[] = [];
@@ -337,20 +429,116 @@ export class CoverAssignmentService {
           }
         }
 
+        // 🎯 Hedef Nöbet Yerini Belirleme (Derslik -> Nöbet Yeri Haritası)
+        let targetStationId: string | null = null;
+        if (finalRoom) {
+          const cleanRoom = finalRoom.trim();
+          const upperRoom = cleanRoom.toUpperCase();
+
+          if (roomStationMap[cleanRoom]) {
+            targetStationId = roomStationMap[cleanRoom];
+          } else if (roomStationMap[upperRoom]) {
+            targetStationId = roomStationMap[upperRoom];
+          } else {
+            // Çoklu oda desteği (örn. "A-02/D-01" ise parçalarına bak)
+            const parts = upperRoom.split(/[\/,]/).map(p => p.trim());
+            for (const part of parts) {
+              if (roomStationMap[part]) {
+                targetStationId = roomStationMap[part];
+                break;
+              }
+            }
+          }
+        }
+
+        const targetStation = targetStationId ? allDutyStations.find(s => s.id === targetStationId) : null;
+        const isTargetOutdoor = isOutdoorStation(targetStation?.name) || (finalRoom ? isOutdoorStation(finalRoom) : false);
+
+        // Hedef kat seviyesi (önce eşleşen nöbet yerinden, yoksa derslik adından örn. "C-02" -> C -> 2)
+        let targetFloor: number | null = getStationFloorLevel(targetStation?.name);
+        if (targetFloor === null && finalRoom && !isTargetOutdoor) {
+          targetFloor = getStationFloorLevel(finalRoom);
+        }
+
         const candidates = dutyAssignments.map(assignment => {
           const staffId    = assignment.staffId;
           const hasClass   = onDutyTimetable.some(t => t.staffId === staffId && t.period === period);
           const coverCount = coverCountMap.get(staffId) || 0;
+          const station    = assignment.station;
 
-          // Yakınlık (Proximity) Bonusu Hesaplama
-          let proximityBonus = 0;
-          if (finalRoom && assignment.station?.roomKeywords) {
-            const keywords = assignment.station.roomKeywords.split(',').map((k: string) => k.trim().toLowerCase());
-            const roomLower = finalRoom.toLowerCase();
-            if (keywords.some((k: string) => k && roomLower.includes(k))) {
-              proximityBonus = 2; // Bu sınıfa yakın, avantajlı! (Tarihsel adalette 2 görev tolere edilir)
+          const candidateFloor = getStationFloorLevel(station?.name);
+          const isCandidateOutdoor = isOutdoorStation(station?.name);
+
+          // 🎯 Kat/Nöbet Yeri Uyumu & Fiziksel Yakınlık Önceliği:
+          // matchTier: 1 = Kat Nöbetçisi (Doğrudan aynı kat / nöbet yeri, mesafe 0) -> KESİN 1. ÖNCELİK!
+          //            2 = En Yakın Kat (Komşu katlar: +1 veya -1 kat mesafe, örn. C Katı için B veya D Katı) -> 2. ÖNCELİK!
+          //            3 = 2 Kat Mesafe (örn. C Katı için A Katı) -> 3. ÖNCELİK!
+          //            4 = 3+ Kat Mesafe
+          //            5 = Diğer Bina İçi Nöbet Yeri
+          //            10 = Bahçe / Dış Alan Nöbetçisi (En son tercih)
+          let matchTier = 5;
+          let floorDistance: number | null = null;
+          let isStationMatch = false;
+          let proximityType: 'EXACT_FLOOR' | 'ADJACENT_FLOOR' | 'DISTANCE_2' | 'DISTANCE_FAR' | 'INDOOR_OTHER' | 'OUTDOOR' = 'INDOOR_OTHER';
+          let proximityLabel = 'Bina İçi';
+
+          if (targetStationId && assignment.stationId === targetStationId) {
+            matchTier = 1;
+            floorDistance = 0;
+            isStationMatch = true;
+            proximityType = 'EXACT_FLOOR';
+            proximityLabel = '🎯 Kat Nöbetçisi';
+          } else if (isTargetOutdoor) {
+            if (isCandidateOutdoor) {
+              matchTier = 1;
+              floorDistance = 0;
+              isStationMatch = true;
+              proximityType = 'EXACT_FLOOR';
+              proximityLabel = '🎯 Bahçe Nöbetçisi';
+            } else {
+              matchTier = 2;
+              floorDistance = 1;
+              proximityType = 'INDOOR_OTHER';
+              proximityLabel = 'Bina İçi';
             }
+          } else if (targetFloor !== null && candidateFloor !== null) {
+            const diff = Math.abs(targetFloor - candidateFloor);
+            floorDistance = diff;
+            if (diff === 0) {
+              matchTier = 1;
+              isStationMatch = true;
+              proximityType = 'EXACT_FLOOR';
+              proximityLabel = '🎯 Kat Nöbetçisi';
+            } else if (diff === 1) {
+              // 📍 En Yakın Komşu Kat (örn. C katı için B veya D katı!)
+              matchTier = 2;
+              proximityType = 'ADJACENT_FLOOR';
+              proximityLabel = '📍 En Yakın Kat (Komşu)';
+            } else if (diff === 2) {
+              matchTier = 3;
+              proximityType = 'DISTANCE_2';
+              proximityLabel = '2 Kat Mesafe';
+            } else {
+              matchTier = 4;
+              proximityType = 'DISTANCE_FAR';
+              proximityLabel = `${diff} Kat Mesafe`;
+            }
+          } else if (isCandidateOutdoor) {
+            matchTier = 10;
+            floorDistance = 99;
+            proximityType = 'OUTDOOR';
+            proximityLabel = '🌳 Bahçe Nöbetçisi';
+          } else {
+            matchTier = 5;
+            floorDistance = 10;
+            proximityType = 'INDOOR_OTHER';
+            proximityLabel = 'Bina İçi';
           }
+
+          let proximityBonus = 0;
+          if (matchTier === 1) proximityBonus = 200;
+          else if (matchTier === 2) proximityBonus = 100;
+          else if (matchTier === 3) proximityBonus = 50;
 
           let isEligible    = true;
           let conflictReason = '';
@@ -399,8 +587,13 @@ export class CoverAssignmentService {
             staff: assignment.staff,
             station: assignment.station,
             isFree: !hasClass,
-            coverCount, // Orijinal güncel sayı (gün içi atamalar dahil artar)
-            effectiveScore: coverCount - proximityBonus, // Sıralama için bonuslu skor
+            coverCount,
+            matchTier,
+            floorDistance,
+            proximityType,
+            proximityLabel,
+            isStationMatch,
+            effectiveScore: coverCount - proximityBonus,
             isEligible,
             conflictReason
           };
@@ -421,10 +614,20 @@ export class CoverAssignmentService {
         const teacherCandidates = eligibleCandidates.filter(c => !isVicePrincipal(c.staff.title));
         const vpCandidates      = eligibleCandidates.filter(c =>  isVicePrincipal(c.staff.title));
 
-        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
-        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
-        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
-        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort((a, b) => a.effectiveScore - b.effectiveScore);
+        // 🎯 Kademeli sıralama:
+        // 1. matchTier (1 = Aynı Kat > 2 = En Yakın Komşu Kat [B/D] > 3 = 2 Kat Mesafe [A] > 4 = 3+ Kat > 5 = Bina İçi > 10 = Bahçe)
+        // 2. coverCount (Aynı kademedeki nöbetçiler arasında daha az görev almış olan önce gelir - Adil Dağıtım)
+        // 3. station sortOrder (Eşitlik durumunda stabilite)
+        const sortCandidates = (a: any, b: any) => {
+          if (a.matchTier !== b.matchTier) return a.matchTier - b.matchTier;
+          if (a.coverCount !== b.coverCount) return a.coverCount - b.coverCount;
+          return (a.station?.sortOrder || 0) - (b.station?.sortOrder || 0);
+        };
+
+        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort(sortCandidates);
+        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort(sortCandidates);
+        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort(sortCandidates);
+        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort(sortCandidates);
 
         let selectedSubstitute: typeof candidates[0] | null = null;
         let isConflict = false;
@@ -446,6 +649,11 @@ export class CoverAssignmentService {
           className:        entry.className,
           subject:          entry.subject,
           room:             finalRoom,
+          isStationMatch:   selectedSubstitute?.isStationMatch || false,
+          matchTier:        selectedSubstitute?.matchTier ?? null,
+          floorDistance:    selectedSubstitute?.floorDistance ?? null,
+          proximityType:    selectedSubstitute?.proximityType ?? null,
+          proximityLabel:   selectedSubstitute?.proximityLabel ?? null,
           substituteStaffId: selectedSubstitute?.staff.id ?? null,
           availableDutyStaff: candidates.map(c => ({
             ...c.staff,
@@ -453,10 +661,24 @@ export class CoverAssignmentService {
             coverCount: c.coverCount,
             isEligible: c.isEligible,
             conflictReason: c.conflictReason,
+            matchTier: c.matchTier,
+            floorDistance: c.floorDistance,
+            proximityType: c.proximityType,
+            proximityLabel: c.proximityLabel,
+            isStationMatch: c.isStationMatch,
             station: c.station
           })),
           suggestedSubstitute: selectedSubstitute
-            ? { staff: selectedSubstitute.staff, station: selectedSubstitute.station, isConflict }
+            ? {
+                staff: selectedSubstitute.staff,
+                station: selectedSubstitute.station,
+                isConflict,
+                isStationMatch: selectedSubstitute.isStationMatch || false,
+                matchTier: selectedSubstitute.matchTier,
+                floorDistance: selectedSubstitute.floorDistance,
+                proximityType: selectedSubstitute.proximityType,
+                proximityLabel: selectedSubstitute.proximityLabel,
+              }
             : null
         });
       }

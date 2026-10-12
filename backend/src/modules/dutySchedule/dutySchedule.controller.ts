@@ -194,6 +194,34 @@ export class DutyScheduleController {
       res.json({ success: true, message: 'Tüm görevlendirmeler silindi.' });
     } catch (e) { next(e); }
   }
+
+  // ── Room Mappings ──
+  async getRoomStationMappings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const academicYear = req.query.academicYear as string | undefined;
+      const data = await dutyScheduleService.getRoomStationMappings(academicYear);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async saveRoomStationMappings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { mapping } = req.body;
+      if (!mapping || typeof mapping !== 'object') throw new AppError('Eşleştirme verisi zorunludur.', 400);
+      const data = await dutyScheduleService.saveRoomStationMappings(mapping);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
+
+  async getDailyDutyStaff(req: Request, res: Response, next: NextFunction) {
+    try {
+      const date = req.query.date as string;
+      const academicYear = (req.query.academicYear as string) || '2025-2026';
+      if (!date) throw new AppError('date zorunludur.', 400);
+      const data = await dutyScheduleService.getDailyDutyStaff(date, academicYear);
+      res.json({ success: true, data });
+    } catch (e) { next(e); }
+  }
 }
 
 export const dutyScheduleController = new DutyScheduleController();

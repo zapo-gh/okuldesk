@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
+import { parseAndStandardizeClass } from '../../utils/classNameFormatter';
 
 const DAYS = [
   { val: 1, label: 'Pazartesi' },
@@ -59,6 +60,7 @@ interface TimetableGridProps {
   todayDow?: number;
   getPeriodTime?: (period: number) => string | null;
   onCellClick?: (group: any) => void;
+  classDisplayMap?: Record<string, string>;
 }
 
 export default function TimetableGrid({
@@ -67,6 +69,7 @@ export default function TimetableGrid({
   todayDow,
   getPeriodTime,
   onCellClick,
+  classDisplayMap,
 }: TimetableGridProps) {
   const { periods } = useMemo(() => {
     const max = entries.length > 0 ? Math.max(...entries.map(e => e.period)) : 8;
@@ -151,7 +154,9 @@ export default function TimetableGrid({
                               {viewMode === 'teacher' ? (
                                 <>
                                   <span className="font-extrabold text-[13px] leading-tight mb-0.5 print:text-[8px] print:leading-none print:text-black print:mb-0 print:tracking-tighter">
-                                    {group.classNames.join(', ')}
+                                    {group.classNames
+                                      .map((cn: string) => parseAndStandardizeClass(cn, classDisplayMap).displayName)
+                                      .join(', ')}
                                   </span>
                                   {group.subject && (
                                     <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase print:opacity-100 print:text-[7.5px] print:leading-none print:text-black print:tracking-tighter">

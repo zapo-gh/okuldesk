@@ -19,6 +19,7 @@ interface DateRange {
   startDate: string;
   endDate?: string;
   isHalfDay: boolean;
+  halfDayPeriod?: 'morning' | 'afternoon';
 }
 
 interface StudentLeave {
@@ -44,6 +45,7 @@ export default function ParentLeavePage() {
   
   const [dateRanges, setDateRanges] = useState<DateRange[]>([]);
   const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState<'morning' | 'afternoon'>('afternoon');
   const [tempStartDate, setTempStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [tempEndDate, setTempEndDate] = useState(new Date().toISOString().slice(0, 10));
 
@@ -79,9 +81,9 @@ export default function ParentLeavePage() {
   const handleAddDate = () => {
     if (isHalfDay) {
       if (!tempStartDate) return toast.error('Lütfen tarih seçin');
-      const exists = dateRanges.some(r => r.isHalfDay && r.startDate === tempStartDate);
-      if (exists) return toast.error('Bu tarih daha önce eklenmiş.');
-      setDateRanges([...dateRanges, { startDate: tempStartDate, isHalfDay: true }]);
+      const exists = dateRanges.some(r => r.isHalfDay && r.startDate === tempStartDate && r.halfDayPeriod === halfDayPeriod);
+      if (exists) return toast.error('Bu tarih ve zaman dilimi daha önce eklenmiş.');
+      setDateRanges([...dateRanges, { startDate: tempStartDate, isHalfDay: true, halfDayPeriod }]);
     } else {
       if (!tempStartDate || !tempEndDate) return toast.error('Lütfen tarihleri seçin');
       if (new Date(tempStartDate) > new Date(tempEndDate)) return toast.error('Başlangıç tarihi bitiş tarihinden sonra olamaz');
@@ -122,6 +124,7 @@ export default function ParentLeavePage() {
     setSearchQuery('');
     setDateRanges([]);
     setIsHalfDay(false);
+    setHalfDayPeriod('afternoon');
     setTempStartDate(new Date().toISOString().slice(0, 10));
     setTempEndDate(new Date().toISOString().slice(0, 10));
     setReason('');
@@ -205,6 +208,35 @@ export default function ParentLeavePage() {
                     <input type="date" value={tempEndDate} onChange={(e) => setTempEndDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                   </div>
                 )}
+                {isHalfDay && (
+                  <div className="shrink-0">
+                    <label className="block text-xs text-slate-500 mb-1">Zaman Dilimi</label>
+                    <div className="flex bg-slate-200/80 p-0.5 rounded-lg h-[38px] items-center border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setHalfDayPeriod('morning')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                          halfDayPeriod === 'morning'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Öğleden Önce
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHalfDayPeriod('afternoon')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                          halfDayPeriod === 'afternoon'
+                            ? 'bg-white text-indigo-700 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Öğleden Sonra
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <Button type="button" onClick={handleAddDate} className="bg-slate-800 text-white hover:bg-slate-900 shrink-0">
                   <Plus size={16} className="mr-1" /> Ekle
                 </Button>
@@ -217,10 +249,12 @@ export default function ParentLeavePage() {
                     const s = new Date(range.startDate).toLocaleDateString('tr-TR');
                     const e = range.endDate ? new Date(range.endDate).toLocaleDateString('tr-TR') : s;
                     const label = s === e ? s : `${s} - ${e}`;
-                    const typeLabel = range.isHalfDay ? '(Yarım Gün)' : '(Tam Gün)';
+                    const typeLabel = range.isHalfDay
+                      ? `(Yarım Gün - ${range.halfDayPeriod === 'morning' ? 'Öğleden Önce' : 'Öğleden Sonra'})`
+                      : '(Tam Gün)';
                     return (
                       <div key={idx} className="flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-full text-sm font-medium text-slate-700 shadow-sm">
-                        {label} <span className="text-xs text-slate-500">{typeLabel}</span>
+                        {label} <span className="text-xs text-indigo-600 font-semibold">{typeLabel}</span>
                         <button type="button" onClick={() => handleRemoveDate(idx)} className="text-slate-400 hover:text-red-500 ml-1 focus:outline-none">
                           <X size={14} />
                         </button>

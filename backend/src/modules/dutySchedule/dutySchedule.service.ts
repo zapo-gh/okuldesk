@@ -366,9 +366,11 @@ class DutyScheduleService {
       }
       else if (rotationFreq === 'custom') {
         try {
-          const dates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
-          const wdTime = workDay.date.getTime();
-          rotationOffset = dates.filter(d => new Date(d).getTime() <= wdTime).length;
+          const rawDates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
+          const startDStr = dutyStartDate ? this._toDateStr(new Date(dutyStartDate)) : (settings?.dutyStartDate ? this._toDateStr(new Date(settings.dutyStartDate)) : '');
+          const transDates = rawDates.filter(d => !startDStr || d > startDStr).sort();
+          const currDateStr = this._toDateStr(workDay.date);
+          rotationOffset = transDates.filter(d => currDateStr >= d).length;
         } catch (e) {
           rotationOffset = 0;
         }
@@ -471,7 +473,6 @@ class DutyScheduleService {
     // Kaydetmeden önce follower (kopyalanacak) haftalara çoğaltma işlemi
     if (targetWeekNum !== undefined) {
       let totalDistributed = 0;
-      const numWeeks = rotationFreq === 'biweekly' ? 2 : rotationFreq === 'fourweekly' ? 4 : rotationFreq === 'monthly' ? 4 : 1;
       const allMonthWorkDays = this._getWorkDays(year, month);
       const maxWeekNumInMonth = Math.max(0, ...allMonthWorkDays.map(d => d.weekNum));
 
@@ -482,29 +483,66 @@ class DutyScheduleService {
       const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
       const parts = academicYear.split('-');
 
-      // Tüm akademik yılın hafta dizisini oluştur: [{year, month, weekNum}]
-      const allAcademicWeeks: { year: number; month: number; weekNum: number }[] = [];
+      // Tüm akademik yılın hafta dizisini oluştur: [{year, month, weekNum, days}]
+      const allAcademicWeeks: {
+        year: number;
+        month: number;
+        weekNum: number;
+        days: { date: Date; dayOfWeek: number; dayNum: number; weekNum: number }[];
+      }[] = [];
       for (const m of academicMonths) {
         const y = m >= 9 ? Number(parts[0]) : (parts[1] ? Number(parts[1]) : Number(parts[0]) + 1);
         const days = this._getWorkDays(y, m);
         const weekNums = [...new Set(days.map(d => d.weekNum))].sort((a, b) => a - b);
         for (const wn of weekNums) {
-          allAcademicWeeks.push({ year: y, month: m, weekNum: wn });
+          allAcademicWeeks.push({ year: y, month: m, weekNum: wn, days: days.filter(d => d.weekNum === wn) });
         }
       }
 
       // Şu anki hedef haftanın dizideki konumunu bul
       const baseIdx = allAcademicWeeks.findIndex(w => w.year === year && w.month === month && w.weekNum === targetWeekNum);
+
+      let numWeeks = 1;
+      if (rotationFreq === 'weekly') {
+        numWeeks = 1;
+      } else if (rotationFreq === 'biweekly') {
+        numWeeks = 2;
+      } else if (rotationFreq === 'fourweekly' || rotationFreq === 'monthly') {
+        numWeeks = 4;
+      } else if (rotationFreq === 'none') {
+        numWeeks = baseIdx !== -1 ? allAcademicWeeks.length - baseIdx : 1;
+      } else if (rotationFreq === 'custom' && baseIdx !== -1) {
+        try {
+          const rawDates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
+          const startDStr = dutyStartDate ? this._toDateStr(new Date(dutyStartDate)) : (settings?.dutyStartDate ? this._toDateStr(new Date(settings.dutyStartDate)) : '');
+          const transDates = rawDates.filter(d => !startDStr || d > startDStr).sort();
+
+          let count = 1;
+          for (let i = baseIdx + 1; i < allAcademicWeeks.length; i++) {
+            const nextW = allAcademicWeeks[i];
+            const nextMondayStr = this._toDateStr(nextW.days[0].date);
+            const prevMondayStr = this._toDateStr(allAcademicWeeks[i - 1].days[0].date);
+            const isTransition = transDates.some(t => nextMondayStr >= t && prevMondayStr < t);
+            if (isTransition) break;
+            count++;
+          }
+          numWeeks = count;
+        } catch {
+          numWeeks = 1;
+        }
+      }
+
       console.log('[DEBUG] targetWeekNum:', targetWeekNum, 'year:', year, 'month:', month, 'baseIdx:', baseIdx, 'numWeeks:', numWeeks);
       console.log('[DEBUG] baseAssignments.length:', baseAssignments.length);
-      console.log('[DEBUG] allAcademicWeeks around base:', allAcademicWeeks.slice(Math.max(0,baseIdx-1), baseIdx+5));
 
       if (baseIdx !== -1) {
         // Aynı ay içindeki follower haftaları temizle (eski kayıtlar)
         for (let i = 1; i < numWeeks; i++) {
-          const nextW = targetWeekNum + i;
-          if (nextW <= maxWeekNumInMonth) {
-            newAssignments = newAssignments.filter(a => a.weekNumber !== nextW);
+          const followerIdx = baseIdx + i;
+          if (followerIdx >= allAcademicWeeks.length) break;
+          const fw = allAcademicWeeks[followerIdx];
+          if (fw.year === year && fw.month === month) {
+            newAssignments = newAssignments.filter(a => a.weekNumber !== fw.weekNum);
           }
         }
 
@@ -622,6 +660,14 @@ class DutyScheduleService {
       totalDistributed += res.distributed;
     }
     return { distributed: totalDistributed };
+  }
+
+  // Yardımcı: Date nesnesini YYYY-MM-DD yerel tarih stringine dönüştür
+  _toDateStr(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   // Yardımcı: Yıl başından (Eylül) itibaren mutlak hafta numarasını hesapla
@@ -764,8 +810,6 @@ class DutyScheduleService {
     const parts = academicYear.split('-');
     const dutyStartDate = settings?.dutyStartDate ? new Date(settings.dutyStartDate) : new Date(`${parts[0]}-09-01`);
     const rotationFreq = settings?.dutyRotationFreq || 'weekly';
-    const numWeeksToFill = rotationFreq === 'biweekly' ? 2 : rotationFreq === 'fourweekly' ? 4 : rotationFreq === 'monthly' ? 4 : 1;
-    
     // Calculate target weeks
     const academicMonths = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
     const allAcademicWeeks: { year: number; month: number; weekNum: number; days: any[] }[] = [];
@@ -786,6 +830,37 @@ class DutyScheduleService {
         break;
       }
     }
+
+    let numWeeksToFill = 1;
+    if (rotationFreq === 'weekly') {
+      numWeeksToFill = 1;
+    } else if (rotationFreq === 'biweekly') {
+      numWeeksToFill = 2;
+    } else if (rotationFreq === 'fourweekly' || rotationFreq === 'monthly') {
+      numWeeksToFill = 4;
+    } else if (rotationFreq === 'none') {
+      numWeeksToFill = allAcademicWeeks.length - startIdx;
+    } else if (rotationFreq === 'custom') {
+      try {
+        const rawDates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
+        const startDStr = this._toDateStr(dutyStartDate);
+        const transDates = rawDates.filter(d => !startDStr || d > startDStr).sort();
+
+        let count = 1;
+        for (let i = startIdx + 1; i < allAcademicWeeks.length; i++) {
+          const nextW = allAcademicWeeks[i];
+          const nextMondayStr = this._toDateStr(nextW.days[0].date);
+          const prevMondayStr = this._toDateStr(allAcademicWeeks[i - 1].days[0].date);
+          const isTransition = transDates.some(t => nextMondayStr >= t && prevMondayStr < t);
+          if (isTransition) break;
+          count++;
+        }
+        numWeeksToFill = count;
+      } catch {
+        numWeeksToFill = 1;
+      }
+    }
+
     const targetWeeks = allAcademicWeeks.slice(startIdx, startIdx + numWeeksToFill);
     let assignmentsToCreate: any[] = [];
     
@@ -835,13 +910,148 @@ class DutyScheduleService {
         });
       }
     });
+
+    const nextTransStr = (() => {
+      try {
+        const rawDates: string[] = JSON.parse((settings as any)?.dutyRotationDates || '[]');
+        const startDStr = this._toDateStr(dutyStartDate);
+        const transDates = rawDates.filter(d => !startDStr || d > startDStr).sort();
+        return transDates[0] ? new Date(transDates[0]).toLocaleDateString('tr-TR') : '';
+      } catch { return ''; }
+    })();
+
+    const fillDesc = rotationFreq === 'custom' && nextTransStr
+      ? `sonraki rotasyon tarihine (${nextTransStr}) kadar ${numWeeksToFill} haftalık`
+      : rotationFreq === 'none'
+      ? `dönem boyunca ${numWeeksToFill} haftalık`
+      : `${numWeeksToFill} haftalık başlangıç rotasyonu`;
     
     return {
-      message: `Nöbet çizelgesi yüklendi. Nöbet başlangıç tarihi (${dutyStartDate.toLocaleDateString('tr-TR')}) baz alınarak ${numWeeksToFill} haftalık başlangıç rotasyonu dolduruldu.`,
+      message: `Nöbet çizelgesi yüklendi. Nöbet başlangıç tarihi (${dutyStartDate.toLocaleDateString('tr-TR')}) baz alınarak ${fillDesc} çizelge dolduruldu.`,
       stationsCount: stationNames.length,
       assignmentsCount: assignmentsToCreate.length,
       warnings
     };
+  }
+
+  // ── Derslik - Nöbet Yeri Eşleştirmeleri ──
+  async getRoomStationMappings(academicYear?: string) {
+    // 1. Timetable'daki tüm benzersiz derslikleri çek
+    const activeTimetable = await prisma.timetable.findFirst({
+      where: { isActive: true, ...(academicYear ? { academicYear } : {}) },
+      select: { id: true }
+    });
+
+    const timetableFilter = activeTimetable
+      ? { timetableId: activeTimetable.id }
+      : (academicYear ? { timetable: { academicYear } } : {});
+
+    const entries = await prisma.timetableEntry.findMany({
+      where: {
+        room: { not: null },
+        ...timetableFilter,
+      },
+      select: { room: true },
+      distinct: ['room'],
+    });
+
+    const timetableRooms = entries
+      .map(e => e.room?.trim())
+      .filter((r): r is string => Boolean(r && r.length > 0));
+
+    // 2. Tanımlı nöbet yerlerini çek
+    const stations = await prisma.dutyStation.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, name: true, sortOrder: true },
+    });
+
+    // 3. Kayıtlı eşleştirmeleri çek
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    let mapping: Record<string, string> = {};
+    try {
+      mapping = JSON.parse((settings as any)?.dutyRoomStationMap || '{}');
+    } catch {
+      mapping = {};
+    }
+
+    // Haritada kayıtlı olup ders programında geçmeyen derslikler varsa onları da listeye ekle
+    const allRoomsSet = new Set<string>([...timetableRooms, ...Object.keys(mapping)]);
+    const rooms = Array.from(allRoomsSet).sort((a, b) => a.localeCompare(b, 'tr-TR', { numeric: true }));
+
+    return { rooms, stations, mapping };
+  }
+
+  async saveRoomStationMappings(mapping: Record<string, string>) {
+    const jsonStr = JSON.stringify(mapping);
+    await prisma.schoolSettings.upsert({
+      where: { id: 'singleton' },
+      create: {
+        id: 'singleton',
+        dutyRoomStationMap: jsonStr,
+      } as any,
+      update: {
+        dutyRoomStationMap: jsonStr,
+      } as any,
+    });
+    return { success: true, count: Object.keys(mapping).length };
+  }
+
+  // ── Günlük Nöbetçi Öğretmen Listesi (Saatlik Çizelge Çıktısı İçin) ──
+  async getDailyDutyStaff(dateStr: string, academicYear: string) {
+    const parts = dateStr.split('-');
+    const year  = Number(parts[0]);
+    const month = Number(parts[1]);
+    const day   = Number(parts[2]);
+    const targetDateLocal = new Date(year, month - 1, day);
+
+    const prevMonthDate = new Date(year, month - 2, 1);
+    const nextMonthDate = new Date(year, month, 1);
+    const workDays = [
+      ...this._getWorkDays(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1).map(d => ({ ...d, assignedYear: prevMonthDate.getFullYear(), assignedMonth: prevMonthDate.getMonth() + 1 })),
+      ...this._getWorkDays(year, month).map(d => ({ ...d, assignedYear: year, assignedMonth: month })),
+      ...this._getWorkDays(nextMonthDate.getFullYear(), nextMonthDate.getMonth() + 1).map(d => ({ ...d, assignedYear: nextMonthDate.getFullYear(), assignedMonth: nextMonthDate.getMonth() + 1 })),
+    ];
+    
+    const workDay = workDays.find(d => d.date.getTime() === targetDateLocal.getTime());
+    if (!workDay) return [];
+
+    const { weekNum, dayOfWeek, assignedYear, assignedMonth } = workDay;
+
+    const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+    const dutyRotationFreq = settings?.dutyRotationFreq || 'weekly';
+
+    const dutyAssignmentsRaw = await prisma.dutyAssignment.findMany({
+      where: { 
+        academicYear, 
+        dayOfWeek,
+        ...(dutyRotationFreq === 'weekly' || dutyRotationFreq === 'none'
+          ? { month: 0, weekNumber: 0 }
+          : { year: assignedYear, month: assignedMonth, weekNumber: weekNum }
+        )
+      },
+      include: {
+        staff: { select: { id: true, name: true, title: true } },
+        station: { select: { id: true, name: true, sortOrder: true } }
+      },
+      orderBy: [
+        { station: { sortOrder: 'asc' } },
+        { staff: { name: 'asc' } }
+      ]
+    });
+
+    const map = new Map<string, any>();
+    for (const d of dutyAssignmentsRaw) {
+      if (!map.has(d.staffId)) {
+        map.set(d.staffId, {
+          staffId: d.staffId,
+          staff: d.staff,
+          station: d.station
+        });
+      }
+    }
+
+    return Array.from(map.values());
   }
 }
 

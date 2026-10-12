@@ -17,5 +17,12 @@ export async function initializeDatabase(): Promise<void> {
     console.log('✅ SQLite bütünlük kontrolü başarılı (ok)');
   }
   
+  // SchoolSettings tablosunda dutyRoomStationMap kolonu yoksa otomatik ekle
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "SchoolSettings" ADD COLUMN "dutyRoomStationMap" TEXT DEFAULT '{}'`);
+  } catch {
+    // Kolon zaten var, yok say
+  }
+
   console.log('✅ SQLite PRAGMA ayarları uygulandı (WAL, FK=ON)');
 }

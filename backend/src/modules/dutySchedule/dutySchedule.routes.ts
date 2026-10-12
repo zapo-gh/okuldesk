@@ -54,4 +54,11 @@ router.post('/covers',             (req, res, next) => dutyScheduleController.sa
 router.delete('/covers-clear',     (req, res, next) => dutyScheduleController.clearCoversForDate(req, res, next));
 router.delete('/covers/:id',       (req, res, next) => dutyScheduleController.deleteCover(req, res, next));
 
+// Room Mappings (Derslik - Nöbet Eşleştirmesi)
+router.get('/room-mappings',       (req, res, next) => dutyScheduleController.getRoomStationMappings(req, res, next));
+router.post('/room-mappings',      (req, res, next) => dutyScheduleController.saveRoomStationMappings(req, res, next));
+
+// Daily Duty Staff for Cover Schedule Matrix
+router.get('/daily-duty-staff',    (req, res, next) => dutyScheduleController.getDailyDutyStaff(req, res, next));
+
 export default router;

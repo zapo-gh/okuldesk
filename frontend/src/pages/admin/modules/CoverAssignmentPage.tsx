@@ -8,18 +8,21 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import {
   UserCheck, Calendar, UserX, Save, Printer, AlertTriangle,
   ExternalLink, RefreshCw, Trash2, Zap, CheckCircle, Info, Check, Copy,
-  ChevronLeft, ChevronRight, BookOpen, Clock
+  ChevronLeft, ChevronRight, BookOpen, Clock, Layers, ChevronDown, FileText, Table
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { ActionModal } from '../../../components/ui/ActionModal';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { RoomStationMappingModal } from './components/RoomStationMappingModal';
+import { CoverMatrixPrintTemplate } from './print/CoverMatrixPrintTemplate';
+import { parseAndStandardizeClass } from '../../../utils/classNameFormatter';
 
 // ─── Yazdırma Şablonu ───────────────────────────────────────────────────────
 const CoverPrintTemplate = React.forwardRef<
   HTMLDivElement,
-  { date: string; covers: any[]; absences: any[]; schoolName: string }
->(({ date, covers, absences, schoolName }, ref) => (
+  { date: string; covers: any[]; absences: any[]; schoolName: string; classDisplayMap?: Record<string, string> }
+>(({ date, covers, absences, schoolName, classDisplayMap }, ref) => (
   <div ref={ref} className="p-8 bg-white font-sans text-sm print:text-xs">
     <div className="text-center mb-6 border-b pb-4">
       <h1 className="text-lg font-bold">{schoolName}</h1>
@@ -70,7 +73,7 @@ const CoverPrintTemplate = React.forwardRef<
             <td className="border border-slate-300 p-2 text-center">{c.period}. Ders</td>
             <td className="border border-slate-300 p-2 text-center">{c.subject || '—'}</td>
             <td className="border border-slate-300 p-2 text-center">
-              <div>{c.className}</div>
+              <div>{parseAndStandardizeClass(c.className, classDisplayMap).displayName}</div>
               {c.room && <div className="text-[10px] text-slate-500 mt-0.5">{c.room}</div>}
             </td>
             <td className="border border-slate-300 p-2">{c.substituteStaff?.name || c.suggestedSubstitute?.staff?.name || '—'}</td>
@@ -89,7 +92,21 @@ export default function CoverAssignmentPage() {
   const { confirm, confirmModal } = useConfirm();
   const academicYear = settings?.academicYear || '2025-2026';
   const schoolName = settings?.schoolName || 'Okul Adı';
-  const printRef = useRef<HTMLDivElement>(null);
+
+  // Yazdırma Ref ve Durumları
+  const printStandardRef = useRef<HTMLDivElement>(null);
+  const printMatrixRef = useRef<HTMLDivElement>(null);
+  const [printFormat, setPrintFormat] = useState<'matrix' | 'standard'>('matrix');
+  const [onlyAssignedInMatrix, setOnlyAssignedInMatrix] = useState<boolean>(true);
+  const [dailyDutyStaff, setDailyDutyStaff] = useState<any[]>([]);
+
+  const classDisplayMap = useMemo<Record<string, string>>(() => {
+    try {
+      return JSON.parse(settings?.classDisplayMap || '{}');
+    } catch {
+      return {};
+    }
+  }, [settings?.classDisplayMap]);
 
   const [dateStr, setDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
@@ -119,11 +136,18 @@ export default function CoverAssignmentPage() {
 
   // Modal
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [absenceForm, setAbsenceForm] = useState({ staffId: '', startDate: dateStr, endDate: dateStr, reason: 'Raporlu', absenceTime: 'TAM_GUN' });
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `BosDesDoldurma_${dateStr}`
+  // İki farklı yazdırma çıktısı (Standart liste & Saatlik Nöbetçi Çizelgesi)
+  const handlePrintStandard = useReactToPrint({
+    contentRef: printStandardRef,
+    documentTitle: `BosDersGorevlendirme_Standart_${dateStr}`
+  });
+
+  const handlePrintMatrix = useReactToPrint({
+    contentRef: printMatrixRef,
+    documentTitle: `NobetciBosDersCizelgesi_${dateStr}`
   });
 
   // ─── Veri Yükleme ───────────────────────────────────────────────────────
@@ -133,17 +157,19 @@ export default function CoverAssignmentPage() {
     setSuggestStatus(null);
     setAbsentTeacherSchedules({});
     try {
-      const [absRes, coversRes, staffRes, timetableRes] = await Promise.all([
+      const [absRes, coversRes, staffRes, timetableRes, dutyStaffRes] = await Promise.all([
         api.get(`/duty-schedule/absences?date=${dateStr}&academicYear=${academicYear}`),
         api.get(`/duty-schedule/covers?date=${dateStr}&academicYear=${academicYear}`),
         api.get('/staff'),
-        api.get(`/timetable/active?academicYear=${academicYear}`).catch(() => ({ data: { data: null } }))
+        api.get(`/timetable/active?academicYear=${academicYear}`).catch(() => ({ data: { data: null } })),
+        api.get(`/duty-schedule/daily-duty-staff?date=${dateStr}&academicYear=${academicYear}`).catch(() => ({ data: { data: [] } }))
       ]);
       const fetchedAbsences: any[] = absRes.data.data || [];
       setAbsences(fetchedAbsences);
       setSavedCovers(coversRes.data.data || []);
       setStaffList(staffRes.data.data?.staff || staffRes.data.data || []);
       setHasTimetable(!!timetableRes.data.data);
+      setDailyDutyStaff(dutyStaffRes.data?.data || []);
 
       // B1: activeTimetable.entries artık gelmiyor — her devamsız öğretmenin programını ayrıca çek
       if (fetchedAbsences.length > 0 && timetableRes.data.data) {
@@ -178,6 +204,16 @@ export default function CoverAssignmentPage() {
       );
       const { status, message, suggestions: sugs } = res.data.data;
       setSuggestions(sugs || []);
+      if (sugs && sugs.length > 0 && sugs[0].availableDutyStaff) {
+        setDailyDutyStaff(prev => {
+          if (prev.length > 0) return prev;
+          return sugs[0].availableDutyStaff.map((st: any) => ({
+            staffId: st.id,
+            staff: { id: st.id, name: st.name, title: st.title },
+            station: st.station
+          }));
+        });
+      }
       setSuggestStatus({ status, message });
       if (status !== 'success') toast(message || 'Öneri oluşturulamadı.', { icon: '⚠️' });
     } catch {
@@ -394,6 +430,93 @@ export default function CoverAssignmentPage() {
     const empty    = total - assigned;
     return { total, assigned, empty, conflict };
   }, [displayCovers]);
+
+  // ─── Yazdırma Seçenekleri Açılır Menü Bileşeni ───
+  const PrintDropdownButton = ({ className, label }: { className?: string; label?: string }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const timeoutRef = useRef<any>(null);
+
+    const handleMouseEnter = () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setIsOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+      timeoutRef.current = setTimeout(() => setIsOpen(false), 300);
+    };
+
+    const isEnabled = displayCovers.length > 0;
+
+    return (
+      <div
+        className="relative inline-block text-left"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <Button
+          variant="outline"
+          onClick={() => setIsOpen(prev => !prev)}
+          disabled={!isEnabled}
+          className={`gap-1.5 text-xs py-1.5 border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold shadow-sm ${className || ''}`}
+          title="Yazdırma formatı seçin (üzerine gelerek de seçebilirsiniz)"
+        >
+          <Printer size={14} className="text-indigo-600" />
+          <span>{label || 'Yazdır'}</span>
+          <ChevronDown size={13} className="text-slate-400" />
+        </Button>
+
+        {isOpen && isEnabled && (
+          <div
+            className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+              Yazdırma Formatı Seçin
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setPrintFormat('matrix');
+                setIsOpen(false);
+                setTimeout(() => handlePrintMatrix(), 60);
+              }}
+              className="w-full text-left px-3.5 py-2.5 hover:bg-indigo-50/70 flex items-start gap-2.5 transition-colors border-b border-slate-100 group"
+            >
+              <Table size={18} className="text-indigo-600 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+              <div>
+                <div className="text-xs font-bold text-slate-800 group-hover:text-indigo-600">
+                  📊 Saatlik Nöbetçi Çizelgesi (Matris)
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                  Nöbetçiler, 1-11. saatler tablosu ve görevlendirme metni
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPrintFormat('standard');
+                setIsOpen(false);
+                setTimeout(() => handlePrintStandard(), 60);
+              }}
+              className="w-full text-left px-3.5 py-2.5 hover:bg-indigo-50/70 flex items-start gap-2.5 transition-colors group"
+            >
+              <FileText size={18} className="text-slate-600 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+              <div>
+                <div className="text-xs font-bold text-slate-800 group-hover:text-indigo-600">
+                  📄 Standart Liste Formatı
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                  Gelmeyen öğretmen, ders saati ve görevli tablosu
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -631,7 +754,7 @@ export default function CoverAssignmentPage() {
                       </div>
                       {/* Sınıf + Ders */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-800 text-sm">{c.className}</p>
+                        <p className="font-bold text-slate-800 text-sm">{parseAndStandardizeClass(c.className, classDisplayMap).displayName}</p>
                         {c.subject && (
                           <p className="text-xs text-slate-500 mt-0.5">{c.subject}</p>
                         )}
@@ -745,6 +868,14 @@ export default function CoverAssignmentPage() {
                   </Button>
                 )}
                 <Button
+                  variant="outline"
+                  onClick={() => setIsRoomModalOpen(true)}
+                  className="gap-2 text-xs py-1.5 border-slate-300 text-slate-700 hover:bg-slate-50"
+                  title="Derslikleri nöbet yerleriyle eşleştir"
+                >
+                  <Layers size={14} className="text-indigo-600" /> Derslik Eşleştir
+                </Button>
+                <Button
                   onClick={handleSuggest}
                   disabled={suggestLoading || !hasTimetable || absences.length === 0}
                   className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-xs py-1.5"
@@ -759,6 +890,9 @@ export default function CoverAssignmentPage() {
                   <Button onClick={handleSaveCovers} className="gap-2 bg-green-600 hover:bg-green-700 text-xs py-1.5">
                     <Save size={14} /> Atamaları Kaydet
                   </Button>
+                )}
+                {displayCovers.length > 0 && (
+                  <PrintDropdownButton />
                 )}
               </div>
             </div>
@@ -839,7 +973,9 @@ export default function CoverAssignmentPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex flex-col items-center gap-1">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-semibold">{c.className}</span>
+                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-semibold">
+                              {parseAndStandardizeClass(c.className, classDisplayMap).displayName}
+                            </span>
                             {c.room && <span className="text-[10px] text-slate-500 font-medium">{c.room}</span>}
                           </div>
                         </td>
@@ -901,21 +1037,39 @@ export default function CoverAssignmentPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 min-w-[250px]">
-                          {/* B4: SearchableSelect ile prefix tabanlı gruplama (B seçeneği) */}
+                          {/* B4: SearchableSelect ile prefix tabanlı gruplama ve Kat Nöbetçisi rozeti */}
                           <SearchableSelect
                             options={[
                               { value: '', label: '— Seçin —' },
                               { value: 'CANCEL', label: '❌ İptal Et / Nöbetçi İstenmiyor' },
-                              ...(sug.availableDutyStaff?.filter((s: any) => s.isEligible).map((st: any) => ({
-                                value: st.id,
-                                label: `✓ ${st.name} (${st.coverCount} Görev)`,
-                                subLabel: st.station?.name ? (st.station.name.length > 20 ? st.station.name.substring(0, 20) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'
-                              })) || []),
-                              ...(sug.availableDutyStaff?.filter((s: any) => !s.isEligible).map((st: any) => ({
-                                value: st.id,
-                                label: `⚠ ${st.name} (${st.coverCount} Görev) — ${st.conflictReason}`,
-                                subLabel: st.station?.name ? (st.station.name.length > 20 ? st.station.name.substring(0, 20) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'
-                              })) || [])
+                              ...(sug.availableDutyStaff?.filter((s: any) => s.isEligible).map((st: any) => {
+                                let icon = '✓ ';
+                                let badge = '';
+                                if (st.matchTier === 1 || st.isStationMatch) {
+                                  icon = '🎯 ';
+                                  badge = ' [KAT NÖBETÇİSİ]';
+                                } else if (st.matchTier === 2 || st.proximityType === 'ADJACENT_FLOOR') {
+                                  icon = '📍 ';
+                                  badge = ' [EN YAKIN KAT]';
+                                } else if (st.matchTier === 10 || st.proximityType === 'OUTDOOR') {
+                                  icon = '🌳 ';
+                                  badge = ' [BAHÇE]';
+                                }
+                                const prox = st.proximityLabel || (st.isStationMatch ? 'Kat Nöbetçisi' : '');
+                                return {
+                                  value: st.id,
+                                  label: `${icon}${st.name} (${st.coverCount} Görev)${badge}`,
+                                  subLabel: `${prox ? prox + ' • ' : ''}${st.station?.name ? (st.station.name.length > 25 ? st.station.name.substring(0, 25) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'}`
+                                };
+                              }) || []),
+                              ...(sug.availableDutyStaff?.filter((s: any) => !s.isEligible).map((st: any) => {
+                                const prox = st.proximityLabel || (st.isStationMatch ? 'Kat Nöbetçisi' : '');
+                                return {
+                                  value: st.id,
+                                  label: `⚠ ${st.name} (${st.coverCount} Görev) — ${st.conflictReason}`,
+                                  subLabel: `${prox ? prox + ' • ' : ''}${st.station?.name ? (st.station.name.length > 25 ? st.station.name.substring(0, 25) + '...' : st.station.name) : 'Görev Yeri Belirtilmemiş'}`
+                                };
+                              }) || [])
                             ]}
                             value={sug.substituteStaffId || ''}
                             onChange={val => updateSuggestion(i, val)}
@@ -928,13 +1082,40 @@ export default function CoverAssignmentPage() {
                                   <Info size={11} /> Bu saatte dersi var veya kural ihlali
                                 </p>
                               )}
-                              <p className="text-[10px] text-slate-500 font-medium">
-                                Nöbet: {(() => {
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {(() => {
                                   const st = sug.availableDutyStaff?.find((s: any) => s.id === sug.substituteStaffId);
-                                  const name = st?.station?.name || 'Belirtilmedi';
-                                  return name.length > 25 ? name.substring(0, 25) + '...' : name;
+                                  if (st?.matchTier === 1 || st?.isStationMatch) {
+                                    return (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        🎯 Kat Nöbetçisi
+                                      </span>
+                                    );
+                                  }
+                                  if (st?.matchTier === 2 || st?.proximityType === 'ADJACENT_FLOOR') {
+                                    return (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                                        📍 En Yakın Komşu Kat
+                                      </span>
+                                    );
+                                  }
+                                  if (st?.matchTier === 10 || st?.proximityType === 'OUTDOOR') {
+                                    return (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                        🌳 Bahçe Nöbetçisi
+                                      </span>
+                                    );
+                                  }
+                                  return null;
                                 })()}
-                              </p>
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                  Nöbet: {(() => {
+                                    const st = sug.availableDutyStaff?.find((s: any) => s.id === sug.substituteStaffId);
+                                    const name = st?.station?.name || 'Belirtilmedi';
+                                    return name.length > 25 ? name.substring(0, 25) + '...' : name;
+                                  })()}
+                                </p>
+                              </div>
                             </div>
                           )}
                           {!sug.substituteStaffId && (
@@ -962,28 +1143,113 @@ export default function CoverAssignmentPage() {
 
       {/* ─── TAB CONTENT: PRINT ─── */}
       {activeTab === 'print' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">Yazdırma Önizlemesi</h3>
-              <Button variant="outline" onClick={() => handlePrint()} className="gap-2" disabled={displayCovers.length === 0}>
-                <Printer size={16} /> Yazdır
-              </Button>
+            <div className="px-6 py-3.5 border-b border-slate-200 flex flex-wrap justify-between items-center bg-slate-50 gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Printer size={16} className="text-indigo-600" /> Yazdırma Önizlemesi
+                </h3>
+                {/* Şablon Değiştirme Butonları */}
+                <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPrintFormat('matrix')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition ${
+                      printFormat === 'matrix'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Table size={14} /> Saatlik Çizelge (Matris)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintFormat('standard')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition ${
+                      printFormat === 'standard'
+                        ? 'bg-white text-indigo-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <FileText size={14} /> Standart Liste
+                  </button>
+                </div>
+
+                {printFormat === 'matrix' && (
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 transition">
+                    <input
+                      type="checkbox"
+                      checked={onlyAssignedInMatrix}
+                      onChange={e => setOnlyAssignedInMatrix(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>Sadece Görevi Olanları Göster</span>
+                  </label>
+                )}
+              </div>
+
+              {/* Yazdır Açılır Menü Butonu */}
+              <PrintDropdownButton label={printFormat === 'matrix' ? 'Çizelgeyi Yazdır' : 'Listeyi Yazdır'} />
             </div>
-            <div className="p-6 overflow-hidden">
-              <div className="border border-slate-200 rounded-xl overflow-x-auto">
-                <CoverPrintTemplate
-                  ref={printRef}
-                  date={dateStr}
-                  covers={displayCovers.filter(c => !c.isCancelled)}
-                  absences={absences}
-                  schoolName={schoolName}
-                />
+
+            {/* Önizleme Alanı */}
+            <div className="p-6 overflow-hidden bg-slate-100/50">
+              <div className="bg-white border border-slate-300 rounded-xl overflow-x-auto shadow-sm max-w-full">
+                {printFormat === 'matrix' ? (
+                  <CoverMatrixPrintTemplate
+                    ref={printMatrixRef}
+                    date={dateStr}
+                    covers={displayCovers.filter(c => !c.isCancelled)}
+                    absences={absences}
+                    dailyDutyStaff={dailyDutyStaff}
+                    staffList={staffList}
+                    schoolName={schoolName}
+                    onlyAssigned={onlyAssignedInMatrix}
+                    classDisplayMap={classDisplayMap}
+                  />
+                ) : (
+                  <CoverPrintTemplate
+                    ref={printStandardRef}
+                    date={dateStr}
+                    covers={displayCovers.filter(c => !c.isCancelled)}
+                    absences={absences}
+                    schoolName={schoolName}
+                    classDisplayMap={classDisplayMap}
+                  />
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Off-screen Container: Her iki ref de DOM'da sürekli canlı kalsın (her sekmeden yazdırılabilmesi için) */}
+      <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '1200px' }}>
+        {activeTab !== 'print' || printFormat !== 'standard' ? (
+          <CoverPrintTemplate
+            ref={activeTab !== 'print' || printFormat === 'matrix' ? printStandardRef : undefined}
+            date={dateStr}
+            covers={displayCovers.filter(c => !c.isCancelled)}
+            absences={absences}
+            schoolName={schoolName}
+            classDisplayMap={classDisplayMap}
+          />
+        ) : null}
+        {activeTab !== 'print' || printFormat !== 'matrix' ? (
+          <CoverMatrixPrintTemplate
+            ref={activeTab !== 'print' || printFormat === 'standard' ? printMatrixRef : undefined}
+            date={dateStr}
+            covers={displayCovers.filter(c => !c.isCancelled)}
+            absences={absences}
+            dailyDutyStaff={dailyDutyStaff}
+            staffList={staffList}
+            schoolName={schoolName}
+            onlyAssigned={onlyAssignedInMatrix}
+            classDisplayMap={classDisplayMap}
+          />
+        ) : null}
+      </div>
 
       {/* İzin Ekleme Modal */}
       <ActionModal
@@ -1061,6 +1327,16 @@ export default function CoverAssignmentPage() {
           </div>
         </form>
       </ActionModal>
+
+      {/* ─── DERSLİK - NÖBET YERİ EŞLEŞTİRME MODALI ─── */}
+      <RoomStationMappingModal
+        isOpen={isRoomModalOpen}
+        onClose={() => setIsRoomModalOpen(false)}
+        academicYear={academicYear}
+        onSaved={() => {
+          toast.success('Derslik eşleştirmeleri güncellendi');
+        }}
+      />
     </div>
   );
 }

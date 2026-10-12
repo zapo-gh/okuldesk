@@ -20,7 +20,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
-import { LayoutDashboard, Receipt } from 'lucide-react';
+import { LayoutDashboard, Receipt, FolderArchive } from 'lucide-react';
 
 interface DashboardData {
   totalStudents: number;
@@ -87,7 +87,8 @@ export default function DashboardPage() {
   const cards = [
     { icon: Users,         value: data.totalStudents,                  label: 'Aktif Öğrenci',    color: 'text-blue-600',    bg: 'bg-blue-50',    path: '/admin/students' },
     { icon: UserCheck,     value: data.totalStaff,                     label: 'Aktif Personel',    color: 'text-indigo-600',  bg: 'bg-indigo-50',  path: '/admin/staff' },
-    { icon: CheckCircle2,  value: data.fieldTripsCount,                label: 'Planlı Gezi',      color: 'text-emerald-600', bg: 'bg-emerald-50', path: '/admin/field-trip' },
+    // [GELECEKTE GELİŞTİRİLECEK] { icon: CheckCircle2, value: data.fieldTripsCount, label: 'Planlı Gezi', path: '/admin/field-trip' },
+    { icon: FolderArchive, value: 'Aktif',                             label: 'Klasör Sırtlığı',  color: 'text-emerald-600', bg: 'bg-emerald-50', path: '/admin/folder-spines' },
     { icon: Briefcase,     value: data.commissionsCount,               label: 'Aktif Komisyon',    color: 'text-orange-600',  bg: 'bg-orange-50',  path: '/admin/commission' },
     { icon: Clock,         value: data.dutyCount,                      label: 'Nöbet Yeri',        color: 'text-purple-600',  bg: 'bg-purple-50',  path: '/admin/duty-schedule' },
     { icon: FileText,      value: data.absenteeism.total,              label: 'Devamsızlık Kaydı', color: 'text-cyan-600',    bg: 'bg-cyan-50',    path: '/admin/absenteeism' },
@@ -125,7 +126,8 @@ export default function DashboardPage() {
               Bugün Cuma. Nöbet yerlerinde {
                 settings.dutyRotationFreq === 'weekly' ? 'haftalık' :
                 settings.dutyRotationFreq === 'biweekly' ? '2 haftalık' :
-                settings.dutyRotationFreq === 'fourweekly' ? '4 haftalık' : 'aylık'
+                settings.dutyRotationFreq === 'fourweekly' ? '4 haftalık' :
+                settings.dutyRotationFreq === 'custom' ? 'özel tarihlere göre' : 'aylık'
               } rotasyon uygulanıyor. Gelecek haftanın nöbet yerlerini oluşturmayı unutmayın.
             </p>
           </div>

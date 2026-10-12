@@ -9,6 +9,7 @@ interface Settings {
   dutyRotationFreq?: string;
   dutyRotationDates?: string; // JSON string → string[] (özel rotasyon tarihleri)
   dutyStartDate?: string | null; // "YYYY-MM-DD" — nöbet başlangıç tarihi
+  classDisplayMap?: string; // JSON string: { [rawClassName: string]: displayName }
 }
 
 interface SettingsContextType {
