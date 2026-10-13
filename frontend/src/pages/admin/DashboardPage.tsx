@@ -16,7 +16,6 @@ import {
   Users,
   XCircle,
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useSettings } from '../../context/SettingsContext';
@@ -178,38 +177,6 @@ export default function DashboardPage() {
           <MiniStat value={data.invoices.odendi} label="Ödendi" className="text-green-600" />
         </DetailCard>
       </section>
-
-      {/* Chart Section */}
-      {data.chartData && data.chartData.length > 0 && (
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-bold text-slate-900">Son 30 Gün İhlal ve Devamsızlık Trendi</h2>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorIhlal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorDevamsizlik" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#cbd5e1" />
-                <YAxis tick={{ fontSize: 12 }} stroke="#cbd5e1" />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
-                />
-                <Area type="monotone" name="İhlal" dataKey="ihlal" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorIhlal)" />
-                <Area type="monotone" name="Devamsızlık" dataKey="devamsizlik" stroke="#4f46e5" strokeWidth={2} fillOpacity={1} fill="url(#colorDevamsizlik)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-      )}
     </div>
   );
 }

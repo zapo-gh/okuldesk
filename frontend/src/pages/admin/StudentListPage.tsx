@@ -7,12 +7,13 @@ import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X, Printer } from 'lucide-react';
+import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X, Printer, Download, ShieldCheck } from 'lucide-react';
 import { Student, ParsedStudent, ImportResult, ParentPreviewRow, ParentImportResult } from './students/types';
 import { StudentNewModal } from './students/StudentNewModal';
 import { StudentEditModal } from './students/StudentEditModal';
 import { StudentImportModal } from './students/StudentImportModal';
 import { ParentImportModal } from './students/ParentImportModal';
+import { DeleteAllSecurityModal } from './students/DeleteAllSecurityModal';
 import { useReactToPrint } from 'react-to-print';
 import { useSettings } from '../../context/SettingsContext';
 import StudentListPrintTemplate from './students/StudentListPrintTemplate';
@@ -66,6 +67,27 @@ export default function StudentListPage() {
   const [parentDone, setParentDone] = useState<ParentImportResult | null>(null);
   const parentFileRef = useRef<HTMLInputElement>(null);
 
+  // WhatsApp Onay Export
+  const [exportingConsents, setExportingConsents] = useState(false);
+  const handleExportConsents = async () => {
+    setExportingConsents(true);
+    try {
+      const res = await api.get('/whatsapp/consents/export', { responseType: 'blob' });
+      const date = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `WhatsApp_Iletisim_Onay_Listesi_${date}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('WhatsApp onay listesi Excel olarak indirildi.');
+    } catch (err: any) {
+      toast.error('Onay listesi indirilirken bir hata oluştu.');
+    } finally {
+      setExportingConsents(false);
+    }
+  };
+
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
@@ -89,6 +111,11 @@ export default function StudentListPage() {
   // Bulk delete state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Delete all security modal state
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+  const [totalSystemStudents, setTotalSystemStudents] = useState<number>(0);
 
   const displayClasses = search 
     ? Array.from(new Set(students.map(s => s.className)))
@@ -172,6 +199,8 @@ export default function StudentListPage() {
       const res = await api.get('/students/classes');
       const classList = res.data.data || [];
       setClasses(classList);
+      const totalFromClasses = classList.reduce((sum: number, c: any) => sum + (c.count || 0), 0);
+      setTotalSystemStudents(totalFromClasses);
       if (classList.length > 0 && !activeClass) {
         setActiveClass(classList[0].name);
       }
@@ -266,19 +295,45 @@ export default function StudentListPage() {
     }
   };
 
-  const handleDeleteAll = async () => {
-    if (!await confirm('TÜM ÖĞRENCİLERİ (ve onlara bağlı devamsızlık/not vb. kayıtları) SİLMEK istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
+  const handleDeleteAllClick = async () => {
+    let total = classes.reduce((sum, c) => sum + (c.count || 0), 0);
     try {
-      await api.delete('/students/bulk/delete-all');
-      toast.success('Tüm öğrenciler silindi.');
+      const countRes = await api.get('/students?limit=1&status=ALL');
+      const totalFromApi = countRes.data?.data?.pagination?.total;
+      if (typeof totalFromApi === 'number') {
+        total = totalFromApi;
+      }
+    } catch {
+      // fallback to classes sum
+    }
+
+    setTotalSystemStudents(total);
+
+    if (total === 0) {
+      toast('Sistemde silinecek öğrenci kaydı bulunamadı.');
+      return;
+    }
+    setShowDeleteAllModal(true);
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    setDeleteAllLoading(true);
+    try {
+      const res = await api.delete('/students/bulk/delete-all');
+      const deletedCount = res.data?.data?.deletedCount ?? totalSystemStudents;
+      toast.success(`Okul genelindeki tüm öğrenciler (${deletedCount} kayıt) başarıyla silindi.`);
+      setShowDeleteAllModal(false);
       setSelectedIds(new Set());
       setPage(1);
       setActiveClass('');
       loadStudents();
-      const res = await api.get('/students/classes');
-      setClasses(res.data.data || []);
-    } catch (error) {
-      toast.error('Silme işlemi başarısız oldu.');
+      const classRes = await api.get('/students/classes');
+      setClasses(classRes.data.data || []);
+      setTotalSystemStudents(0);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Silme işlemi başarısız oldu.');
+    } finally {
+      setDeleteAllLoading(false);
     }
   };
 
@@ -581,11 +636,20 @@ export default function StudentListPage() {
         actions={
           <>
             <Button 
-              onClick={handleDeleteAll}
+              onClick={handleDeleteAllClick}
               variant="outline"
               className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
             >
               <Trash2 size={16} /> Tümünü Sil
+            </Button>
+            <Button 
+              onClick={handleExportConsents}
+              disabled={exportingConsents}
+              variant="outline"
+              title="Velilerden alınan WhatsApp onay durumlarını Excel listesi olarak indirir"
+              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+            >
+              <Download size={16} /> Onayları İndir
             </Button>
             <Button 
               onClick={() => { resetParentModal(); setShowParentModal(true); }}
@@ -860,6 +924,17 @@ export default function StudentListPage() {
         handleParentFileSelect={handleParentFileSelect}
         resetParentModal={resetParentModal}
         handleParentImportConfirm={handleParentImportConfirm}
+      />
+
+      {/* Delete All Security Modal */}
+      <DeleteAllSecurityModal
+        isOpen={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleConfirmDeleteAll}
+        loading={deleteAllLoading}
+        totalStudents={totalSystemStudents || classes.reduce((sum, c) => sum + (c.count || 0), 0)}
+        totalClasses={classes.length}
+        activeClassName={activeClass}
       />
 
       {/* Hidden Print Container */}

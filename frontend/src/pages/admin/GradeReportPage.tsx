@@ -1,12 +1,32 @@
 import toast from 'react-hot-toast';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import api from '../../services/api';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useSettings } from '../../context/SettingsContext';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { printPdfBlob } from '../../utils/printPdf';
 import { ActionModal } from '../../components/ui/ActionModal';
-import { LineChart, UploadCloud, Archive, ClipboardList, Trash2, FileText, Check, AlertTriangle, Eye, Download, Search, Loader2, Printer } from 'lucide-react';
+import { 
+  LineChart, 
+  UploadCloud, 
+  Archive, 
+  ClipboardList, 
+  Trash2, 
+  FileText, 
+  Check, 
+  AlertTriangle, 
+  Eye, 
+  Download, 
+  Search, 
+  Loader2, 
+  Printer,
+  FileSpreadsheet,
+  X,
+  Calendar,
+  Sparkles,
+  Info
+} from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 interface FailedSubject { subject: string; grade: number; }
@@ -17,10 +37,14 @@ type GenResult = { id: string; name: string; pdfPath: string | null; error?: str
 
 export default function GradeReportPage() {
   const { confirm, confirmModal } = useConfirm();
+  const { settings } = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [schoolYear,      setSchoolYear]      = useState('2025 / 2026');
+  const [schoolYear,      setSchoolYear]      = useState(settings?.academicYear || '2025-2026');
   const [meetingDate,     setMeetingDate]      = useState(new Date().toISOString().slice(0, 10));
+  const [selectedFile,    setSelectedFile]     = useState<File | null>(null);
+  const [isDragging,      setIsDragging]       = useState(false);
+
   const [uploading,       setUploading]        = useState(false);
   const [generating,      setGenerating]       = useState(false);
   const [bulkDownloading, setBulkDownloading]  = useState(false);
@@ -42,6 +66,58 @@ export default function GradeReportPage() {
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [studentSearchResults, setStudentSearchResults] = useState<any[]>([]);
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
+
+  useEffect(() => {
+    if (settings?.academicYear) {
+      setSchoolYear(settings.academicYear);
+    }
+  }, [settings?.academicYear]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (['xlsx', 'xls', 'pdf'].includes(ext || '')) {
+        setSelectedFile(file);
+      } else {
+        toast.error('Lütfen geçerli bir Excel (.xlsx, .xls) veya PDF dosyası seçin.');
+      }
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedFile(null);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const handleSearchStudents = async (query: string) => {
     setStudentSearchQuery(query);
@@ -75,6 +151,7 @@ export default function GradeReportPage() {
       setMatchModalOpen(false);
       setStudentSearchQuery('');
       setStudentSearchResults([]);
+      toast.success('Öğrenci veritabanı ile eşleştirildi.');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Eşleştirme başarısız.');
     }
@@ -82,8 +159,8 @@ export default function GradeReportPage() {
 
   // ── Analiz
   const handleAnalyze = async () => {
-    void 0; setResult(null); setGenResults([]); setSelectedIds(new Set());
-    const file = fileRef.current?.files?.[0];
+    setResult(null); setGenResults([]); setSelectedIds(new Set());
+    const file = selectedFile || fileRef.current?.files?.[0];
     if (!file) { toast.error('Lütfen bir Excel veya PDF dosyası seçin.'); return; }
 
     const formData = new FormData();
@@ -111,13 +188,14 @@ export default function GradeReportPage() {
   // ── PDF Oluştur
   const handleGenerate = async () => {
     if (!result) return;
-    void 0; setGenerating(true);
+    setGenerating(true);
     try {
       const res = await api.post<{ success: boolean; data: GenResult[] }>(
         `/grade-reports/${result.reportId}/generate-pdfs`, {},
         { timeout: 300000 },
       );
       setGenResults(res.data.data);
+      toast.success('Tüm bildirim PDF belgeleri oluşturuldu.');
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || 'PDF oluşturma hatası');
     } finally { setGenerating(false); }
@@ -133,6 +211,7 @@ export default function GradeReportPage() {
     } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
     finally { setLoadingList(false); }
   };
+
   // ── Arşivlenmiş raporları yükle
   const handleLoadArchived = async () => {
     try {
@@ -148,6 +227,7 @@ export default function GradeReportPage() {
     try {
       await api.delete(`/grade-reports/${conflictInfo.existingId}`);
       setReports(prev => prev?.filter(r => r.id !== conflictInfo.existingId) ?? null);
+      toast.success('Eski rapor silindi.');
     } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
     finally { setConflictInfo(null); }
   };
@@ -159,10 +239,12 @@ export default function GradeReportPage() {
       await api.patch(`/grade-reports/${conflictInfo.existingId}/archive`);
       setReports(prev => prev?.filter(r => r.id !== conflictInfo.existingId) ?? null);
       setArchivedReports(null);
+      toast.success('Eski rapor arşive taşındı.');
     } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
     finally { setConflictInfo(null); }
   };
-  // ── Tek PDF görüntüle
+
+  // ── Tek PDF görüntüle / yazdır
   const handleDownload = async (studentId: string, studentName: string) => {
     try {
       const res = await api.get(`/grade-reports/students/${studentId}/pdf`, { responseType: 'blob' });
@@ -171,11 +253,10 @@ export default function GradeReportPage() {
     } catch { toast.error('PDF görüntüleme başarısız.'); }
   };
 
-  // ── Toplu PDF birleştir ve indir
+  // ── Toplu PDF birleştir ve yazdır
   const handleBulkDownload = async () => {
     if (selectedIds.size === 0 || !result) return;
     setBulkDownloading(true);
-    void 0;
     try {
       const mergedPdf = await PDFDocument.create();
       const orderedIds = result.students.filter(s => selectedIds.has(s.id)).map(s => s.id);
@@ -203,6 +284,7 @@ export default function GradeReportPage() {
       await api.delete(`/grade-reports/${id}`);
       setReports(prev => prev?.filter(r => r.id !== id) ?? null);
       if (result?.reportId === id) { setResult(null); setGenResults([]); setSelectedIds(new Set()); }
+      toast.success('Rapor silindi.');
     } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
   };
 
@@ -246,126 +328,283 @@ export default function GradeReportPage() {
   const someSelected      = selectedIds.size > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* ── 1. Page Header ── */}
       <PageHeader
         title="Başarısızlık Riski Bildirimi"
         description="Not listesi yükleyin — 4 veya daha fazla zayıfı olan öğrenciler için veli bildirim formu oluşturun."
-        icon={<LineChart size={28} />}
+        icon={<LineChart size={24} />}
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button 
-              onClick={() => activePanel === 'reports' ? setActivePanel('none') : handleLoadReports}
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (activePanel === 'reports') {
+                  setActivePanel('none');
+                } else {
+                  handleLoadReports();
+                }
+              }}
               disabled={loadingList}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePanel === 'reports' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+              leftIcon={<ClipboardList size={16} />}
+              className={activePanel === 'reports' ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}
             >
-              <ClipboardList size={18} />
               {activePanel === 'reports' ? 'Analize Dön' : 'Kayıtlı Raporlar'}
               {reports && activePanel !== 'reports' && (
-                <span className="ml-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">{reports.length}</span>
+                <span className="ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  {reports.length}
+                </span>
               )}
             </Button>
             <Button 
-              onClick={() => { activePanel === 'archived' ? setActivePanel('none') : handleLoadArchived(); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activePanel === 'archived' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+              variant="outline"
+              size="sm"
+              onClick={() => { 
+                if (activePanel === 'archived') {
+                  setActivePanel('none');
+                } else {
+                  handleLoadArchived();
+                }
+              }}
+              leftIcon={<Archive size={16} />}
+              className={activePanel === 'archived' ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}
             >
-              <Archive size={18} />
               {activePanel === 'archived' ? 'Arşivi Kapat' : 'Arşiv'}
+              {archivedReports && activePanel !== 'archived' && (
+                <span className="ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                  {archivedReports.length}
+                </span>
+              )}
             </Button>
           </div>
         }
       />
 
-      
-
-      {/* ── Yükleme formu ── */}
+      {/* ── 2. Yükleme Formu ── */}
       {activePanel === 'none' && !result && (
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><UploadCloud size={20} /></div>
-            Not Listesi Yükle
-          </h2>
-
-          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl mb-6">
-            <div className="flex gap-3">
-              <FileText className="text-amber-600 shrink-0" size={24} />
-              <div>
-                <p className="font-bold text-amber-800 text-sm mb-1">Yüklenecek rapor: OOK07003R035</p>
-                <p className="text-amber-700 text-sm">e-Okul &gt; Raporlar bölümünden <strong className="font-semibold">«Öğrenci Dönem Sonu Ders Notu Ortalamaları»</strong> raporunu Excel (.xlsx) olarak indirip yükleyin.</p>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          {/* Kart Başlığı */}
+          <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <UploadCloud size={20} />
               </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Not Listesi Yükleme & Analiz</h2>
+                <p className="text-xs text-slate-500 font-medium">e-Okul ders notu ortalamaları raporunu yükleyerek 4 ve üzeri zayıfı olan öğrencileri listeleyin.</p>
+              </div>
+            </div>
+            
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200/80 rounded-lg text-xs font-semibold self-start sm:self-auto">
+              <FileSpreadsheet size={14} className="text-amber-600" />
+              <span>Rapor Kodu: <strong>OOK07003R035</strong></span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Komisyon Toplantı Tarihi</label>
-              <input
-                type="date"
-                value={meetingDate}
-                onChange={e => setMeetingDate(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-shadow text-sm"
-              />
+          <div className="p-4 sm:p-5 space-y-4">
+            {/* Açıklama Banner'ı */}
+            <div className="bg-amber-50/60 border border-amber-200/70 rounded-xl p-3.5 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-amber-100/80 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
+                <Info size={16} />
+              </div>
+              <div className="text-xs text-amber-900/90 leading-relaxed">
+                <p className="font-bold text-amber-950 mb-0.5">Rapor İndirme Adımı:</p>
+                <p>
+                  <strong>e-Okul &gt; Raporlar</strong> menüsünden <strong className="text-amber-950">«Öğrenci Dönem Sonu Ders Notu Ortalamaları»</strong> (OOK07003R035) raporunu <strong>Excel (.xlsx)</strong> olarak indirip aşağıdaki alana yükleyin.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Dosya (Excel / PDF)</label>
-              <div className="relative">
+
+            {/* Parametre Alanları */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" />
+                  Komisyon Toplantı Tarihi
+                </label>
                 <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+                  type="date"
+                  value={meetingDate}
+                  onChange={e => setMeetingDate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-800 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Eğitim Öğretim Yılı
+                </label>
+                <input
+                  type="text"
+                  placeholder="2025-2026"
+                  value={schoolYear}
+                  onChange={e => setSchoolYear(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-800 transition"
                 />
               </div>
             </div>
-          </div>
 
-          <Button 
-            onClick={handleAnalyze}
-            disabled={uploading}
-            variant="primary"
-          >
-            {uploading ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"/> Analiz Ediliyor...</> : <><Search size={20} /> Analiz Et</>}
-          </Button>
+            {/* Modern Dosya Seçici / Sürükle-Bırak Alanı */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Rapor Dosyası (Excel / PDF)
+              </label>
+
+              {!selectedFile ? (
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all cursor-pointer relative group ${
+                    isDragging
+                      ? 'border-indigo-500 bg-indigo-50/60 ring-4 ring-indigo-500/10'
+                      : 'border-slate-300 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20'
+                  }`}
+                >
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-2.5 group-hover:scale-105 group-hover:bg-indigo-100 transition-all shadow-2xs">
+                    <UploadCloud size={24} />
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-slate-800 mb-1">
+                    Excel veya PDF dosyasını buraya sürükleyin veya <span className="text-indigo-600 underline underline-offset-2">seçin</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Desteklenen formatlar: <strong className="text-slate-700">.xlsx, .xls, .pdf</strong> (Maks. 25 MB)
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                      {selectedFile.name.endsWith('.pdf') ? (
+                        <FileText size={20} className="text-red-500" />
+                      ) : (
+                        <FileSpreadsheet size={20} className="text-emerald-600" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                          {selectedFile.name}
+                        </p>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                          Hazır
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {formatFileSize(selectedFile.size)} • {selectedFile.type || 'Belge'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileRef.current?.click()}
+                      className="h-8 px-2.5 text-xs text-slate-700 bg-white border-slate-300 hover:bg-slate-50"
+                    >
+                      Değiştir
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+                      title="Dosyayı kaldır"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Alt Buton Alanı */}
+            <div className="pt-2 flex justify-end">
+              <Button 
+                onClick={handleAnalyze}
+                disabled={!selectedFile || uploading}
+                variant="primary"
+                leftIcon={uploading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                className="w-full sm:w-auto px-5 text-xs font-semibold"
+              >
+                {uploading ? 'Not Listesi Analiz Ediliyor...' : 'Listeyi Analiz Et'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── Raporlar paneli ── */}
+      {/* ── 3. Raporlar Paneli ── */}
       {activePanel === 'reports' && reports && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ClipboardList size={20} /></div>
-              Kayıtlı Raporlar
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ClipboardList size={18} className="text-indigo-600" />
+              <span>Kayıtlı Raporlar</span>
             </h2>
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">{reports.length} Rapor</span>
+            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-xs font-bold">
+              {reports.length} Rapor
+            </span>
           </div>
 
           {reports.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 text-sm">Henüz kayıtlı rapor bulunmuyor.</div>
+            <div className="p-10 text-center text-slate-500 text-xs">Henüz kayıtlı rapor bulunmuyor.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eğitim Yılı</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Toplantı</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yüklenme</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Sınıf</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Eğitim Yılı</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Toplantı Tarihi</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Öğrenci Sayısı</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Yüklenme Tarihi</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
+                <tbody className="bg-white divide-y divide-slate-100">
                   {reports.map(r => (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{r.className || '—'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.schoolYear}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r._count.students}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button onClick={() => handleLoadReport(r.id)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Görüntüle"><Eye size={18}/></Button>
-                          <Button onClick={() => handleDeleteReport(r.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Sil"><Trash2 size={18}/></Button>
+                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3 text-xs font-bold text-slate-900">{r.className || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{r.schoolYear}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-900">{r._count.students}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        <div className="flex justify-end gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => handleLoadReport(r.id)} 
+                            className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition" 
+                            title="Raporu Görüntüle"
+                          >
+                            <Eye size={15}/>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteReport(r.id)} 
+                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition" 
+                            title="Raporu Sil"
+                          >
+                            <Trash2 size={15}/>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -377,50 +616,67 @@ export default function GradeReportPage() {
         </div>
       )}
 
-      {/* ── Arşiv paneli ── */}
+      {/* ── 4. Arşiv Paneli ── */}
       {activePanel === 'archived' && archivedReports && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-amber-900 flex items-center gap-2">
-              <div className="p-2 text-amber-600 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"><Archive size={20} /></div>
-              Arşivlenmiş Raporlar
+          <div className="p-4 border-b border-amber-100 bg-amber-50/60 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+              <Archive size={18} className="text-amber-700" />
+              <span>Arşivlenmiş Raporlar</span>
             </h2>
-            <span className="px-3 py-1 bg-white text-amber-700 rounded-full text-xs font-bold shadow-sm">{archivedReports.length} Rapor</span>
+            <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 rounded-full text-xs font-bold">
+              {archivedReports.length} Rapor
+            </span>
           </div>
 
           {archivedReports.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 text-sm">Arşivlenmiş rapor bulunmuyor.</div>
+            <div className="p-10 text-center text-slate-500 text-xs">Arşivlenmiş rapor bulunmuyor.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Eğitim Yılı</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Toplantı</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci</th>
-                    <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Yüklenme</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">İşlem</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Sınıf</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Eğitim Yılı</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Toplantı Tarihi</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Öğrenci Sayısı</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Yüklenme Tarihi</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
+                <tbody className="bg-white divide-y divide-slate-100">
                   {archivedReports.map(r => (
-                    <tr key={r.id} className="hover:bg-amber-50/30 transition-colors group opacity-80 hover:opacity-100">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{r.className || '—'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{r.schoolYear}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{r._count.students}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" onClick={() => handleLoadReport(r.id)} className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors" title="Sil"><Eye size={18}/></Button>
-                          <Button onClick={async () => {
-                            if (!await confirm('Bu arşiv raporunu kalıcı olarak silmek istiyor musunuz?')) return;
-                            try {
-                              await api.delete(`/grade-reports/${r.id}`);
-                              setArchivedReports(prev => prev?.filter(x => x.id !== r.id) ?? null);
-                            } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
-                          }} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Kalıcı Olarak Sil"><Trash2 size={18}/></Button>
+                    <tr key={r.id} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="px-4 py-3 text-xs font-bold text-slate-900">{r.className || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{r.schoolYear}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{new Date(r.meetingDate).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-4 py-3 text-xs font-semibold text-slate-900">{r._count.students}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{new Date(r.uploadedAt).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-4 py-3 text-right text-xs">
+                        <div className="flex justify-end gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => handleLoadReport(r.id)} 
+                            className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition" 
+                            title="Raporu Aç"
+                          >
+                            <Eye size={15}/>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={async () => {
+                              if (!await confirm('Bu arşiv raporunu kalıcı olarak silmek istiyor musunuz?')) return;
+                              try {
+                                await api.delete(`/grade-reports/${r.id}`);
+                                setArchivedReports(prev => prev?.filter(x => x.id !== r.id) ?? null);
+                                toast.success('Arşiv raporu kalıcı olarak silindi.');
+                              } catch (err: any) { toast.error(err.response?.data?.message || err.message); }
+                            }} 
+                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition" 
+                            title="Kalıcı Olarak Sil"
+                          >
+                            <Trash2 size={15}/>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -432,126 +688,181 @@ export default function GradeReportPage() {
         </div>
       )}
 
-      {/* ── Analiz sonuçları ── */}
+      {/* ── 5. Analiz Sonuçları ── */}
       {result && activePanel === 'none' && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h2 className="text-xl font-bold text-gray-900">Analiz Sonuçları</h2>
+              <div className="flex items-center gap-2.5 mb-1">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Analiz Sonuçları</h2>
                 {result.className && (
-                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm font-bold rounded-full">
+                  <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold rounded-full">
                     {result.className}
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 flex items-center gap-2">
-                <span className="font-semibold text-gray-700">{result.studentCount}</span> öğrencide 4 veya daha fazla zayıf tespit edildi.
+              <p className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
+                <span>
+                  <strong className="text-slate-800">{result.studentCount}</strong> öğrencide 4 veya daha fazla zayıf tespit edildi.
+                </span>
                 {successCount > 0 && (
-                  <span className="text-green-600 font-semibold flex items-center gap-1">
-                    <Check size={14}/> {successCount}/{genResults.length} PDF oluşturuldu.
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check size={13} className="text-emerald-600"/> {successCount}/{genResults.length} PDF oluşturuldu
                   </span>
                 )}
               </p>
             </div>
             
-            <div className="flex gap-3">
-              <Button onClick={() => { setResult(null); setGenResults([]); setSelectedIds(new Set()); }} variant="outline">
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => { setResult(null); setGenResults([]); setSelectedIds(new Set()); }} 
+                variant="outline"
+                size="sm"
+                className="text-xs text-slate-700 bg-white border-slate-300 hover:bg-slate-50"
+              >
                 Yeni Analiz
               </Button>
-              <Button onClick={handleGenerate} disabled={generating} variant="primary">
-                {generating ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> Oluşturuluyor...</> : <><FileText size={16}/> Tüm PDF'leri Oluştur</>}
+              <Button 
+                onClick={handleGenerate} 
+                disabled={generating} 
+                variant="primary"
+                size="sm"
+                leftIcon={generating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                className="text-xs"
+              >
+                {generating ? 'Oluşturuluyor...' : 'Tüm PDF\'leri Oluştur'}
               </Button>
             </div>
           </div>
 
           {result.students.some(s => !s.matched) && (
-            <div className="bg-red-50 px-6 py-3 border-b border-red-100 flex items-center gap-4 text-red-800 text-sm">
-              <AlertTriangle size={18} className="text-red-600" />
-              <span><strong>Uyarı:</strong> Veritabanında eşleştirilemeyen {result.students.filter(s => !s.matched).length} öğrenci var. Öğrencilerin yanındaki "Eşleştir" butonuna tıklayarak manuel eşleştirme yapabilirsiniz.</span>
+            <div className="bg-red-50/80 px-4 py-2.5 border-b border-red-100 flex items-center gap-2.5 text-red-800 text-xs">
+              <AlertTriangle size={16} className="text-red-600 shrink-0" />
+              <span>
+                <strong>Uyarı:</strong> Veritabanında eşleştirilemeyen <strong>{result.students.filter(s => !s.matched).length}</strong> öğrenci var. Öğrencilerin yanındaki "Eşleştir" butonuna tıklayarak manuel eşleştirme yapabilirsiniz.
+              </span>
             </div>
           )}
 
           {someSelected && (
-            <div className="bg-blue-50 px-6 py-3 border-b border-blue-100 flex items-center gap-4 animate-in fade-in">
-              <span className="text-sm font-bold text-blue-800">✓ {selectedIds.size} öğrenci seçildi</span>
-              {selectedHavePdfs && (
-                <Button
-                  onClick={handleBulkDownload}
-                  disabled={bulkDownloading}
-                  variant="primary"
-                >
-                  {bulkDownloading ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
-                  {bulkDownloading ? 'Birleştiriliyor...' : 'Seçilenleri Yazdır'}
-                </Button>
-              )}
-              <Button onClick={() => setSelectedIds(new Set())} className="text-xs font-semibold text-gray-500 hover:text-gray-700 underline underline-offset-2">Seçimi Temizle</Button>
+            <div className="bg-indigo-50/70 px-4 py-2.5 border-b border-indigo-100 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-indigo-900">✓ {selectedIds.size} öğrenci seçildi</span>
+                {selectedHavePdfs && (
+                  <Button
+                    onClick={handleBulkDownload}
+                    disabled={bulkDownloading}
+                    variant="primary"
+                    size="sm"
+                    leftIcon={bulkDownloading ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                    className="h-7 text-xs"
+                  >
+                    {bulkDownloading ? 'Birleştiriliyor...' : 'Seçilenleri Yazdır'}
+                  </Button>
+                )}
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSelectedIds(new Set())} 
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2"
+              >
+                Seçimi Temizle
+              </button>
             </div>
           )}
 
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="text-center w-12 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></th>
-                  <th className="text-left w-12 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">#</th>
-                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Öğrenci Adı</th>
-                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Sınıf</th>
-                  <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Veritabanı Eşleşmesi</th>
-                  <th className="text-left w-1/3 text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Zayıf Dersler</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">PDF</th>
+                  <th className="text-center w-10 px-3 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    <input 
+                      type="checkbox" 
+                      checked={allSelected} 
+                      onChange={toggleAll} 
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                    />
+                  </th>
+                  <th className="text-left w-10 px-3 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">#</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Öğrenci Adı</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Sınıf</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Veritabanı Eşleşmesi</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">Zayıf Dersler</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">PDF</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
+              <tbody className="bg-white divide-y divide-slate-100">
                 {result.students.map((stu, idx) => {
-                  const genRes   = genResults.find(g => g.id === stu.id);
-                  const hasPdf   = genRes?.pdfPath || stu.pdfPath;
+                  const genRes     = genResults.find(g => g.id === stu.id);
+                  const hasPdf     = genRes?.pdfPath || stu.pdfPath;
                   const isSelected = selectedIds.has(stu.id);
                   
                   return (
-                    <tr key={stu.id} className={`${isSelected ? 'bg-indigo-50/50' : 'hover:bg-gray-50'} transition-colors`}>
-                      <td className="px-4 py-3 text-center"><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(stu.id)} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></td>
-                      <td className="px-4 py-3 text-sm text-gray-400 font-medium">{idx + 1}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-900">{stu.fullName}</td>
-                      <td className="px-4 py-3">
-                        {stu.className ? <span className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded text-xs font-bold">{stu.className}</span> : <span className="text-gray-400">—</span>}
+                    <tr key={stu.id} className={`${isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/70'} transition-colors`}>
+                      <td className="px-3 py-2.5 text-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => toggleSelect(stu.id)} 
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                        />
                       </td>
-                      <td className="px-4 py-3">
-                        {stu.matched ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                            <Check size={12}/> {stu.dbStudentName || 'Eşleşti'}
+                      <td className="px-3 py-2.5 text-xs text-slate-400 font-medium">{idx + 1}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="text-xs font-bold text-slate-900">{stu.fullName}</div>
+                        {stu.schoolNumber && (
+                          <div className="text-[11px] text-slate-500 font-medium">No: {stu.schoolNumber}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {stu.className ? (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/80 rounded text-[11px] font-bold">
+                            {stu.className}
                           </span>
                         ) : (
-                          <Button
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {stu.matched ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Check size={11} className="text-emerald-600"/> {stu.dbStudentName || 'Eşleşti'}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
                             onClick={() => { setSelectedStudentToMatch(stu); setMatchModalOpen(true); }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
                             title="Manuel eşleştirmek için tıklayın"
                           >
                             ✗ Eşleşme yok (Eşleştir)
-                          </Button>
+                          </button>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
+                      <td className="px-4 py-2.5">
+                        <div className="flex flex-wrap gap-1.5">
                           {stu.failedSubjects.map((f, fi) => (
-                            <span key={fi} className="px-2 py-1 bg-red-50 border border-red-100 rounded text-xs font-semibold text-red-700">
+                            <span key={fi} className="px-2 py-0.5 bg-red-50 border border-red-100/90 rounded text-[11px] font-semibold text-red-700">
                               {f.subject} ({f.grade})
                             </span>
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2.5 text-center">
                         {hasPdf ? (
-                          <Button
+                          <button
+                            type="button"
                             onClick={() => handleDownload(stu.id, stu.fullName)}
-                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                            className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition"
                             title="Yazdır"
                           >
-                            <Printer size={18} />
-                          </Button>
+                            <Printer size={15} />
+                          </button>
                         ) : genRes?.error ? (
-                          <span title={genRes.error} className="text-red-500"><AlertTriangle size={18}/></span>
-                        ) : <span className="text-gray-300">—</span>}
+                          <span title={genRes.error} className="text-red-500 inline-block"><AlertTriangle size={16}/></span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -561,20 +872,20 @@ export default function GradeReportPage() {
           </div>
           
           {genResults.length > 0 && (
-            <div className={`p-4 flex items-center gap-3 border-t ${successCount === genResults.length ? 'bg-green-50 border-green-100 text-green-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
-              <div className="p-1.5 rounded-full bg-white shadow-sm shrink-0">
-                {successCount === genResults.length ? <Check size={20} className="text-green-600"/> : <AlertTriangle size={20} className="text-amber-600"/>}
+            <div className={`p-3.5 flex items-center gap-3 border-t ${successCount === genResults.length ? 'bg-emerald-50/70 border-emerald-100 text-emerald-800' : 'bg-amber-50/70 border-amber-100 text-amber-800'}`}>
+              <div className="p-1 rounded-full bg-white shadow-2xs shrink-0">
+                {successCount === genResults.length ? <Check size={16} className="text-emerald-600"/> : <AlertTriangle size={16} className="text-amber-600"/>}
               </div>
-              <p className="text-sm font-medium">
+              <p className="text-xs font-medium">
                 <strong className="font-bold">{successCount}/{genResults.length} PDF başarıyla oluşturuldu.</strong> 
-                {successCount > 0 && " PDF'leri indirmek için tablo satırlarındaki butonu kullanın veya satırları seçip 'Tek PDF'e İndir' yapın."}
+                {successCount > 0 && " PDF'leri yazdırmak için satırlardaki butonları kullanabilir veya sol kutucukları işaretleyip 'Seçilenleri Yazdır' yapabilirsiniz."}
               </p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Çakışma modali ── */}
+      {/* ── 6. Çakışma Modalı ── */}
       <ActionModal
         isOpen={!!conflictInfo}
         onClose={() => setConflictInfo(null)}
@@ -583,26 +894,27 @@ export default function GradeReportPage() {
         cancelText="Şimdilik kalsın"
       >
         <div className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
-            <AlertTriangle size={32} />
+          <div className="mx-auto w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-3">
+            <AlertTriangle size={24} />
           </div>
-          <p className="text-sm text-gray-600 mb-6 px-4">
-            <strong className="font-bold text-gray-900">{conflictInfo?.className}</strong> sınıfına ait kayıtlı bir rapor zaten var.
+          <p className="text-xs sm:text-sm text-slate-600 mb-5 px-3">
+            <strong className="font-bold text-slate-900">{conflictInfo?.className}</strong> sınıfına ait kayıtlı bir rapor zaten var.
             Yeni analiz kaydedildi. Eski raporu ne yapmak istersiniz?
           </p>
-          <div className="space-y-3">
-            <Button onClick={handleConflictArchive} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition flex justify-center items-center gap-2">
-              <Archive size={18}/> Eski raporu arşivle
+          <div className="space-y-2.5">
+            <Button onClick={handleConflictArchive} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition flex justify-center items-center gap-2 text-xs">
+              <Archive size={16}/> Eski raporu arşivle
             </Button>
-            <Button onClick={handleConflictDelete} variant="danger">
-              <Trash2 size={18}/> Eski raporu sil
+            <Button onClick={handleConflictDelete} variant="danger" className="w-full py-2.5 text-xs">
+              <Trash2 size={16}/> Eski raporu sil
             </Button>
           </div>
         </div>
       </ActionModal>
 
       {confirmModal}
-      {/* ── Manuel Eşleştirme Modalı ── */}
+
+      {/* ── 7. Manuel Eşleştirme Modalı ── */}
       <ActionModal
         isOpen={matchModalOpen}
         onClose={() => { setMatchModalOpen(false); setStudentSearchQuery(''); setStudentSearchResults([]); }}
@@ -610,40 +922,41 @@ export default function GradeReportPage() {
         hideSubmit
         width="lg"
       >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Karnedeki <strong className="text-gray-900">{selectedStudentToMatch?.fullName}</strong> ({selectedStudentToMatch?.className}) öğrencisi veritabanında bulunamadı. Lütfen aşağıdan arama yaparak doğru öğrenciyi seçin.
+        <div className="space-y-3.5">
+          <p className="text-xs text-slate-600">
+            Karnedeki <strong className="text-slate-900">{selectedStudentToMatch?.fullName}</strong> ({selectedStudentToMatch?.className}) öğrencisi veritabanında bulunamadı. Lütfen aşağıdan arama yaparak doğru öğrenciyi seçin:
           </p>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-gray-400" />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Search size={16} />
             </div>
             <input
               type="text"
               placeholder="Öğrenci adı veya numarası ara..."
               value={studentSearchQuery}
               onChange={(e) => handleSearchStudents(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              className="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs bg-white"
               autoFocus
             />
           </div>
           
-          <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-lg">
+          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
             {isSearchingStudents ? (
-              <div className="p-4 flex items-center justify-center text-sm text-gray-500 gap-2">
-                <Loader2 size={16} className="animate-spin" /> Aranıyor...
+              <div className="p-4 flex items-center justify-center text-xs text-slate-500 gap-2">
+                <Loader2 size={14} className="animate-spin text-indigo-500" /> Aranıyor...
               </div>
             ) : studentSearchResults.length > 0 ? (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {studentSearchResults.map(stu => (
-                  <li key={stu.id} className="p-3 hover:bg-gray-50 flex items-center justify-between transition-colors">
+                  <li key={stu.id} className="p-2.5 hover:bg-indigo-50/50 flex items-center justify-between transition-colors">
                     <div>
-                      <div className="font-bold text-gray-900 text-sm">{stu.fullName}</div>
-                      <div className="text-xs text-gray-500">{stu.schoolNumber} • {stu.className}</div>
+                      <div className="font-bold text-slate-900 text-xs">{stu.fullName}</div>
+                      <div className="text-[11px] text-slate-500">{stu.schoolNumber} • {stu.className}</div>
                     </div>
                     <Button
+                      size="sm"
                       onClick={() => handleConfirmMatch(stu.id, stu.fullName)}
-                      className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-colors"
+                      className="px-2.5 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-xs font-bold transition-colors border border-indigo-200"
                     >
                       Seç
                     </Button>
@@ -651,7 +964,7 @@ export default function GradeReportPage() {
                 ))}
               </ul>
             ) : studentSearchQuery.length >= 2 ? (
-              <div className="p-4 text-center text-sm text-gray-500">Sonuç bulunamadı.</div>
+              <div className="p-4 text-center text-xs text-slate-500">Sonuç bulunamadı.</div>
             ) : null}
           </div>
         </div>

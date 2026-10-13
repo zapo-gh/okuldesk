@@ -14,6 +14,7 @@ interface Props {
   formatDate: (d: string) => string;
   onPreview: (r: AbsenteeismRecord) => void;
   onDelete: (id: string) => void;
+  onViewPDF: (r: AbsenteeismRecord) => void;
 }
 
 export function AbsenteeismTable({
@@ -24,6 +25,7 @@ export function AbsenteeismTable({
   formatDate,
   onPreview,
   onDelete,
+  onViewPDF,
 }: Props) {
   const unsent = records.filter((r) => !r.waSentAt);
   const sent = records.filter((r) => r.waSentAt);
@@ -33,19 +35,19 @@ export function AbsenteeismTable({
       <table className="min-w-full divide-y divide-gray-100">
         <thead className="bg-gray-50">
           <tr>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Öğrenci
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Sınıf
             </th>
             <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Uyarı No
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Durum
             </th>
-            <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
               Tarih
             </th>
             <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">
@@ -81,24 +83,7 @@ export function AbsenteeismTable({
                       formatDate={formatDate}
                       onPreview={() => onPreview(r)}
                       onDelete={() => onDelete(r.id)}
-                      onViewPDF={async () => {
-                        try {
-                          const response = await api.get(`/absenteeism/${r.id}/pdf`, {
-                            responseType: "blob",
-                          });
-                          const url = window.URL.createObjectURL(
-                            new Blob([response.data], { type: "application/pdf" })
-                          );
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.target = "_blank";
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                        } catch (err) {
-                          toast.error("Mektup açılamadı.");
-                        }
-                      }}
+                      onViewPDF={() => onViewPDF(r)}
                     />
                   ))}
                 </>
@@ -122,16 +107,7 @@ export function AbsenteeismTable({
                       formatDate={formatDate}
                       onPreview={() => onPreview(r)}
                       onDelete={() => onDelete(r.id)}
-                      onViewPDF={async () => {
-                        try {
-                          const response = await api.get(`/absenteeism/${r.id}/pdf`, {
-                            responseType: "blob",
-                          });
-                          printPdfBlob(new Blob([response.data], { type: "application/pdf" }));
-                        } catch (err) {
-                          toast.error("Mektup açılamadı.");
-                        }
-                      }}
+                      onViewPDF={() => onViewPDF(r)}
                     />
                   ))}
                 </>
@@ -202,13 +178,14 @@ const RecordRow = ({
               {!r.waSentAt && "Gönder"}
             </Button>
           )}
-          <Button
+          <button
+            type="button"
             onClick={onViewPDF}
-            className="p-1.5 text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded shadow-sm transition"
-            title="Mektubu PDF olarak aç"
+            className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors"
+            title="Mektubu PDF olarak aç ve görüntüle"
           >
             <FileText size={16} />
-          </Button>
+          </button>
           <Button variant="ghost" onClick={onDelete}  className="text-red-600 hover:text-red-900 px-2 py-1 transition-colors" title="Kaydı Sil">
             <Trash2 size={16} />
           </Button>

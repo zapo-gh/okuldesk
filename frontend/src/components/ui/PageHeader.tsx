@@ -32,7 +32,7 @@ export function PageHeader({
 
   const headerContent = (
     <div
-      className={`relative flex items-center justify-between gap-4 px-6 py-4 rounded-xl shadow-md overflow-hidden ${
+      className={`relative flex items-center justify-between gap-4 px-6 py-4 rounded-xl shadow-md overflow-hidden w-full min-w-0 max-w-full ${
         hidePrint ? 'print:hidden' : ''
       }`}
       style={{

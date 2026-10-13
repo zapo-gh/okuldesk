@@ -1,5 +1,4 @@
 import { ClipboardList, UserPlus } from "lucide-react";
-import { Button } from '../../../components/ui/Button';
 
 type Tab = "entry" | "history";
 
@@ -9,36 +8,36 @@ interface Props {
 }
 
 /**
- * ViolationsPage ana sekme cesidi (Yeni Ihlal Kaydi / Ihlal Gecmisi).
+ * ViolationsPage ana sekme çubuğu (Yeni İhlal Kaydı / İhlal Geçmişi).
  */
 export function ViolationTabBar({ activeTab, onTabChange }: Props) {
   return (
-    <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex justify-center">
-      <div className="inline-flex bg-gray-200/70 p-1.5 rounded-xl shadow-inner gap-2 w-full md:w-auto">
-        <Button
-          variant="ghost"
+    <div className="p-3 bg-slate-50/70 border-b border-slate-200 flex justify-center">
+      <div className="inline-flex bg-slate-200/80 p-1 rounded-xl gap-1.5 w-full sm:w-auto">
+        <button
+          type="button"
           onClick={() => onTabChange("entry")}
-          className={`flex-1 md:flex-none relative flex items-center justify-center gap-2 px-8 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
             activeTab === "entry"
-              ? "bg-white text-indigo-700 shadow-[0_2px_8px_rgb(0,0,0,0.08)] ring-1 ring-black/5 scale-100"
-              : "text-gray-500 hover:text-gray-800 hover:bg-gray-200/50 scale-95"
+              ? "bg-white text-indigo-700 shadow-2xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
           }`}
         >
-          <UserPlus size={18} className={activeTab === "entry" ? "text-indigo-600" : "text-gray-400"} />
+          <UserPlus size={15} className={activeTab === "entry" ? "text-indigo-600" : "text-slate-400"} />
           <span>Yeni İhlal Kaydı</span>
-        </Button>
-        <Button
-          variant="ghost"
+        </button>
+        <button
+          type="button"
           onClick={() => onTabChange("history")}
-          className={`flex-1 md:flex-none relative flex items-center justify-center gap-2 px-8 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${
+          className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
             activeTab === "history"
-              ? "bg-white text-indigo-700 shadow-[0_2px_8px_rgb(0,0,0,0.08)] ring-1 ring-black/5 scale-100"
-              : "text-gray-500 hover:text-gray-800 hover:bg-gray-200/50 scale-95"
+              ? "bg-white text-indigo-700 shadow-2xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
           }`}
         >
-          <ClipboardList size={18} className={activeTab === "history" ? "text-indigo-600" : "text-gray-400"} />
-          <span>İhlal Geçmişi</span>
-        </Button>
+          <ClipboardList size={15} className={activeTab === "history" ? "text-indigo-600" : "text-slate-400"} />
+          <span>İhlal Geçmişi & Sorgu</span>
+        </button>
       </div>
     </div>
   );

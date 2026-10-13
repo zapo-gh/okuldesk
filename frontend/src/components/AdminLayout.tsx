@@ -313,17 +313,17 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 h-screen flex flex-col transform translate-x-0 bg-slate-100/75 print:h-auto print:bg-white print:p-0 print:transform-none">
+      <main className="flex-1 min-w-0 max-w-full h-screen flex flex-col transform translate-x-0 bg-slate-100 print:h-auto print:bg-white print:p-0 print:transform-none overflow-x-hidden">
         {/* Sabit Başlık Alanı (Kaydırma dışı, asla yukarı kaymaz ve içerik altına girmez) */}
-        <div id="page-header-slot" className="shrink-0 px-4 md:px-6 pt-3 pb-1 empty:hidden print:hidden" />
+        <div id="page-header-slot" className="shrink-0 w-full min-w-0 max-w-full px-4 md:px-6 pt-3 pb-1 empty:hidden print:hidden overflow-hidden" />
 
-        <div className="flex-1 overflow-y-auto print:overflow-visible">
+        <div className="flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden print:overflow-visible">
           <Suspense fallback={
-            <div className="flex h-full w-full items-center justify-center min-h-screen bg-slate-100/75">
+            <div className="flex h-full w-full items-center justify-center min-h-screen bg-slate-100">
               <div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent opacity-60" />
             </div>
           }>
-            <div className="px-4 md:px-6 pt-2 pb-6 print:p-0">
+            <div className="w-full min-w-0 max-w-full px-4 md:px-6 pt-2 pb-6 print:p-0">
               <Outlet />
             </div>
           </Suspense>

@@ -61,6 +61,33 @@ class TebligController {
     }
   }
 
+  async getPdf(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const doc = await prisma.tebligDocument.findUnique({
+        where: { id, deletedAt: null },
+      });
+      if (!doc || !doc.pdfPath) {
+        return res.status(404).json({ success: false, message: 'Belge bulunamadı.' });
+      }
+
+      const relativePath = doc.pdfPath.replace(/^\/uploads\/?/, '');
+      const fullPath = path.join(config.upload.dir, relativePath);
+
+      if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ success: false, message: 'PDF dosyası bulunamadı.' });
+      }
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${path.basename(fullPath)}"`,
+      });
+      res.sendFile(fullPath);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;

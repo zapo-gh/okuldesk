@@ -6,57 +6,66 @@ import { absenteeismService } from '../absenteeism/absenteeism.service';
 import { getFullPageBuffer } from '../absenteeism/pdfPreview.service';
 import { settingsService } from '../settings/settings.service';
 import prisma from '../shared/utils/prisma';
+import { whatsappConsentService } from './whatsappConsent.service';
 
 // ── Devamsızlık mesaj şablonları (varsayılan) ─────────────────────────────────
 // Kullanıcı Settings sayfasından kendi şablonunu girebilir.
 // Yer tutucular: {{ogrenciAdi}} {{ozurluGun}} {{ozursuzGun}} {{toplamGun}} {{okulAdi}} {{uyariNo}}
 
 const DEFAULT_WA_TEMPLATES: Record<number, string> = {
-  1: `*Devamsızlık Mektubu – {{uyariNo}}. Uyarı*
+  1: `📩 *ÖĞRENCİ DEVAMSIZLIK BİLGİLENDİRMESİ*
+_(1. Uyarı Bildirimi)_
 
 Sayın Velimiz,
 
-Okulumuz öğrencisi *{{ogrenciAdi}}*'nın devamsızlığı; *{{ozurluGun}} gün özürlü, {{ozursuzGun}} gün özürsüz* olmak üzere *toplam {{toplamGun}} gündür.*
+Okulumuz *{{okulAdi}}* bünyesinde öğrenim gören öğrencimiz *{{ogrenciAdi}}*'nın güncel devamsızlık durumu aşağıda bilgilerinize sunulmuştur:
 
-Öğrencinizin okula devamının sağlanması hususunda gereğini önemle rica ederiz.
+▫️ *Özürsüz Devamsızlık:* {{ozursuzGun}} Gün
+▫️ *Özürlü (İzin/Rapor):* {{ozurluGun}} Gün
+▫️ *Toplam Devamsızlık:* {{toplamGun}} Gün
 
-Bu mesaj, devamsızlık mektubu ve yasal bildirim niteliğinde olup, ilgili yönetmelik gereği tarafınıza gönderilmiştir.
+Milli Eğitim Bakanlığı mevzuatı gereği öğrencimizin devamsızlık sınırlarını aşmaması ve ders başarısının olumsuz etkilenmemesi adına okula düzenli devamının sağlanmasını önemle rica ederiz.
 
-{{okulAdi}}`,
+📌 *Not:* Detaylı devamsızlık mektubu ve ilgili belgeler okul idaremiz tarafından resmi kayıt altına alınmıştır.
 
-  2: `*Devamsızlık Mektubu – {{uyariNo}}. Uyarı*
+Saygılarımızla,
+*{{okulAdi}} MÜDÜRLÜĞÜ*`,
 
-Sayın Velimiz,
-
-Milli Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliğine göre; özürsüz devamsızlığı 10 günü, toplam devamsızlığı 30 günü aşan öğrenciler, ders puanlarına bakılmaksızın başarısız sayılmaktadır.
-
-Okulumuz öğrencisi *{{ogrenciAdi}}*'nın devamsızlığı; *{{ozurluGun}} gün özürlü, {{ozursuzGun}} gün özürsüz* olmak üzere *toplam {{toplamGun}} gündür.*
-
-*Toplam devamsızlığı 30 günü aşan öğrenciler, ders puanları ne olursa olsun başarısız sayılmakta ve sınıf tekrarına kalmaktadır.* Öğrencinin daha önce sınıf tekrarı yapmış olması hâlinde ise örgün eğitim hakkı sona ermekte ve öğrenci örgün eğitim dışına çıkarılmaktadır.
-
-*Öğrencinizin okula devamının sağlanması hususunda gereğini önemle rica ederiz.*
-
-Bu mesaj, devamsızlık mektubu ve yasal bildirim niteliğinde olup, ilgili yönetmelik gereği tarafınıza gönderilmiştir.
-
-{{okulAdi}}`,
-
-  3: `*Devamsızlık Mektubu – {{uyariNo}}. Uyarı*
+  2: `⚠️ *ÖĞRENCİ DEVAMSIZLIK UYARISI*
+_(2. Kritik Seviye Uyarısı)_
 
 Sayın Velimiz,
 
-Milli Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliğine göre; özürsüz devamsızlığı 10 günü, toplam devamsızlığı 30 günü aşan öğrenciler, ders puanlarına bakılmaksızın başarısız sayılmaktadır.
+Öğrencimiz *{{ogrenciAdi}}*'nın devamsızlık süresi yasal sınır eşiğine yaklaşmış bulunmaktadır:
 
-Okulumuz öğrencisi *{{ogrenciAdi}}*'nın devamsızlığı; *{{ozurluGun}} gün özürlü, {{ozursuzGun}} gün özürsüz* olmak üzere *toplam {{toplamGun}} gündür.*
+▫️ *Özürsüz Devamsızlık:* {{ozursuzGun}} Gün
+▫️ *Özürlü (İzin/Rapor):* {{ozurluGun}} Gün
+▫️ *Toplam Devamsızlık:* {{toplamGun}} Gün
 
-*Toplam devamsızlığı 30 günü aşan öğrenciler, ders puanları ne olursa olsun başarısız sayılmakta ve sınıf tekrarına kalmaktadır.* Öğrencinin daha önce sınıf tekrarı yapmış olması hâlinde ise örgün eğitim hakkı sona ermekte ve öğrenci örgün eğitim dışına çıkarılmaktadır.
+⚠️ *Yasal Hatırlatma:* MEB Ortaöğretim Kurumları Yönetmeliği uyarınca; özürsüz devamsızlığı 10 günü veya toplam devamsızlığı 30 günü aşan öğrenciler, ders puanlarına bakılmaksızın başarısız sayılarak sınıf tekrarına kalmaktadır.
 
-Öğrencinizin okula devamının sağlanması hususunda gereğini önemle rica ederiz.
+Öğrencimizin eğitim hakkının kesintiye uğramaması adına devamsızlık durumunun ivedilikle takip edilmesini ve mazeret belgelerinin (varsa sevk/rapor) süresi içerisinde okul idaremize teslim edilmesini rica ederiz.
 
-*Konuyla ilgili detaylı bilgi için ilgili müdür yardımcısı ile görüşmeniz gerekmektedir.*
+Saygılarımızla,
+*{{okulAdi}} MÜDÜRLÜĞÜ*`,
 
-Bu mesaj, devamsızlık mektubu ve yasal bildirim niteliğinde olup, ilgili yönetmelik gereği tarafınıza gönderilmiştir.
+  3: `🚨 *ÖNEMLİ VE ACİL: DEVAMSIZLIK SON UYARISI*
+_(3. Uyarı - Yasal Sınır Eşiği Bildirimi)_
 
-{{okulAdi}}`,
+Sayın Velimiz,
+
+Öğrencimiz *{{ogrenciAdi}}*'nın devamsızlığı kritik yasal sınır aşamasına ulaşmıştır:
+
+▫️ *Özürsüz Devamsızlık:* {{ozursuzGun}} Gün
+▫️ *Özürlü (İzin/Rapor):* {{ozurluGun}} Gün
+▫️ *Toplam Devamsızlık:* {{toplamGun}} Gün
+
+🛑 *DİKKAT:* MEB mevzuatına göre özürsüz 10 gün veya toplam 30 gün devamsızlık sınırının aşılması durumunda öğrencinin doğrudan sınıf tekrarına kalacağını, daha önce sınıf tekrarı yapmış olması hâlinde ise örgün eğitim dışına çıkarılacağını önemle hatırlatırız.
+
+Öğrencimizin durumunu görüşmek ve gerekli yasal süreçleri tamamlamak üzere en kısa sürede okulumuz ilgili müdür yardımcılığı ile görüşmeniz gerekmektedir.
+
+Saygılarımızla,
+*{{okulAdi}} MÜDÜRLÜĞÜ*`,
 };
 
 // BEP (Bireysel Eğitim Planı) öğrencileri için şablon — tüm uyarı seviyeleri için aynı
@@ -100,6 +109,14 @@ function parsePercent(raw: unknown): number | undefined {
   return Math.min(100, Math.max(0, n));
 }
 
+function formatSchoolClosing(schoolName: string): string {
+  const clean = (schoolName || '').trim();
+  if (!clean) return 'Okul Müdürlüğü';
+  if (/müdürlüğü$/i.test(clean)) return clean;
+  const isUpper = clean === clean.toLocaleUpperCase('tr-TR');
+  return isUpper ? `${clean} MÜDÜRLÜĞÜ` : `${clean} Müdürlüğü`;
+}
+
 function buildAbsenteeismMessage(opts: {
   template: string;
   studentName: string;
@@ -110,6 +127,7 @@ function buildAbsenteeismMessage(opts: {
 }): string {
   const { template, studentName, warningNumber, excusedDays, unexcusedDays, schoolName } = opts;
   const total = (excusedDays ?? 0) + (unexcusedDays ?? 0);
+  const closingName = formatSchoolClosing(schoolName);
 
   // Fonksiyonlu replace: değerlerdeki '$&' gibi dizilerin özel anlam kazanmasını önler
   return template
@@ -117,6 +135,7 @@ function buildAbsenteeismMessage(opts: {
     .replace(/\{\{ozurluGun\}\}/g, () => formatDay(excusedDays))
     .replace(/\{\{ozursuzGun\}\}/g, () => formatDay(unexcusedDays))
     .replace(/\{\{toplamGun\}\}/g, () => formatDay(total))
+    .replace(/\{\{okulAdi\}\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => closingName)
     .replace(/\{\{okulAdi\}\}/g, () => schoolName)
     .replace(/\{\{uyariNo\}\}/g, () => String(warningNumber))
     .trim();
@@ -483,6 +502,40 @@ export const whatsappController = {
 
       await whatsappService.sendConsentRequest(primaryPhone);
       res.json({ message: 'Onay isteği gönderildi.' });
+    } catch (err) { next(err); }
+  },
+
+  getConsentStats: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const stats = await whatsappConsentService.getStats();
+      res.json({ success: true, data: stats });
+    } catch (err) { next(err); }
+  },
+
+  exportConsents: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const excelBuffer = await whatsappConsentService.exportToExcel();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `WhatsApp_Onay_Listesi_${dateStr}.xlsx`;
+
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Content-Length': String(excelBuffer.length),
+      });
+      res.send(excelBuffer);
+    } catch (err) { next(err); }
+  },
+
+  importConsents: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'Excel dosyası yüklenmedi.' });
+        return;
+      }
+      const mode = req.query.mode === 'import' ? 'import' : 'preview';
+      const result = await whatsappConsentService.importFromExcel(req.file.buffer, mode);
+      res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
 };

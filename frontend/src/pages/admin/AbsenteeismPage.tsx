@@ -2,12 +2,13 @@ import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import api from '../../services/api';
 import { useConfirm } from '../../hooks/useConfirm';
-import { FileText, Search, Plus, Filter, RefreshCw, Send, History, Trash2, Smartphone, ShieldAlert, CheckCircle2, Clock, MapPin, Printer, Mail, X } from 'lucide-react';
+import { FileText, Search, Plus, Filter, RefreshCw, Send, History, Trash2, Smartphone, ShieldAlert, CheckCircle2, Clock, MapPin, Printer, Mail, X, FolderOpen } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Student, AbsenteeismRecord } from './absenteeism/types';
 import { AbsenteeismTable } from './absenteeism/AbsenteeismTable';
 import { AbsenteeismUploadModal } from './absenteeism/AbsenteeismUploadModal';
 import { AbsenteeismWhatsAppModal } from './absenteeism/AbsenteeismWhatsAppModal';
+import { AbsenteeismPdfModal } from './absenteeism/AbsenteeismPdfModal';
 import { Button } from '../../components/ui/Button';
 
 export default function AbsenteeismPage() {
@@ -19,6 +20,8 @@ export default function AbsenteeismPage() {
   // Modals
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showWaModal, setShowWaModal] = useState(false);
+  const [selectedPdfRecord, setSelectedPdfRecord] = useState<AbsenteeismRecord | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   // List Search
   const [listSearch, setListSearch] = useState('');
@@ -272,6 +275,20 @@ export default function AbsenteeismPage() {
     });
   };
 
+  const handleOpenPdfModal = (record: AbsenteeismRecord) => {
+    setSelectedPdfRecord(record);
+    setShowPdfModal(true);
+  };
+
+  const handleOpenArchiveFolder = async () => {
+    try {
+      const res = await api.post('/absenteeism/open-archive-folder');
+      toast.success(`Devamsızlık mektupları klasörü açıldı.`);
+    } catch (err: any) {
+      toast.error('Klasör açılamadı.');
+    }
+  };
+
   const unsent = records.filter(r => !r.waSentAt);
   const sent = records.filter(r => r.waSentAt);
 
@@ -284,9 +301,19 @@ export default function AbsenteeismPage() {
         description="Öğrenci devamsızlık mektuplarını PDF olarak yükleyin ve WhatsApp üzerinden velilere otomatik gönderin."
         icon={<Mail size={28} />}
         actions={
-          <Button onClick={() => { resetUploadForm(); setShowUploadModal(true); }} variant="primary" leftIcon={<Plus size={18} />}>
-            Mektup Yükle
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleOpenArchiveFolder}
+              variant="outline"
+              leftIcon={<FolderOpen size={16} />}
+              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
+            >
+              Mektuplar Klasörünü Aç
+            </Button>
+            <Button onClick={() => { resetUploadForm(); setShowUploadModal(true); }} variant="primary" leftIcon={<Plus size={18} />}>
+              Mektup Yükle
+            </Button>
+          </div>
         }
       />
 
@@ -329,6 +356,7 @@ export default function AbsenteeismPage() {
             formatDate={formatDate}
             onPreview={handleWaPreviewOpen}
             onDelete={handleDelete}
+            onViewPDF={handleOpenPdfModal}
           />
         )}
 
@@ -390,6 +418,16 @@ export default function AbsenteeismPage() {
         handleCropMouseDown={handleCropMouseDown}
         waSelectedParents={waSelectedParents}
         setWaSelectedParents={setWaSelectedParents}
+      />
+
+      {/* 3. PDF Viewer Modal */}
+      <AbsenteeismPdfModal
+        isOpen={showPdfModal}
+        onClose={() => {
+          setShowPdfModal(false);
+          setSelectedPdfRecord(null);
+        }}
+        record={selectedPdfRecord}
       />
       
       {confirmModal}

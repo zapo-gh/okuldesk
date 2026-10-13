@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { Prisma } from '@prisma/client';
 import prisma from '../shared/utils/prisma';
 import { config } from '../shared/config';
@@ -7,6 +8,46 @@ import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { generateAbsenteeismPreview, deletePreviewFile, extractAbsenceDays } from './pdfPreview.service';
 
 export class AbsenteeismService {
+  getArchiveFolderPath(): string {
+    const archiveDir = path.join(os.homedir(), 'Documents', 'OkulDesk', 'Devamsızlık Mektupları');
+    if (!fs.existsSync(archiveDir)) {
+      fs.mkdirSync(archiveDir, { recursive: true });
+    }
+    return archiveDir;
+  }
+
+  ensureArchiveFile(record: any): string {
+    if (!record || !record.pdfPath) return '';
+    const archiveDir = this.getArchiveFolderPath();
+    const student = record.student;
+    const safeStudentName = (student?.fullName || 'Ogrenci').replace(/[\\/:*?"<>|]/g, '').trim();
+    const safeClassName = (student?.className || 'Sinif').replace(/[\\/:*?"<>|]/g, '-').trim();
+    const ext = path.extname(record.pdfPath) || '.pdf';
+    const readableFileName = `${safeClassName}_${student?.schoolNumber || ''}_${safeStudentName}_${record.warningNumber}.Uyari${ext}`;
+    const archiveFilePath = path.join(archiveDir, readableFileName);
+
+    if (fs.existsSync(record.pdfPath) && !fs.existsSync(archiveFilePath)) {
+      try {
+        fs.copyFileSync(record.pdfPath, archiveFilePath);
+      } catch (err) {
+        console.error('Failed to copy to archive:', err);
+      }
+    }
+
+    return fs.existsSync(archiveFilePath) ? archiveFilePath : record.pdfPath;
+  }
+
+  async syncAllToArchive() {
+    const archiveDir = this.getArchiveFolderPath();
+    const records = await prisma.absenteeism.findMany({
+      where: { deletedAt: null },
+      include: { student: { select: { fullName: true, className: true, schoolNumber: true } } },
+    });
+    for (const r of records) {
+      this.ensureArchiveFile(r);
+    }
+    return { folderPath: archiveDir, count: records.length };
+  }
   private static turkishTitleCase(s: string): string {
     return s.replace(/\S+/g, (word) =>
       word[0].toLocaleUpperCase('tr-TR') + word.slice(1).toLocaleLowerCase('tr-TR')
@@ -116,7 +157,7 @@ export class AbsenteeismService {
       extractAbsenceDays(data.pdfPath),
     ]);
 
-    return prisma.absenteeism.create({
+    const created = await prisma.absenteeism.create({
       data: {
         ...data,
         isBep: data.isBep ?? false,
@@ -125,9 +166,13 @@ export class AbsenteeismService {
         unexcusedDays: absenceDays.unexcusedDays ?? undefined,
       },
       include: {
-        student: { select: { fullName: true, className: true } },
+        student: { select: { fullName: true, className: true, schoolNumber: true } },
       },
     });
+
+    this.ensureArchiveFile(created);
+
+    return created;
   }
 
   async getWarningCount(studentId: string): Promise<number> {
@@ -143,18 +188,38 @@ export class AbsenteeismService {
   async servePdf(absenteeismId: string): Promise<string> {
     const record = await prisma.absenteeism.findUnique({
       where: { id: absenteeismId },
+      include: {
+        student: { select: { fullName: true, className: true, schoolNumber: true } },
+      },
     });
 
     if (!record) {
       throw new AppError('Devamsızlık kaydı bulunamadı.', 404);
     }
 
+    const archivePath = this.ensureArchiveFile(record);
+
     const uploadBase = path.resolve(config.upload.dir);
+    const archiveBase = path.resolve(this.getArchiveFolderPath());
     const fullPath = path.resolve(record.pdfPath);
-    if (!fullPath.startsWith(uploadBase + path.sep) && !fullPath.startsWith(uploadBase + '/')) {
+
+    const isAllowedDir =
+      fullPath.startsWith(uploadBase + path.sep) ||
+      fullPath.startsWith(uploadBase + '/') ||
+      fullPath.startsWith(archiveBase + path.sep) ||
+      fullPath.startsWith(archiveBase + '/');
+
+    if (!isAllowedDir) {
+      if (archivePath && fs.existsSync(archivePath)) {
+        return archivePath;
+      }
       throw new AppError('Geçersiz dosya yolu.', 403);
     }
+
     if (!fs.existsSync(fullPath)) {
+      if (archivePath && fs.existsSync(archivePath)) {
+        return archivePath;
+      }
       throw new AppError('Dosya bulunamadı.', 404);
     }
 

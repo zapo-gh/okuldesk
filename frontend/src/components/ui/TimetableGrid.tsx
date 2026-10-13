@@ -2,27 +2,27 @@ import React, { useCallback, useMemo } from 'react';
 import { parseAndStandardizeClass } from '../../utils/classNameFormatter';
 
 const DAYS = [
-  { val: 1, label: 'Pazartesi' },
-  { val: 2, label: 'Salı' },
-  { val: 3, label: 'Çarşamba' },
-  { val: 4, label: 'Perşembe' },
-  { val: 5, label: 'Cuma' },
+  { val: 1, label: 'Pazartesi', short: 'Pzt' },
+  { val: 2, label: 'Salı', short: 'Sal' },
+  { val: 3, label: 'Çarşamba', short: 'Çar' },
+  { val: 4, label: 'Perşembe', short: 'Per' },
+  { val: 5, label: 'Cuma', short: 'Cum' },
 ];
 
 const CLASS_COLORS = [
-  'bg-blue-100 text-blue-800 border-blue-200',
-  'bg-emerald-100 text-emerald-800 border-emerald-200',
-  'bg-amber-100 text-amber-800 border-amber-200',
-  'bg-violet-100 text-violet-800 border-violet-200',
-  'bg-pink-100 text-pink-800 border-pink-200',
-  'bg-rose-100 text-rose-800 border-rose-200',
-  'bg-teal-100 text-teal-800 border-teal-200',
-  'bg-cyan-100 text-cyan-800 border-cyan-200',
-  'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
-  'bg-orange-100 text-orange-800 border-orange-200',
-  'bg-lime-100 text-lime-800 border-lime-200',
-  'bg-sky-100 text-sky-800 border-sky-200',
+  'bg-blue-100/90 text-blue-950 border-blue-300/80',
+  'bg-emerald-100/90 text-emerald-950 border-emerald-300/80',
+  'bg-amber-100/90 text-amber-950 border-amber-300/80',
+  'bg-violet-100/90 text-violet-950 border-violet-300/80',
+  'bg-rose-100/90 text-rose-950 border-rose-300/80',
+  'bg-teal-100/90 text-teal-950 border-teal-300/80',
+  'bg-cyan-100/90 text-cyan-950 border-cyan-300/80',
+  'bg-indigo-100/90 text-indigo-950 border-indigo-300/80',
+  'bg-fuchsia-100/90 text-fuchsia-950 border-fuchsia-300/80',
+  'bg-orange-100/90 text-orange-950 border-orange-300/80',
+  'bg-lime-100/90 text-lime-950 border-lime-300/80',
+  'bg-sky-100/90 text-sky-950 border-sky-300/80',
+  'bg-purple-100/90 text-purple-950 border-purple-300/80',
 ];
 
 export function getSubjectColor(subject?: string): string {
@@ -72,9 +72,19 @@ export default function TimetableGrid({
   classDisplayMap,
 }: TimetableGridProps) {
   const { periods } = useMemo(() => {
-    const max = entries.length > 0 ? Math.max(...entries.map(e => e.period)) : 8;
-    const safeMax = Math.max(max, 8);
+    const max = entries.length > 0 ? Math.max(...entries.map(e => e.period)) : 10;
+    // MTAL okullarında standart 10 ders saati vardır (bazı sınıflarda 11)
+    const safeMax = Math.max(max, 10);
     return { maxPeriod: safeMax, periods: Array.from({ length: safeMax }, (_, i) => i + 1) };
+  }, [entries]);
+
+  const activeDays = useMemo(() => {
+    const hasSat = entries.some(e => e.dayOfWeek === 6);
+    const hasSun = entries.some(e => e.dayOfWeek === 7);
+    const list = [...DAYS];
+    if (hasSat) list.push({ val: 6, label: 'Cumartesi', short: 'Cmt' });
+    if (hasSun) list.push({ val: 7, label: 'Pazar', short: 'Paz' });
+    return list;
   }, [entries]);
 
   const getCells = useCallback(
@@ -83,11 +93,17 @@ export default function TimetableGrid({
   );
 
   return (
-    <div className="overflow-x-auto print:overflow-visible print:px-1">
-      <table className="w-full text-sm border-collapse print:border-2 print:border-black print:text-black print:table-fixed print:w-full">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto print:overflow-visible">
+      <table className="w-full table-fixed text-xs border-collapse print:border-2 print:border-black print:text-black print:table-fixed print:w-full min-w-[700px] xl:min-w-0">
+        <colgroup>
+          <col className="w-14 sm:w-16 md:w-20 print:w-[8%]" style={{ width: '70px' }} />
+          {periods.map(p => (
+            <col key={p} style={{ width: `calc((100% - 70px) / ${periods.length})` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th className="px-4 py-4 text-left text-xs font-extrabold text-slate-700 uppercase tracking-wider w-28 bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:p-0.5 print:text-[9px] print:w-[8%]">
+            <th className="px-1.5 py-1.5 text-center text-[11px] font-extrabold text-slate-700 uppercase tracking-wider bg-slate-200/90 sticky left-0 z-20 shadow-[1px_1px_0_0_rgba(203,213,225,1)] print:static print:bg-gray-100 print:border print:border-black print:shadow-none print:text-black print:p-0.5 print:text-[9px] overflow-hidden">
               Gün
             </th>
             {periods.map(p => {
@@ -95,11 +111,11 @@ export default function TimetableGrid({
               return (
                 <th
                   key={p}
-                  className="px-2 py-3 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider min-w-[110px] bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:p-0.5 print:min-w-0"
+                  className="px-0.5 py-1.5 text-center text-[11px] font-extrabold text-slate-700 uppercase tracking-wider bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:p-0.5 overflow-hidden"
                 >
-                  <span className="block print:text-[8px] print:leading-none">{p}. Ders</span>
+                  <span className="block leading-tight truncate print:text-[8px] print:leading-none">{p}. Ders</span>
                   {time && (
-                    <span className="block text-[10px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 print:text-black print:text-[6.5px] print:leading-none print:mt-0 print:tracking-tighter">
+                    <span className="block text-[9px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 truncate print:text-black print:text-[6.5px] print:leading-none print:mt-0 print:tracking-tighter">
                       {time}
                     </span>
                   )}
@@ -109,99 +125,104 @@ export default function TimetableGrid({
           </tr>
         </thead>
         <tbody className="bg-white print:bg-transparent">
-          {DAYS.map((day, rowIndex) => {
+          {activeDays.map((day, rowIndex) => {
             const isToday = todayDow !== undefined && day.val === todayDow;
             return (
               <tr
                 key={day.val}
                 className={`transition-colors group border-b border-slate-200 last:border-0 print:border-b print:border-black ${
                   isToday 
-                    ? 'bg-indigo-50/80 hover:bg-indigo-100/60' 
+                    ? 'bg-indigo-50/70 hover:bg-indigo-100/50' 
                     : rowIndex % 2 === 0 
-                      ? 'bg-white hover:bg-slate-50' 
-                      : 'bg-slate-50/70 hover:bg-slate-100/60'
+                      ? 'bg-white hover:bg-slate-50/60' 
+                      : 'bg-slate-50/50 hover:bg-slate-100/50'
                 }`}
               >
                 <td
-                  className={`px-4 py-3 font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors print:static print:bg-gray-50 print:border print:border-black print:shadow-none print:text-black print:p-1 print:text-[9px] print:break-words ${
+                  className={`px-1 py-1 text-center font-bold text-xs uppercase sticky left-0 z-10 shadow-[1px_0_0_0_rgba(226,232,240,1)] transition-colors print:static print:bg-gray-50 print:border print:border-black print:shadow-none print:text-black print:p-1 print:text-[9px] print:break-words overflow-hidden ${
                     isToday
-                      ? 'bg-indigo-100/90 text-indigo-800'
+                      ? 'bg-indigo-100/95 text-indigo-800'
                       : rowIndex % 2 === 0
-                        ? 'bg-slate-50/90 text-slate-700'
-                        : 'bg-slate-100/80 text-slate-700'
+                        ? 'bg-slate-50/95 text-slate-700'
+                        : 'bg-slate-100/90 text-slate-700'
                   }`}
                 >
-                  {day.label}
-                  {isToday && (
-                    <span className="block text-indigo-500 text-[9px] font-semibold normal-case tracking-normal mt-0.5 print:hidden">
-                      ● bugün
-                    </span>
-                  )}
+                  <div className="flex flex-col items-center justify-center leading-tight">
+                    <span className="tracking-tight text-[11px] font-bold">{day.label}</span>
+                    {isToday && (
+                      <span className="inline-block px-1.5 py-0.2 text-[8px] font-bold text-indigo-700 bg-indigo-200/80 rounded-full mt-0.5 print:hidden">
+                        Bugün
+                      </span>
+                    )}
+                  </div>
                 </td>
                 {periods.map(period => {
                   const cells = getCells(day.val, period);
                   const grouped = groupCells(cells);
                   return (
-                    <td key={period} className="px-1 py-1 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-0 print:align-top">
+                    <td
+                      key={period}
+                      className="p-0.5 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-0 print:align-top overflow-hidden"
+                    >
                       {grouped.length > 0 ? (
                         <div className="flex flex-col gap-0.5 w-full h-full">
-                          {grouped.map((group, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => onCellClick?.(group)}
-                              className={`flex flex-col items-center justify-center rounded-xl border px-1 py-1.5 w-full min-h-[50px] shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 print:rounded-none print:border-none print:shadow-none print:bg-transparent print:p-0.5 print:min-h-0 print:text-black ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''}`}
-                            >
-                              {viewMode === 'teacher' ? (
-                                <>
-                                  <span className="font-extrabold text-[13px] leading-tight mb-0.5 print:text-[8px] print:leading-none print:text-black print:mb-0 print:tracking-tighter">
-                                    {group.classNames
-                                      .map((cn: string) => parseAndStandardizeClass(cn, classDisplayMap).displayName)
-                                      .join(', ')}
-                                  </span>
-                                  {group.subject && (
-                                    <span className="font-semibold text-[10px] opacity-75 leading-tight uppercase print:opacity-100 print:text-[7.5px] print:leading-none print:text-black print:tracking-tighter">
-                                      {group.subject}
+                          {grouped.map((group, idx) => {
+                            const fullSubject = group.subjectName || group.subject || '';
+                            const classStr = group.classNames
+                              ? group.classNames.map((cn: string) => parseAndStandardizeClass(cn, classDisplayMap).displayName).join(', ')
+                              : '';
+                            const teacherStr = group.staffNames?.join(', ') || '';
+                            const tooltip = `${fullSubject ? `Ders: ${fullSubject}` : ''}${classStr ? `\nSınıf: ${classStr}` : ''}${teacherStr ? `\nÖğretmen: ${teacherStr}` : ''}${group.room ? `\nDerslik: ${group.room}` : ''}\n${period}. Ders (${day.label})`;
+
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => onCellClick?.(group)}
+                                title={tooltip}
+                                className={`flex flex-col items-center justify-center rounded-lg border px-1 py-1 w-full min-h-[38px] shadow-2xs transition-all duration-150 hover:shadow-md hover:scale-[1.01] print:rounded-none print:border-none print:shadow-none print:bg-transparent print:p-0.5 print:min-h-0 print:text-black ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''}`}
+                              >
+                                {viewMode === 'teacher' ? (
+                                  <>
+                                    <span className="font-bold text-[11px] leading-tight text-slate-900 truncate max-w-full print:text-[8px] print:leading-none print:text-black print:mb-0 print:tracking-tighter">
+                                      {classStr}
                                     </span>
-                                  )}
-                                  {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-[7px] print:leading-none print:text-black print:mt-0 print:tracking-tighter">
-                                      <span className="print:hidden">🚪 </span>
-                                      <span className="hidden print:hidden">Derslik: </span>
-                                      {group.room}
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  {group.subject && (
-                                    <span className="font-extrabold text-[13px] leading-tight mb-0.5 uppercase print:text-[8.5px] print:leading-[9px] print:text-black print:mb-0 print:tracking-tighter">
-                                      {group.subject}
-                                    </span>
-                                  )}
-                                  {group.staffNames.length > 0 && (
-                                    <div className="flex flex-col items-center gap-0 mt-0.5 print:mt-0 print:w-full">
-                                      {group.staffNames.map((name: string, i: number) => (
-                                        <span key={i} className="font-semibold text-[10px] opacity-80 leading-tight text-center print:opacity-100 print:text-[7px] print:leading-[8px] print:text-black print:tracking-tighter print:w-full print:truncate">
-                                          {name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {group.room && (
-                                    <span className="text-[9px] opacity-60 leading-tight mt-0.5 print:opacity-100 print:text-[6.5px] print:leading-none print:text-black print:mt-0.5 print:tracking-tighter">
-                                      <span className="print:hidden">🚪 </span>
-                                      <span className="hidden print:hidden">Derslik: </span>
-                                      {group.room}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          ))}
+                                    {group.subject && (
+                                      <span className="font-semibold text-[10px] opacity-80 leading-tight uppercase truncate max-w-full print:opacity-100 print:text-[7.5px] print:leading-none print:text-black print:tracking-tighter mt-0.5">
+                                        {group.subject}
+                                      </span>
+                                    )}
+                                    {group.room && (
+                                      <span className="text-[9px] opacity-75 font-medium leading-none truncate max-w-full mt-0.5 flex items-center justify-center gap-0.5 print:opacity-100 print:text-[7px] print:leading-none print:text-black print:mt-0 print:tracking-tighter">
+                                        <span className="print:hidden">🚪</span> {group.room}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {group.subject && (
+                                      <span className="font-bold text-[11px] leading-tight text-slate-900 uppercase truncate max-w-full print:text-[8.5px] print:leading-[9px] print:text-black print:mb-0 print:tracking-tighter">
+                                        {group.subject}
+                                      </span>
+                                    )}
+                                    {teacherStr && (
+                                      <span className="font-medium text-[10px] opacity-85 leading-tight truncate max-w-full print:opacity-100 print:text-[7px] print:leading-[8px] print:text-black print:tracking-tighter mt-0.5">
+                                        {teacherStr}
+                                      </span>
+                                    )}
+                                    {group.room && (
+                                      <span className="text-[9px] opacity-75 font-medium leading-none truncate max-w-full mt-0.5 flex items-center justify-center gap-0.5 print:opacity-100 print:text-[6.5px] print:leading-none print:text-black print:mt-0.5 print:tracking-tighter">
+                                        <span className="print:hidden">🚪</span> {group.room}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-2 py-2 w-full min-h-[60px] text-xs font-medium text-slate-400/60 print:border-none print:bg-transparent print:text-transparent print:min-h-0 print:hidden">
-                          Boş
+                        <div className="flex items-center justify-center rounded-lg border border-slate-100/80 bg-slate-50/40 w-full min-h-[38px] text-[11px] font-light text-slate-300 select-none hover:bg-slate-50/80 transition-colors print:border-none print:bg-transparent print:text-transparent print:min-h-0 print:hidden">
+                          —
                         </div>
                       )}
                     </td>

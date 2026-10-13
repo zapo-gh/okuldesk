@@ -14,6 +14,10 @@ Bu belgede, OkulDesk projesinde menü kalabalığını önlemek ve öncelikli mo
 | 4 | **Okul Gezi Planı** | Kurullar & Planlama | `/admin/field-trip` | `frontend/src/pages/admin/modules/FieldTripPage.tsx` | İl/İlçe MEM onayına sunulacak okul gezisi izin belgeleri, veli izinleri ve kafile listesi. |
 | 5 | **Doğrudan Temin (22/d)** | Satın Alma & Mali İşler | `/admin/procurement` | `frontend/src/pages/admin/modules/ProcurementPage.tsx` | 4734 sayılı KİK 22/d doğrudan temin süreçleri: onay belgesi, piyasa araştırma tutanağı, teklif mektupları. |
 | 6 | **Firma Rehberi** | Satın Alma & Mali İşler | `/admin/supplier` | `frontend/src/pages/admin/modules/SupplierPage.tsx` | Doğrudan temin ve okul ihtiyaçlarında teklif alınan tedarikçi/firma iletişim ve vergi no havuzu. |
+| 7 | **Yıllık Çalışma Planı** | Kurullar & Planlama | `/admin/annual-plan` | `frontend/src/pages/admin/modules/AnnualPlanPage.tsx` | Okul yıllık çalışma ve eylem planı şablonları. |
+| 8 | **Okul Aile Birliği** | Kurullar & Planlama | `/admin/parent-association` | `frontend/src/pages/admin/modules/ParentAssociationPage.tsx` | Okul Aile Birliği genel kurul ve yönetim kurulu evrakları. |
+| 9 | **Ders Dışı Egzersiz Planı** | Eğitim & Öğretim | `/admin/extracurricular` | `frontend/src/pages/admin/modules/ExtracurricularPage.tsx` | Ders dışı eğitim ve egzersiz onay/planlama belgeleri. |
+| 10 | **Yolluk Hesaplama** | Personel & İnsan Kayn. | `/admin/travel-allowance` | `frontend/src/pages/admin/modules/TravelAllowancePage.tsx` | Sürekli ve geçici görev yolluğu hesaplama tablosu. |
 
 ---
 

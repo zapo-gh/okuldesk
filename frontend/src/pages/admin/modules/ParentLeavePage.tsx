@@ -336,7 +336,7 @@ export default function ParentLeavePage() {
 
         {/* SAĞ KOLON: CANLI A5 ÖNİZLEME */}
         <div className="xl:col-span-6 space-y-4">
-          <div className="bg-slate-100/90 rounded-xl border border-slate-200/80 p-4">
+          <div className="bg-slate-50/80 rounded-xl border border-slate-200/70 p-4 shadow-2xs">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -370,7 +370,7 @@ export default function ParentLeavePage() {
                 ) : (
                   ' geçerli mazereti nedeniyle '
                 )}
-                okula devam edemeyeceğini bildirir; <strong>Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 36 ncı maddesinin 7 nci fıkrası</strong> hükmü uyarınca belirtilen tarihlerde <strong>izinli sayılması</strong> ve devamsızlığının <strong>özürlü devamsızlık</strong> olarak işlenmesini arz ederim.
+                okula devam edemeyeceğini bildirir; <strong>Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 36 ncı maddesinin 7 nci fıkrası</strong> hükmü uyarınca belirtilen tarihlerde <strong>izinli sayılması</strong> konusunda gereğini arz ederim.
               </p>
 
               <div className="bg-slate-50 border border-slate-200 rounded p-2.5 my-2.5">

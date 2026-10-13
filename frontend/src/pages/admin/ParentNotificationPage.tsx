@@ -161,34 +161,33 @@ export default function ParentNotificationPage() {
   const canGenerate = !!selectedStudent && excusedDays !== '' && unexcusedDays !== '';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="ÖMYK Veli Devamsızlık Bildirimi"
         description="Öğrenci arayın, devamsızlık bilgilerini girin ve veli bildirim tutanağını PDF olarak oluşturun."
-        icon={<FileText size={28} />}
+        icon={<FileText size={24} />}
       />
 
-      
-      {success && (
-        <div className="bg-green-50 text-green-700 p-4 rounded-xl border border-green-100 text-sm flex items-center gap-2">
-          <CheckSquare size={18} className="shrink-0"/> <span className="font-bold">Başarılı:</span> {success}
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* SOL KOLON: FORM GİRİŞİ */}
+        <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Users size={16} className="text-indigo-600" />
+              <span>Tutanak Parametreleri & Bilgi Girişi</span>
+            </h2>
+            <span className="text-[11px] text-slate-500 font-medium">MEB Ortaöğretim Md. 36</span>
+          </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        
-        {/* Adım 1: Öğrenci Seçimi */}
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-4">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Users size={20} /></div>
-            1. Öğrenci Seçimi
-          </h2>
-
-          <div className="relative z-50">
+          {/* 1. Öğrenci Seçimi */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              1. Öğrenci Seçimi
+            </label>
             {!selectedStudent ? (
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  {loadingStudents ? <Loader2 size={18} className="text-indigo-500 animate-spin" /> : <Search size={18} className="text-gray-400" />}
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  {loadingStudents ? <Loader2 size={15} className="animate-spin text-indigo-500" /> : <Search size={15} />}
                 </div>
                 <input
                   type="text"
@@ -196,39 +195,39 @@ export default function ParentNotificationPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   disabled={loadingStudents}
-                  className="w-full pl-11 pr-10 py-3.5 border-2 border-indigo-100 rounded-xl text-sm font-medium focus:border-indigo-500 focus:ring-0 shadow-xs transition-colors bg-white text-gray-900 placeholder:text-gray-400"
+                  className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white placeholder:text-slate-400 transition"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
-                    title="Aramayı Temizle"
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                    title="Temizle"
                   >
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 )}
 
-                {/* Dropdown Arama Sonuçları (Absolute Z-50) */}
+                {/* Dropdown Arama Sonuçları */}
                 {searchQuery.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-72 overflow-y-auto animate-in fade-in duration-100">
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-60 overflow-y-auto scrollbar-thin">
                     {filteredStudents.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">Sonuç bulunamadı.</div>
+                      <div className="p-3 text-center text-xs text-slate-500 italic">Sonuç bulunamadı</div>
                     ) : (
-                      <div className="p-1.5 space-y-0.5">
+                      <div className="p-1 space-y-0.5">
                         {filteredStudents.map(s => (
                           <button
                             type="button"
                             key={s.id}
                             onClick={() => { selectStudent(s); setSearchQuery(''); }}
-                            className="w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all hover:bg-indigo-50 border border-transparent hover:border-indigo-100 cursor-pointer"
+                            className="w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition hover:bg-indigo-50 cursor-pointer"
                           >
-                            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold bg-indigo-100 text-indigo-700">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold bg-indigo-100 text-indigo-700">
                               {s.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm font-bold text-gray-900">{s.fullName}</div>
-                              <div className="text-xs text-gray-500">Sınıf: {s.className} · No: {s.schoolNumber}</div>
+                              <div className="text-xs font-semibold text-slate-800 truncate">{s.fullName}</div>
+                              <div className="text-[10px] text-slate-500">Sınıf: {s.className} · No: {s.schoolNumber}</div>
                             </div>
                           </button>
                         ))}
@@ -238,231 +237,294 @@ export default function ParentNotificationPage() {
                 )}
               </div>
             ) : (
-              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center font-bold text-lg shadow-sm">
+              <div className="p-2.5 bg-indigo-50/70 border border-indigo-200/80 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                     {selectedStudent.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <div className="text-base font-bold text-indigo-900">{selectedStudent.fullName}</div>
-                    <div className="text-sm text-indigo-700 font-medium">Sınıf: {selectedStudent.className} · No: {selectedStudent.schoolNumber}</div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-indigo-950 truncate">{selectedStudent.fullName}</p>
+                    <p className="text-[11px] text-indigo-700 font-medium">{selectedStudent.className} · No: {selectedStudent.schoolNumber}</p>
                   </div>
                 </div>
-                <Button 
-                  variant="ghost"
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => { setSelectedStudent(null); setSearchQuery(''); }}
-                  className="px-4 py-2 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-lg hover:bg-indigo-100 transition-colors shadow-sm"
+                  className="h-7 px-2.5 text-xs text-indigo-700 bg-white border-indigo-200 hover:bg-indigo-50"
                 >
                   Değiştir
                 </Button>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Adım 2: Tutanak Bilgileri (Öğrenci seçiliyse aktif) */}
-        <div className={`transition-all duration-300 relative z-10 ${!selectedStudent ? 'opacity-40 pointer-events-none grayscale-[0.5]' : ''}`}>
-          <div className="p-6 md:p-8">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-6">
-              <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><Calendar size={20} /></div>
-              2. Tutanak ve Devamsızlık Bilgileri
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Devamsızlık Günü Seçimi */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Tebligat Kademesi</label>
-                <div className="flex flex-col gap-3">
-                  {absenceDayOptions.map(opt => {
-                    const active = absenceDay === opt.value;
-                    return (
-                      <Button
-                        key={opt.value}
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setAbsenceDay(opt.value)}
-                        className={`
-                          py-3.5 px-4 rounded-xl text-left transition-all border-2 flex items-center justify-between
-                          ${active 
-                            ? 'border-indigo-600 bg-indigo-50 shadow-sm' 
-                            : 'border-gray-200 bg-white hover:border-indigo-200'
-                          }
-                        `}
-                      >
-                        <div>
-                          <div className={`text-base ${active ? 'font-bold text-indigo-800' : 'font-semibold text-gray-700'}`}>{opt.label}</div>
-                          <div className={`text-xs mt-0.5 ${active ? 'text-indigo-600 font-medium' : 'text-gray-500'}`}>{opt.desc}</div>
-                        </div>
-                        {active && <CheckSquare size={20} className="text-indigo-600" />}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {/* Tarih */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Tutanak Tarihi</label>
-                  <input 
-                    type="date"  
-                    value={meetingDate} 
-                    onChange={e => setMeetingDate(e.target.value)} 
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-indigo-500 focus:ring-0 transition-colors"
-                  />
-                </div>
-
-                {/* Gün Sayıları */}
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Devamsızlık Günleri</label>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1 text-center font-medium">Özürlü</label>
-                      <input 
-                        type="number" min="0" placeholder="0" 
-                        value={excusedDays} onChange={e => setExcusedDays(e.target.value)}
-                        className="w-full p-2.5 border-2 border-gray-200 rounded-lg text-base focus:border-indigo-500 focus:ring-0 text-center font-bold"
-                      />
+          {/* 2. Tebligat Kademesi (Kompakt 3'lü Segment Kontrolü) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              2. Tebligat Aşaması
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {absenceDayOptions.map(opt => {
+                const active = absenceDay === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setAbsenceDay(opt.value)}
+                    className={`py-2 px-2 rounded-lg border text-center transition-all ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="text-xs font-bold">{opt.label}</div>
+                    <div className={`text-[10px] truncate mt-0.5 ${active ? 'text-indigo-100 font-medium' : 'text-slate-400'}`}>
+                      {opt.desc}
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1 text-center font-medium">Özürsüz</label>
-                      <input 
-                        type="number" min="0" placeholder="0" 
-                        value={unexcusedDays} onChange={e => setUnexcusedDays(e.target.value)}
-                        className="w-full p-2.5 border-2 border-gray-200 rounded-lg text-base focus:border-indigo-500 focus:ring-0 text-center font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1 text-center font-medium">Toplam</label>
-                      <div className={`
-                        h-[46px] flex items-center justify-center rounded-lg border-2 text-base font-black
-                        ${totalDays > 0 ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-400'}
-                      `}>
-                        {totalDays > 0 ? totalDays : '—'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Tarih & Devamsızlık Sayıları */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Tutanak Tarihi
+              </label>
+              <input
+                type="date"
+                value={meetingDate}
+                onChange={e => setMeetingDate(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 text-center">
+                Özürlü Gün
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={excusedDays}
+                onChange={e => setExcusedDays(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-center font-bold text-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 text-center">
+                Özürsüz Gün
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={unexcusedDays}
+                onChange={e => setUnexcusedDays(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-center font-bold text-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 text-center">
+                Toplam
+              </label>
+              <div
+                className={`h-[33px] flex items-center justify-center rounded-lg border text-xs font-black transition-colors ${
+                  totalDays > 0
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    : 'bg-slate-50 border-slate-200 text-slate-400'
+                }`}
+              >
+                {totalDays > 0 ? `${totalDays} gün` : '—'}
               </div>
             </div>
           </div>
 
-          {/* Adım 3: Veli & Oluştur */}
-          <div className="p-6 md:p-8 border-t border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-6">
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><UserCheck size={20} /></div>
-              3. Veli Bilgisi ve Sonuç
-            </h2>
+          {/* 4. Komisyon Yetkilileri */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Rehber Öğretmen
+              </label>
+              <select
+                value={selectedCounselorName}
+                onChange={e => setSelectedCounselorName(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
+              >
+                <option value="">(Otomatik / Boş Bırak)</option>
+                {counselors.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Müdür Yardımcısı
+              </label>
+              <select
+                value={selectedViceDirectorName}
+                onChange={e => setSelectedViceDirectorName(e.target.value)}
+                className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
+              >
+                <option value="">(Otomatik / Boş Bırak)</option>
+                {viceDirectors.map(v => (
+                  <option key={v.id} value={v.name}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-end">
-              <div>
-                <div 
-                  onClick={() => setIncludeParent(p => !p)}
-                  className={`
-                    flex items-center gap-3 p-3.5 rounded-xl cursor-pointer border-2 transition-all mb-3
-                    ${includeParent ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white hover:bg-gray-50'}
-                  `}
-                >
-                  <div className={`
-                    w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-colors
-                    ${includeParent ? 'bg-emerald-600 border-emerald-600' : 'bg-white border-gray-300'}
-                  `}>
-                    {includeParent && <CheckSquare size={14} className="text-white fill-current" />}
-                  </div>
-                  <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    Veli bilgisini PDF'e ekle (İsteğe Bağlı)
-                  </div>
-                </div>
+          {/* 5. Veli Bilgisi (İsteğe Bağlı) */}
+          <div className="pt-2 border-t border-slate-100">
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={includeParent}
+                onChange={e => setIncludeParent(e.target.checked)}
+                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+              />
+              <span>Veli bilgisini tutanağa ekle (İsteğe Bağlı)</span>
+            </label>
 
-                {includeParent && (
-                  <div onClick={e => e.stopPropagation()} className="animate-in fade-in slide-in-from-top-2 ml-2">
-                    {selectedStudent && studentParents.length > 0 ? (
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <select 
-                          value={selectedParentId}
-                          onChange={e => { setSelectedParentId(e.target.value); setCustomParentName(''); }}
-                          className="flex-1 p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
-                        >
-                          {studentParents.map(p => (
-                            <option key={p.id} value={p.id}>{p.fullName} (Sistemdeki Veli)</option>
-                          ))}
-                          <option value="__other__">Diğer (Manuel Giriş)</option>
-                        </select>
-                        {selectedParentId === '__other__' && (
-                          <input 
-                            type="text" 
-                            placeholder="Veli adı soyadı girin"
-                            value={customParentName}
-                            onChange={e => setCustomParentName(e.target.value)}
-                            className="flex-1 p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
-                            autoFocus
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <input 
-                        type="text" 
-                        placeholder={selectedStudent ? 'Kayıtlı veli yok — veli adını manuel girin' : 'Öğrenci seçince otomatik dolar'}
+            {includeParent && (
+              <div className="mt-2 animate-in fade-in duration-150">
+                {selectedStudent && studentParents.length > 0 ? (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      value={selectedParentId}
+                      onChange={e => { setSelectedParentId(e.target.value); setCustomParentName(''); }}
+                      className="flex-1 px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {studentParents.map(p => (
+                        <option key={p.id} value={p.id}>{p.fullName} (Sistemdeki Veli)</option>
+                      ))}
+                      <option value="__other__">Diğer (Manuel Giriş)</option>
+                    </select>
+                    {selectedParentId === '__other__' && (
+                      <input
+                        type="text"
+                        placeholder="Veli adı soyadı girin"
                         value={customParentName}
                         onChange={e => setCustomParentName(e.target.value)}
-                        disabled={!selectedStudent}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
+                        className="flex-1 px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        autoFocus
                       />
                     )}
                   </div>
-                )}
-              </div>
-
-              {/* İdareci & Rehber Öğretmen Seçimi */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-3">
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Rehber Öğretmen</label>
-                  <select
-                    value={selectedCounselorName}
-                    onChange={e => setSelectedCounselorName(e.target.value)}
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
-                  >
-                    <option value="">(Otomatik / Boş Bırak)</option>
-                    {counselors.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Müdür Yardımcısı</label>
-                  <select
-                    value={selectedViceDirectorName}
-                    onChange={e => setSelectedViceDirectorName(e.target.value)}
-                    className="w-full p-3 border-2 border-gray-200 rounded-xl text-sm font-medium focus:border-emerald-500 focus:ring-0 bg-white"
-                  >
-                    <option value="">(Otomatik / Boş Bırak)</option>
-                    {viceDirectors.map(v => (
-                      <option key={v.id} value={v.name}>{v.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <Button 
-                variant="primary"
-                onClick={handleGenerate}
-                disabled={loading || loadingStudents || !canGenerate}
-              >
-                {loading ? (
-                  <><Loader2 size={20} className="animate-spin" /> Hazırlanıyor...</>
                 ) : (
-                  <><Download size={20} /> Oluştur ve Yazdır</>
+                  <input
+                    type="text"
+                    placeholder={selectedStudent ? 'Kayıtlı veli yok — veli adını manuel girin' : 'Öğrenci seçince otomatik dolar'}
+                    value={customParentName}
+                    onChange={e => setCustomParentName(e.target.value)}
+                    disabled={!selectedStudent}
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 )}
-              </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SAĞ KOLON: CANLI ÖZET & AKSİYON KARTI */}
+        <div className="lg:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>Tutanak Özeti & İşlem</span>
+            </h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+              {absenceDay}. Gün
+            </span>
+          </div>
+
+          {/* Öğrenci & Tutanak Bilgi Kartı */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+              <span className="text-slate-500 font-medium">Öğrenci:</span>
+              <span className="font-bold text-slate-900 truncate max-w-[200px]">
+                {selectedStudent ? selectedStudent.fullName : '—'}
+              </span>
             </div>
-            
-            {/* Alt Bilgi */}
-            <div className="mt-6 flex items-center justify-between text-xs text-gray-500 font-medium">
-              <div className="flex items-center gap-1.5"><Info size={14}/> Sınıf Rehber Öğretmeni öğrencinin sınıfından otomatik olarak bulunur.</div>
-              <div>Gizlilik & KVKK Uyumlu</div>
+            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+              <span className="text-slate-500 font-medium">Sınıf & No:</span>
+              <span className="font-semibold text-slate-800">
+                {selectedStudent ? `${selectedStudent.className} · No: ${selectedStudent.schoolNumber}` : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+              <span className="text-slate-500 font-medium">Tutanak Tarihi:</span>
+              <span className="font-semibold text-slate-800">
+                {meetingDate ? new Date(meetingDate).toLocaleDateString('tr-TR') : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+              <span className="text-slate-500 font-medium">Tebligat Kademesi:</span>
+              <span className="font-bold text-indigo-700">
+                {absenceDay}. Gün ({absenceDay === 5 ? '1. Tebligat' : absenceDay === 15 ? '2. Tebligat + Komisyon' : '3. Tebligat + Komisyon'})
+              </span>
+            </div>
+
+            {/* Devamsızlık Özeti Kutucuğu */}
+            <div className="pt-1.5">
+              <div className="text-[11px] font-bold text-slate-600 mb-1">Bildirilen Devamsızlık:</div>
+              <div className="grid grid-cols-3 gap-1.5 text-center">
+                <div className="p-1.5 bg-white rounded border border-slate-200/70">
+                  <div className="text-[10px] text-slate-400 font-medium">Özürlü</div>
+                  <div className="text-xs font-bold text-slate-700">{excusedDays !== '' ? `${excusedDays}g` : '—'}</div>
+                </div>
+                <div className="p-1.5 bg-white rounded border border-slate-200/70">
+                  <div className="text-[10px] text-slate-400 font-medium">Özürsüz</div>
+                  <div className="text-xs font-bold text-slate-700">{unexcusedDays !== '' ? `${unexcusedDays}g` : '—'}</div>
+                </div>
+                <div className="p-1.5 bg-indigo-50/70 rounded border border-indigo-200/80">
+                  <div className="text-[10px] text-indigo-600 font-medium">Toplam</div>
+                  <div className="text-xs font-extrabold text-indigo-700">{totalDays > 0 ? `${totalDays}g` : '—'}</div>
+                </div>
+              </div>
             </div>
           </div>
 
+          {/* Mevzuat Bilgi Notu */}
+          <div className="p-2.5 bg-amber-50/80 border border-amber-200/70 rounded-lg text-[11px] text-amber-800 leading-snug">
+            <div className="flex items-start gap-1.5">
+              <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>MEB OÖKY Md. 36/5:</strong> Özürsüz 5, 15 ve 25. gün devamsızlıklarında veliye bildirim yapılarak ÖMYK komisyon tutanağı düzenlenir.
+              </div>
+            </div>
+          </div>
+
+          {/* Başarı Bildirimi */}
+          {success && (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
+              <CheckSquare size={16} className="text-emerald-600 shrink-0" />
+              <span className="font-medium">{success}</span>
+            </div>
+          )}
+
+          {/* Aksiyon Butonu */}
+          <Button
+            variant="primary"
+            onClick={handleGenerate}
+            disabled={loading || loadingStudents || !canGenerate}
+            className="w-full h-10 justify-center gap-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
+          >
+            {loading ? (
+              <><Loader2 size={16} className="animate-spin" /> Hazırlanıyor...</>
+            ) : (
+              <><Download size={16} /> Tutanak Oluştur ve Yazdır</>
+            )}
+          </Button>
+
+          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+            <span>Sınıf rehber öğretmeni otomatik eklenir</span>
+            <span>KVKK Uyumlu</span>
+          </div>
         </div>
       </div>
     </div>

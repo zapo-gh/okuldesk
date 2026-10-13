@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { Settings, Save, Edit, ShieldAlert, School, KeyRound, MessageCircle, AlertTriangle, CheckCircle2, X, Info, UploadCloud } from 'lucide-react';
+import { Settings, Save, Edit, ShieldAlert, School, KeyRound, AlertTriangle, CheckCircle2, X, Info, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
 
@@ -23,13 +23,6 @@ export default function SettingsPage() {
   const [academicYear,  setAcademicYear]  = useState('2025-2026');
   const [schoolSaving,  setSchoolSaving]  = useState(false);
 
-  // ── WhatsApp şablonları ──
-  const [waTemplates,     setWaTemplates]     = useState<string[]>(['', '', '']);
-  const [waTemplatesEdit, setWaTemplatesEdit] = useState<string[]>(['', '', '']);
-  const [waSaving,        setWaSaving]        = useState(false);
-  const [waError,         setWaError]         = useState('');
-  const [waSuccess,       setWaSuccess]       = useState('');
-
   // ── Şifre değiştir ──
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
@@ -47,8 +40,6 @@ export default function SettingsPage() {
       setSchoolName(d.schoolName || '');
       setPrincipalName(d.principalName || '');
       setAcademicYear(d.academicYear || '2025-2026');
-      setWaTemplates([d.waTemplate1 || '', d.waTemplate2 || '', d.waTemplate3 || '']);
-      setWaTemplatesEdit([d.waTemplate1 || '', d.waTemplate2 || '', d.waTemplate3 || '']);
     } catch {
       toast.error('Ayarlar yüklenemedi. Sayfayı yenileyin.');
     }
@@ -66,22 +57,6 @@ export default function SettingsPage() {
     } finally { 
       setSchoolSaving(false); 
     }
-  };
-
-  const handleSaveWa = async (e: FormEvent) => {
-    e.preventDefault();
-    setWaError(''); setWaSuccess('');
-    setWaSaving(true);
-    try {
-      await api.put('/settings', {
-        waTemplate1: waTemplatesEdit[0],
-        waTemplate2: waTemplatesEdit[1],
-        waTemplate3: waTemplatesEdit[2],
-      });
-      setWaTemplates([...waTemplatesEdit]);
-      setWaSuccess('WhatsApp şablonları başarıyla kaydedildi.');
-    } catch { setWaError('Kayıt sırasında hata oluştu.'); }
-    finally { setWaSaving(false); }
   };
 
   const handlePasswordSubmit = async (e: FormEvent) => {
@@ -300,63 +275,6 @@ export default function SettingsPage() {
               </div>
             </form>
           </div>
-        </div>
-      </div>
-
-      {/* WhatsApp Şablonları */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><MessageCircle size={20} /></div>
-            WhatsApp Devamsızlık Mesaj Şablonları
-          </h2>
-        </div>
-
-        <div className="p-6">
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800 mb-6 flex gap-3">
-            <Info className="shrink-0 text-blue-500 mt-0.5" size={18}/>
-            <div>
-              <p className="mb-2 font-medium">Boş bırakılan şablonlar için sistemin varsayılan metni kullanılır. Mesajlarınızda aşağıdaki yer tutucuları kullanabilirsiniz:</p>
-              <div className="flex flex-wrap gap-2">
-                {['{{ogrenciAdi}}', '{{ozurluGun}}', '{{ozursuzGun}}', '{{toplamGun}}', '{{okulAdi}}', '{{uyariNo}}'].map(tag => (
-                  <span key={tag} className="px-2 py-1 bg-white border border-blue-200 rounded font-mono text-xs font-bold text-blue-700 shadow-sm">{tag}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {waError && <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg flex items-center justify-between"><div className="flex gap-2 items-center"><AlertTriangle size={16}/> {waError}</div> <Button onClick={()=>setWaError('')}><X size={16}/></Button></div>}
-          {waSuccess && <div className="mb-4 text-sm text-green-600 bg-green-50 p-3 rounded-lg flex items-center justify-between"><div className="flex gap-2 items-center"><CheckCircle2 size={16}/> {waSuccess}</div> <Button onClick={()=>setWaSuccess('')}><X size={16}/></Button></div>}
-
-          <form onSubmit={handleSaveWa} className="animate-in fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[1, 2, 3].map((n, i) => (
-                  <div key={n} className="space-y-2">
-                    <label className="block text-sm font-bold text-gray-700 flex items-center justify-between">
-                      <span>{n}. Uyarı Mesajı</span>
-                      <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-1 rounded">(boş = varsayılan)</span>
-                    </label>
-                    <textarea
-                      rows={8}
-                      value={waTemplatesEdit[i]}
-                      onChange={e => {
-                        const next = [...waTemplatesEdit];
-                        next[i] = e.target.value;
-                        setWaTemplatesEdit(next);
-                      }}
-                      placeholder={`Bu uyarı seviyesi için varsayılan mesaj kullanılacak...`}
-                      className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 resize-y leading-relaxed"
-                    />
-                  </div>
-                ))}
-              </div>
-              
-              <div className="flex justify-end pt-4 mt-6 border-t border-gray-100">
-                <Button type="submit" disabled={waSaving} variant="primary">
-                  {waSaving ? 'Kaydediliyor...' : 'Şablonları Kaydet'}
-                </Button>
-              </div>
-            </form>
         </div>
       </div>
 

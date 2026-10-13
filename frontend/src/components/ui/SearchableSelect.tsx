@@ -96,8 +96,8 @@ export function SearchableSelect({
       </div>
 
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-          <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
+        <div className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200/90 overflow-hidden ring-1 ring-black/5">
+          <div className="max-h-72 overflow-y-auto overscroll-contain py-1 scrollbar-thin">
             {filteredOptions.length > 0 ? (
               filteredOptions.map(opt => (
                 <div

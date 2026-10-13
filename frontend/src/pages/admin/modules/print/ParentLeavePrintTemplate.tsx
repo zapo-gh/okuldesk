@@ -41,7 +41,7 @@ export default function ParentLeavePrintTemplate({ data, settings }: PrintTempla
       <div className="mt-3 text-justify leading-relaxed text-[14px] indent-8">
         Velisi bulunduğum okulunuz <strong>{data.student.className}</strong> sınıfı, <strong>{data.student.schoolNumber}</strong> numaralı <strong>{data.student.fullName}</strong> isimli öğrencinin, 
         aşağıda belirtilen tarihlerde{data.reason ? <span> <strong>{data.reason}</strong> mazereti nedeniyle </span> : ' geçerli mazereti nedeniyle '} 
-        okula devam edemeyeceğini / edemediğini bildirir; <strong>Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 36 ncı maddesinin 7 nci fıkrası</strong> hükmü uyarınca belirtilen tarihlerde <strong>izinli sayılması</strong> ve devamsızlığının <strong>özürlü devamsızlık</strong> olarak e-Okul sistemine işlenmesi hususunda gereğini bilgilerinize arz ederim.
+        okula devam edemeyeceğini / edemediğini bildirir; <strong>Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 36 ncı maddesinin 7 nci fıkrası</strong> hükmü uyarınca belirtilen tarihlerde <strong>izinli sayılması</strong> konusunda gereğini arz ederim.
       </div>
       
       <div className="mt-3.5 flex justify-between items-start">

@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { absenteeismService } from './absenteeism.service';
 import { z } from 'zod';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
+import { exec } from 'child_process';
+import path from 'path';
 
 const createSchema = z.object({
   studentId: z.string().uuid('Geçersiz öğrenci ID.'),
@@ -122,6 +124,56 @@ export class AbsenteeismController {
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await absenteeismService.delete(req.params.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async openPdfInSystem(req: Request, res: Response, next: NextFunction) {
+    try {
+      const record = await absenteeismService.getById(req.params.id);
+      const filePath = absenteeismService.ensureArchiveFile(record);
+      if (process.platform === 'win32') {
+        exec(`start "" "${filePath}"`);
+      } else if (process.platform === 'darwin') {
+        exec(`open "${filePath}"`);
+      } else {
+        exec(`xdg-open "${filePath}"`);
+      }
+      res.json({ success: true, message: 'Dosya varsayılan uygulamada açıldı.', data: { filePath } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async showInFolder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const record = await absenteeismService.getById(req.params.id);
+      const filePath = absenteeismService.ensureArchiveFile(record);
+      if (process.platform === 'win32') {
+        exec(`explorer /select,"${filePath}"`);
+      } else if (process.platform === 'darwin') {
+        exec(`open -R "${filePath}"`);
+      } else {
+        exec(`xdg-open "${path.dirname(filePath)}"`);
+      }
+      res.json({ success: true, message: 'Dosya klasörde gösterildi.', data: { filePath } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async openArchiveFolder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await absenteeismService.syncAllToArchive();
+      if (process.platform === 'win32') {
+        exec(`explorer "${result.folderPath}"`);
+      } else if (process.platform === 'darwin') {
+        exec(`open "${result.folderPath}"`);
+      } else {
+        exec(`xdg-open "${result.folderPath}"`);
+      }
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

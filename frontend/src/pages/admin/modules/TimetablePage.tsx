@@ -51,11 +51,24 @@ export default function TimetablePage() {
     }
   }, [settings?.classDisplayMap]);
 
-  // Tüm sınıfların meta listesi (alfabetik ve şubeye göre sıralı)
+  // Tüm sınıfların meta listesi (9'dan 12'ye doğru kademe ve şube sırasıyla)
   const allClassMetas = useMemo(() => {
+    const gradeOrder: Record<string, number> = {
+      '9': 9,
+      '10': 10,
+      '11': 11,
+      '12': 12,
+      'Özel': 90,
+      'Diğer': 99,
+    };
     return classNames
       .map(c => parseAndStandardizeClass(c, classDisplayMap))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'tr-TR'));
+      .sort((a, b) => {
+        const orderA = gradeOrder[a.grade] ?? (parseInt(a.grade, 10) || 99);
+        const orderB = gradeOrder[b.grade] ?? (parseInt(b.grade, 10) || 99);
+        if (orderA !== orderB) return orderA - orderB;
+        return a.displayName.localeCompare(b.displayName, 'tr-TR', { numeric: true, sensitivity: 'base' });
+      });
   }, [classNames, classDisplayMap]);
 
   // Seçili kademeye göre filtrelenmiş sınıflar
@@ -80,6 +93,9 @@ export default function TimetablePage() {
   const [viewTeacherDetails, setViewTeacherDetails] = useState<any>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewTitle, setViewTitle] = useState('');
+
+  const [showSubjectSummary, setShowSubjectSummary] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [crossEntries, setCrossEntries] = useState<any[]>([]);
   const [crossTitle, setCrossTitle] = useState('');
@@ -118,10 +134,14 @@ export default function TimetablePage() {
       setActiveTimetable(activeRes.data.data);
       setHistory(histRes.data.data || []);
       const allStaff = staffRes.data.data?.staff || staffRes.data.data || [];
-      setStaffList(allStaff.filter((s: any) => {
-        const g = (s.gorev || '').toLowerCase();
-        return !g.includes('öğrenci') && !g.includes('veli');
-      }));
+      setStaffList(
+        allStaff
+          .filter((s: any) => {
+            const g = (s.gorev || '').toLowerCase();
+            return !g.includes('öğrenci') && !g.includes('veli');
+          })
+          .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', 'tr-TR'))
+      );
       setClassNames(classRes.data.data || []);
     } catch { toast.error('Veriler yüklenemedi.'); }
     finally { setLoading(false); }
@@ -199,13 +219,42 @@ export default function TimetablePage() {
 
   const summaryStats = useMemo(() => {
     if (!viewEntries.length) return null;
+    const distinctSlots = new Set(viewEntries.map((e) => `${e.dayOfWeek}-${e.period}`)).size;
     return {
-      total: viewEntries.length,
+      total: viewMode === 'teacher' ? viewEntries.length : distinctSlots,
+      rawAssignments: viewEntries.length,
       activeDays: new Set(viewEntries.map((e) => e.dayOfWeek)).size,
       minP: Math.min(...viewEntries.map((e) => e.period)),
       maxP: Math.max(...viewEntries.map((e) => e.period)),
     };
-  }, [viewEntries]);
+  }, [viewEntries, viewMode]);
+
+  const subjectSummaryList = useMemo(() => {
+    if (!viewEntries.length) return [];
+    const map = new Map<string, any>();
+    viewEntries.forEach(e => {
+      const key = viewMode === 'teacher' 
+        ? `${e.className || ''}-${e.subject || ''}`
+        : `${e.subject || ''}-${e.staff?.name || ''}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          subject: e.subject || '',
+          subjectName: (e as any).subjectName || e.subject || '',
+          className: e.className || '',
+          staffName: e.staff?.name || '',
+          rooms: [e.room].filter(Boolean),
+          count: 1
+        });
+      } else {
+        const item = map.get(key)!;
+        item.count++;
+        if (e.room) item.rooms.push(e.room);
+      }
+    });
+    return Array.from(map.values())
+      .map(item => ({ ...item, roomStr: Array.from(new Set(item.rooms)).join(' - ') }))
+      .sort((a, b) => a.subject.localeCompare(b.subject));
+  }, [viewEntries, viewMode]);
 
   const handleUpload = async () => {
     if (!selectedFile) return toast.error('Lütfen bir Excel dosyası seçin.');
@@ -259,21 +308,57 @@ export default function TimetablePage() {
   const isViewDisabled = viewLoading || (viewMode === 'teacher' ? !selectedStaffId : !selectedClass);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 w-full min-w-0 max-w-full">
       <PageHeader
         title="Ders Programı Yönetimi"
-        description="Öğretmen ve sınıf ders programlarını görüntüleyin, yazdırın ve yönetin."
-        icon={<CalendarDays size={24} />}
+        description={
+          activeTimetable
+            ? `🟢 Aktif Program: ${activeTimetable.name} • ${activeTimetable._count?.entries || 0} ders ataması • Yüklenme: ${new Date(activeTimetable.createdAt).toLocaleDateString('tr-TR')}`
+            : `${academicYear} dönemi için ders programlarını görüntüleyin, yazdırın ve yönetin.`
+        }
+        icon={<CalendarDays size={22} />}
         actions={
-          <Button onClick={() => setIsUploadModalOpen(true)} className="gap-2">
-            <UploadCloud size={18} /> Yeni Program Yükle (Excel)
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {activeTimetable && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={toggleLoadPanel}
+                  className="gap-1.5 text-xs text-white border-white/20 hover:bg-white/10 shrink-0"
+                  title="Öğretmen haftalık ders yükü dağılımı"
+                >
+                  <BarChart2 size={14} />
+                  <span className="hidden sm:inline">Öğretmen Yük Özeti</span>
+                  {showLoadPanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsClassUploadModalOpen(true)}
+                  className="gap-1.5 text-xs text-white border-white/20 hover:bg-white/10 shrink-0"
+                  title="Sınıf el programından derslik bilgilerini eşleştir"
+                >
+                  <UploadCloud size={14} />
+                  <span className="hidden md:inline">Derslikleri Eşleştir</span>
+                </Button>
+              </>
+            )}
+            <Button
+              size="sm"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="gap-1.5 text-xs font-bold shrink-0 bg-white text-indigo-700 hover:bg-indigo-50 shadow-xs"
+            >
+              <UploadCloud size={14} />
+              <span>Yeni Program Yükle</span>
+            </Button>
+          </div>
         }
       />
 
       {loading ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+          <div className="h-7 w-7 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
         </div>
       ) : !activeTimetable ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex gap-4 items-start">
@@ -286,50 +371,39 @@ export default function TimetablePage() {
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap gap-6 items-center">
-          <div className="flex items-center gap-2 text-green-600 font-semibold">
-            <CheckCircle size={20} /> Aktif Program: <span className="text-slate-800">{activeTimetable.name}</span>
-          </div>
-          <div className="text-slate-500 text-sm">{activeTimetable._count?.entries || 0} ders ataması</div>
-          <div className="text-slate-400 text-xs">Yüklenme: {new Date(activeTimetable.createdAt).toLocaleDateString('tr-TR')}</div>
-          
-          <Button size="sm" variant="outline" onClick={() => setIsClassUploadModalOpen(true)} className="ml-auto gap-2">
-            <UploadCloud size={16} /> Derslikleri Eşleştir
-          </Button>
-
-          <button onClick={toggleLoadPanel} className="ml-2 flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">
-            <BarChart2 size={16} /> Öğretmen Yük Özeti {showLoadPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {showLoadPanel && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-            <BarChart2 size={18} className="text-indigo-500" />
-            <h3 className="font-bold text-slate-800">Öğretmen Haftalık Ders Yükü</h3>
-            <span className="text-xs text-slate-400 ml-1">({academicYear} aktif program)</span>
+          <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart2 size={16} className="text-indigo-600" />
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Öğretmen Haftalık Ders Yükü</h3>
+              <span className="text-[11px] text-slate-400">({academicYear} aktif program)</span>
+            </div>
+            <button onClick={() => setShowLoadPanel(false)} className="text-slate-400 hover:text-slate-600 p-1">
+              <ChevronUp size={16} />
+            </button>
           </div>
           {loadLoading ? (
             <div className="p-6 flex justify-center"><div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" /></div>
           ) : (
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
               {loadSummary.map((s, i) => (
-                <div key={s.staffId ?? i} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition">
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">{i + 1}</div>
+                <div key={s.staffId ?? i} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 transition border border-slate-100">
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">{i + 1}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{s.name}</p>
+                    <p className="text-xs font-semibold text-slate-800 truncate">{s.name}</p>
                     {s.brans && <p className="text-[10px] text-slate-400 truncate">{s.brans}</p>}
-                    <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-400 rounded-full transition-all" style={{ width: `${Math.round((s.count / maxLoadCount) * 100)}%` }} />
+                    <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.round((s.count / maxLoadCount) * 100)}%` }} />
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-indigo-600 shrink-0">{s.count}</span>
+                  <span className="text-xs font-bold text-indigo-600 shrink-0">{s.count} sa</span>
                   {s.staffId && (
-                    <button onClick={() => { setViewMode('teacher'); setSelectedStaffId(s.staffId); setShowLoadPanel(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                      className="shrink-0 p-1 text-slate-300 hover:text-indigo-500 transition" title="Programını Görüntüle">
-                      <ExternalLink size={13} />
+                    <button onClick={() => { setViewMode('teacher'); setSelectedStaffId(s.staffId); setShowLoadPanel(false); }}
+                      className="shrink-0 p-1 text-slate-300 hover:text-indigo-600 transition" title="Programını Görüntüle">
+                      <ExternalLink size={12} />
                     </button>
                   )}
                 </div>
@@ -340,18 +414,46 @@ export default function TimetablePage() {
       )}
 
       {activeTimetable && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex flex-wrap gap-3 items-end" onKeyDown={handleKeyDown}>
-            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-              <button onClick={() => setViewMode('teacher')} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${viewMode === 'teacher' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-                <Users size={16} /> Öğretmen
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2.5 sm:p-3 space-y-2 w-full min-w-0 max-w-full relative z-20">
+          {/* Row 1: Mode Switcher + Searchable Select + Action Buttons */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full min-w-0" onKeyDown={handleKeyDown}>
+            {/* Mode Switcher */}
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 shrink-0 border border-slate-200/60">
+              <button
+                type="button"
+                onClick={() => setViewMode('teacher')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  viewMode === 'teacher'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <Users size={14} />
+                <span>Öğretmen</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${viewMode === 'teacher' ? 'bg-indigo-700/80 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  {staffList.length}
+                </span>
               </button>
-              <button onClick={() => setViewMode('class')} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition ${viewMode === 'class' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
-                <BookOpen size={16} /> Sınıf
+              <button
+                type="button"
+                onClick={() => setViewMode('class')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  viewMode === 'class'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <BookOpen size={14} />
+                <span>Sınıf</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${viewMode === 'class' ? 'bg-indigo-700/80 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  {allClassMetas.length}
+                </span>
               </button>
             </div>
-            {viewMode === 'teacher' ? (
-              <div className="flex-1 min-w-[250px]">
+
+            {/* Searchable Select Input */}
+            <div className="flex-1 min-w-[200px]">
+              {viewMode === 'teacher' ? (
                 <SearchableSelect
                   options={filteredStaffList.map((s: any) => ({ 
                     value: s.id, 
@@ -361,190 +463,184 @@ export default function TimetablePage() {
                   onChange={(val) => setSelectedStaffId(val)}
                   placeholder={selectedBranchFilter !== 'ALL' ? `${selectedBranchFilter} öğretmeni seç...` : "Öğretmen ara ve seç..."}
                 />
-              </div>
-            ) : (
-              <div className="flex-1 min-w-[280px] flex items-center gap-2">
-                <div className="flex-1">
-                  <SearchableSelect
-                    options={filteredClassMetas.map((c) => ({ value: c.raw, label: c.displayName }))}
-                    value={selectedClass}
-                    onChange={(val) => setSelectedClass(val)}
-                    placeholder={selectedGradeFilter !== 'ALL' ? `${selectedGradeFilter}. Sınıf ara ve seç...` : "Sınıf ara ve seç..."}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsClassNamesModalOpen(true)}
-                  className="gap-1.5 text-xs text-slate-700 hover:text-indigo-600 hover:border-indigo-300 shrink-0 h-[38px]"
-                  title="Sınıf isimlerini standartlaştır ve düzenle"
-                >
-                  <Tag size={13} className="text-indigo-500" /> Sınıf İsimlerini Düzenle
-                </Button>
-              </div>
+              ) : (
+                <SearchableSelect
+                  options={filteredClassMetas.map((c) => ({ value: c.raw, label: c.displayName }))}
+                  value={selectedClass}
+                  onChange={(val) => setSelectedClass(val)}
+                  placeholder={selectedGradeFilter !== 'ALL' ? `${selectedGradeFilter}. Sınıf ara ve seç...` : "Sınıf ara ve seç..."}
+                />
+              )}
+            </div>
+
+            {/* Sınıf İsimlerini Düzenle (Class Mode only) */}
+            {viewMode === 'class' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setIsClassNamesModalOpen(true)}
+                className="gap-1.5 text-xs text-slate-700 hover:text-indigo-600 hover:border-indigo-300 shrink-0 h-[38px] px-2.5"
+                title="Sınıf isimlerini standartlaştır ve düzenle"
+              >
+                <Tag size={13} className="text-indigo-500" />
+                <span className="hidden md:inline">Sınıf İsimleri</span>
+              </Button>
             )}
-            <Button onClick={() => handleView()} disabled={isViewDisabled} className="gap-2">
-              <RefreshCw size={16} className={viewLoading ? 'animate-spin' : ''} /> Yenile
+
+            {/* Yenile Button */}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => handleView()}
+              disabled={isViewDisabled}
+              className="gap-1.5 shrink-0 h-[38px] px-2.5 text-xs text-slate-700"
+              title="Programı Yenile"
+            >
+              <RefreshCw size={13} className={viewLoading ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Yenile</span>
             </Button>
+
+            {/* Yazdır Button */}
             {viewEntries.length > 0 && (
-              <Button variant="outline" onClick={() => handlePrint()} className="gap-2">
-                <Printer size={16} /> Yazdır
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handlePrint()}
+                className="gap-1.5 shrink-0 h-[38px] px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs font-semibold"
+                title="Ders Programını Yazdır"
+              >
+                <Printer size={14} />
+                <span>Yazdır</span>
               </Button>
             )}
           </div>
 
-          {/* Öğretmen Modunda Branş Filtre Çipleri */}
+          {/* Row 2: Compact Filter Chips */}
+          {/* Teacher Mode: Branch Chips */}
           {viewMode === 'teacher' && teacherBranches.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto pb-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                Branş:
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedBranchFilter('ALL')}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
-                  selectedBranchFilter === 'ALL'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tümü ({staffList.length})
-              </button>
-              {teacherBranches.map(brans => {
-                const count = staffList.filter((s: any) => s.brans === brans).length;
-                const isSelected = selectedBranchFilter === brans;
-                return (
-                  <button
-                    key={brans}
-                    type="button"
-                    onClick={() => setSelectedBranchFilter(isSelected ? 'ALL' : brans)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {brans} ({count})
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Sınıf Modunda Kademe Filtre Butonları ve Hızlı Seçim Çipleri */}
-          {viewMode === 'class' && (
-            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-              {/* Kademe Sekmeleri */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                  Kademe:
+            <div className="pt-1.5 border-t border-slate-100 w-full min-w-0 max-w-full overflow-hidden">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin w-full min-w-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                  Branş:
                 </span>
                 <button
                   type="button"
-                  onClick={() => setSelectedGradeFilter('ALL')}
-                  className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
-                    selectedGradeFilter === 'ALL'
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                  onClick={() => setSelectedBranchFilter('ALL')}
+                  className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition whitespace-nowrap shrink-0 ${
+                    selectedBranchFilter === 'ALL'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  Tümü ({gradeCounts['ALL'] || 0})
+                  Tümü ({staffList.length})
                 </button>
-                {['9', '10', '11', '12', 'Özel'].map(grade => {
-                  const count = gradeCounts[grade] || 0;
-                  if (count === 0) return null;
-                  const isSelected = selectedGradeFilter === grade;
+                {teacherBranches.map(brans => {
+                  const count = staffList.filter((s: any) => s.brans === brans).length;
+                  const isSelected = selectedBranchFilter === brans;
                   return (
                     <button
-                      key={grade}
+                      key={brans}
                       type="button"
-                      onClick={() => setSelectedGradeFilter(grade)}
-                      className={`px-3 py-1 rounded-lg font-bold text-xs transition whitespace-nowrap ${
+                      onClick={() => setSelectedBranchFilter(isSelected ? 'ALL' : brans)}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition whitespace-nowrap shrink-0 ${
                         isSelected
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      {grade === 'Özel' ? 'Özel Eğitim' : `${grade}. Sınıf`} ({count})
+                      {brans} ({count})
                     </button>
                   );
                 })}
               </div>
+            </div>
+          )}
 
-              {/* Hızlı Sınıf Çipleri (Tek Tıkla Seçim) */}
-              {filteredClassMetas.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50/70 rounded-xl border border-slate-200/70 max-h-36 overflow-y-auto">
-                  {filteredClassMetas.map(meta => {
-                    const isSelected = selectedClass === meta.raw;
+          {/* Class Mode: Kademe & Quick Class Chips */}
+          {viewMode === 'class' && (
+            <div className="pt-1.5 border-t border-slate-100 space-y-1.5 w-full min-w-0 max-w-full overflow-hidden">
+              {/* Kademe Filter Chips */}
+              <div className="w-full min-w-0 max-w-full overflow-hidden">
+                <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin w-full min-w-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                    Kademe:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGradeFilter('ALL')}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition whitespace-nowrap shrink-0 ${
+                      selectedGradeFilter === 'ALL'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Tümü ({gradeCounts['ALL'] || 0})
+                  </button>
+                  {['9', '10', '11', '12', 'Özel'].map(grade => {
+                    const count = gradeCounts[grade] || 0;
+                    if (count === 0) return null;
+                    const isSelected = selectedGradeFilter === grade;
                     return (
                       <button
-                        key={meta.raw}
+                        key={grade}
                         type="button"
-                        onClick={() => setSelectedClass(meta.raw)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-150 flex items-center gap-1.5 border ${
+                        onClick={() => setSelectedGradeFilter(grade)}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition whitespace-nowrap shrink-0 ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200 scale-[1.02]'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50'
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
-                        title={`Ham Ad: ${meta.raw}`}
                       >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                            isSelected ? 'bg-amber-300' : meta.program === 'ATP' ? 'bg-amber-400' : 'bg-indigo-400'
-                          }`}
-                        />
-                        <span>{meta.displayName}</span>
+                        {grade === 'Özel' ? 'Özel Eğitim' : `${grade}. Sınıf`} ({count})
                       </button>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
 
-          {summaryStats && (
-            <div className="mt-3 flex flex-wrap gap-4 px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
-              <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">📚</span><span className="font-semibold text-slate-700">{summaryStats.total}</span><span className="text-slate-400 text-xs">ders saati</span></div>
-              
-              {viewMode === 'teacher' && viewTeacherDetails ? (
-                <>
-                  {viewTeacherDetails.duty && (
-                    <>
-                      <div className="w-px bg-slate-200 self-stretch" />
-                      <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🛡️</span><span className="text-slate-500 text-xs">Nöbet:</span><span className="font-semibold text-slate-700 ml-1">{viewTeacherDetails.duty}</span></div>
-                    </>
-                  )}
-                  {viewTeacherDetails.homeroomClass && (
-                    <>
-                      <div className="w-px bg-slate-200 self-stretch" />
-                      <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🏫</span><span className="text-slate-500 text-xs">Rehberlik:</span><span className="font-semibold text-slate-700 ml-1">{viewTeacherDetails.homeroomClass}</span></div>
-                    </>
-                  )}
-                  {viewTeacherDetails.clubs && (
-                    <>
-                      <div className="w-px bg-slate-200 self-stretch" />
-                      <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🎯</span><span className="text-slate-500 text-xs">Kulüp:</span><span className="font-semibold text-slate-700 ml-1">{viewTeacherDetails.clubs}</span></div>
-                    </>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="w-px bg-slate-200 self-stretch" />
-                  <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🗓</span><span className="font-semibold text-slate-700">{summaryStats.activeDays}</span><span className="text-slate-400 text-xs">gün derse giriyor</span></div>
-                  <div className="w-px bg-slate-200 self-stretch" />
-                  <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🕗</span><span className="font-semibold text-slate-700">{summaryStats.minP}. ders</span><span className="text-slate-400 text-xs">en erken</span></div>
-                  <div className="w-px bg-slate-200 self-stretch" />
-                  <div className="flex items-center gap-1.5 text-sm"><span className="text-slate-400">🕔</span><span className="font-semibold text-slate-700">{summaryStats.maxP}. ders</span><span className="text-slate-400 text-xs">en geç</span></div>
-                </>
+              {/* Quick Class Selection (Single row horizontal scroll) */}
+              {filteredClassMetas.length > 0 && (
+                <div className="w-full min-w-0 max-w-full overflow-hidden">
+                  <div className="flex items-center gap-1 overflow-x-auto py-1 px-1 bg-slate-50/70 rounded-lg border border-slate-200/60 scrollbar-thin w-full min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 px-1">
+                      Hızlı Seçim:
+                    </span>
+                    {filteredClassMetas.map(meta => {
+                      const isSelected = selectedClass === meta.raw;
+                      return (
+                        <button
+                          key={meta.raw}
+                          type="button"
+                          onClick={() => setSelectedClass(meta.raw)}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap flex items-center gap-1 border shrink-0 ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200/80 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50'
+                          }`}
+                          title={`Ham Ad: ${meta.raw}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              isSelected ? 'bg-amber-300' : meta.program === 'ATP' ? 'bg-amber-400' : 'bg-indigo-400'
+                            }`}
+                          />
+                          <span>{meta.displayName}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )}
         </div>
       )}
 
+      {/* Main Timetable View */}
       {viewEntries.length > 0 && (
-        <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
+        <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible w-full min-w-0 max-w-full">
           <style type="text/css" media="print">
             {`
               @page { size: A4 portrait; margin: 8mm; }
@@ -555,15 +651,78 @@ export default function TimetablePage() {
               }
             `}
           </style>
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between print:hidden">
-            <h3 className="font-bold text-slate-800 text-sm">{viewTitle}</h3>
-            <p className="text-xs text-slate-400">💡 Bir kutucuğa tıklayarak {viewMode === 'teacher' ? 'sınıfın' : 'öğretmenin'} programını görüntüleyin</p>
+
+          {/* Screen Card Header */}
+          <div className="px-3.5 py-2 bg-gradient-to-r from-slate-50 via-indigo-50/15 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 print:hidden w-full min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm">{viewTitle}</h3>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                {viewMode === 'teacher' ? 'Öğretmen' : 'Sınıf'}
+              </span>
+            </div>
+
+            {summaryStats && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="flex items-center gap-1 font-semibold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                  <span>📚</span>
+                  <span>{summaryStats.total} ders saati</span>
+                  {viewMode === 'class' && summaryStats.rawAssignments > summaryStats.total && (
+                    <span className="text-[10px] text-slate-400 font-normal ml-0.5">
+                      ({summaryStats.rawAssignments} atama)
+                    </span>
+                  )}
+                </div>
+                {viewMode === 'teacher' && viewTeacherDetails ? (
+                  <>
+                    {viewTeacherDetails.duty && (
+                      <div className="flex items-center gap-1 text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                        <span>🛡️</span>
+                        <span className="text-slate-400 text-[10px]">Nöbet:</span>
+                        <span className="font-medium text-slate-700">{viewTeacherDetails.duty}</span>
+                      </div>
+                    )}
+                    {viewTeacherDetails.homeroomClass && (
+                      <div className="flex items-center gap-1 text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                        <span>🏫</span>
+                        <span className="text-slate-400 text-[10px]">Rehberlik:</span>
+                        <span className="font-medium text-slate-700">{viewTeacherDetails.homeroomClass}</span>
+                      </div>
+                    )}
+                    {viewTeacherDetails.clubs && (
+                      <div className="flex items-center gap-1 text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                        <span>🎯</span>
+                        <span className="text-slate-400 text-[10px]">Kulüp:</span>
+                        <span className="font-medium text-slate-700">{viewTeacherDetails.clubs}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1 text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                      <span>🗓️</span>
+                      <span>{summaryStats.activeDays} gün</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                      <span>⏰</span>
+                      <span>{summaryStats.minP}. - {summaryStats.maxP}. ders</span>
+                    </div>
+                  </>
+                )}
+                <span className="text-[11px] text-slate-400 hidden xl:inline ml-1">
+                  💡 Kutucuğa tıklayarak çapraz programı gör
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* Print Header */}
           <div className="hidden print:block text-center py-4 mb-4 border-b-2 border-black">
             <h1 className="text-xl font-black uppercase text-black">{schoolName}</h1>
             <h2 className="text-lg font-bold mt-1 text-black">{viewTitle}</h2>
             <p className="text-black text-sm mt-1 font-medium">{academicYear} EĞİTİM ÖĞRETİM YILI — Yazdır: {new Date().toLocaleDateString('tr-TR')}</p>
           </div>
+
+          {/* Grid */}
           <TimetableGrid
             entries={viewEntries}
             viewMode={viewMode}
@@ -573,69 +732,150 @@ export default function TimetablePage() {
             classDisplayMap={classDisplayMap}
           />
           
-          {/* Ders Listesi Özeti (Sadece Çıktıda Görünebilir veya Hep Görünebilir) */}
-          <div className="mt-8 px-4 print:px-1">
-            <table className="w-full text-[11px] border-collapse print:border-2 print:border-black print:text-black">
-              <thead>
-                <tr className="bg-slate-100 print:bg-transparent text-slate-700 print:text-black font-bold">
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-8 text-center">Sr</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-24 text-left">Ders Kodu</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 text-left">Ders Adı</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-20 text-center">Alan/Dal</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-12 text-center">Süre</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 text-left">{viewMode === 'teacher' ? 'Sınıf' : 'Öğretmen'}</th>
-                  <th className="border border-slate-300 print:border-black px-1.5 py-1.5 w-32 text-left">Yer</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white print:bg-transparent">
-                {(() => {
-                  const map = new Map<string, any>();
-                  viewEntries.forEach(e => {
-                    const key = viewMode === 'teacher' 
-                      ? `${e.className || ''}-${e.subject || ''}`
-                      : `${e.subject || ''}-${e.staff?.name || ''}`;
-                    if (!map.has(key)) {
-                      map.set(key, {
-                        subject: e.subject || '',
-                        subjectName: (e as any).subjectName || e.subject || '',
-                        className: e.className || '',
-                        staffName: e.staff?.name || '',
-                        rooms: [e.room].filter(Boolean),
-                        count: 1
-                      });
-                    } else {
-                      const item = map.get(key)!;
-                      item.count++;
-                      if (e.room) item.rooms.push(e.room);
-                    }
-                  });
-                  return Array.from(map.values())
-                    .map(item => ({ ...item, roomStr: Array.from(new Set(item.rooms)).join(' - ') }))
-                    .sort((a, b) => a.subject.localeCompare(b.subject))
-                    .map((item, idx) => (
-                      <tr key={idx} className="print:border-b print:border-black">
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-semibold text-slate-700 print:text-black">{idx + 1}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">{item.subject.substring(0, 8)}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-semibold">{item.subjectName}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center text-slate-600 print:text-black"></td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-center font-bold text-slate-800 print:text-black">{item.count}</td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 uppercase text-slate-800 print:text-black font-medium">
+          {/* Ders Dağılım Listesi Özeti (Collapsible on screen, always visible in print) */}
+          {subjectSummaryList.length > 0 && (
+            <div className="border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowSubjectSummary(prev => !prev)}
+                className="w-full px-4 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-600 flex items-center justify-between transition print:hidden"
+              >
+                <div className="flex items-center gap-2">
+                  <BarChart2 size={14} className="text-indigo-600" />
+                  <span>Ders Dağılım Listesi</span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    ({subjectSummaryList.length} ders türü, {summaryStats?.total || 0} saat)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600">
+                  <span>{showSubjectSummary ? 'Listeyi Gizle' : 'Listeyi Göster'}</span>
+                  {showSubjectSummary ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                </div>
+              </button>
+
+              <div className={`${showSubjectSummary ? 'block' : 'hidden'} print:block p-3 print:p-0 print:mt-4`}>
+                <table className="w-full text-[11px] border-collapse print:border-2 print:border-black print:text-black">
+                  <thead>
+                    <tr className="bg-slate-100 print:bg-transparent text-slate-700 print:text-black font-bold">
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 w-8 text-center">Sr</th>
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 w-24 text-left">Ders Kodu</th>
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 text-left">Ders Adı</th>
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 w-14 text-center">Süre</th>
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 text-left">{viewMode === 'teacher' ? 'Sınıf' : 'Öğretmen'}</th>
+                      <th className="border border-slate-300 print:border-black px-1.5 py-1 w-28 text-left">Derslik</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white print:bg-transparent divide-y divide-slate-100 print:divide-black">
+                    {subjectSummaryList.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/70 print:hover:bg-transparent print:border-b print:border-black">
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 text-center font-semibold text-slate-600 print:text-black">{idx + 1}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 uppercase text-slate-800 print:text-black font-semibold">{item.subject.substring(0, 10)}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 uppercase text-slate-800 print:text-black font-medium">{item.subjectName}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 text-center font-bold text-indigo-700 print:text-black">{item.count}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 uppercase text-slate-800 print:text-black font-medium">
                           {viewMode === 'teacher' ? parseAndStandardizeClass(item.className, classDisplayMap).displayName : item.staffName}
                         </td>
-                        <td className="border border-slate-200 print:border-black px-1.5 py-1.5 text-xs uppercase text-slate-600 print:text-black">{item.roomStr}</td>
+                        <td className="border border-slate-200 print:border-black px-1.5 py-1 text-slate-600 print:text-black">{item.roomStr || '—'}</td>
                       </tr>
-                    ));
-                })()}
-              </tbody>
-            </table>
-            <div className="h-4"></div>
-          </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {viewLoading && viewEntries.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+      {/* Loading state for timetable view */}
+      {viewLoading && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 flex justify-center">
+          <div className="h-7 w-7 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+        </div>
+      )}
+
+      {/* Empty State Banner when no selection is made */}
+      {activeTimetable && !viewLoading && viewEntries.length === 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center w-full max-w-lg mx-auto my-3">
+          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+            <CalendarDays size={24} />
+          </div>
+          <h3 className="text-sm font-bold text-slate-800">Ders Programı Seçimi</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Haftalık ders programını ekranda görüntülemek için yukarıdan bir öğretmen veya sınıf seçin.
+          </p>
+        </div>
+      )}
+
+      {/* Program Geçmişi (Always visible when no selection, collapsible when selection is active) */}
+      {history.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          {viewEntries.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowHistory(prev => !prev)}
+              className="w-full px-4 py-2 bg-slate-50 hover:bg-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600 transition"
+            >
+              <div className="flex items-center gap-2">
+                <History size={14} className="text-slate-400" />
+                <span>Program Geçmişi ({history.length} Kayıt)</span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                <span>{showHistory ? 'Gizle' : 'Göster'}</span>
+                {showHistory ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </div>
+            </button>
+          ) : (
+            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2">
+              <History size={16} className="text-slate-500" />
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Program Geçmişi</h3>
+            </div>
+          )}
+
+          {(viewEntries.length === 0 || showHistory) && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3.5 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase">Program Adı</th>
+                    <th className="px-3.5 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase">Ders Sayısı</th>
+                    <th className="px-3.5 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase">Yükleme Tarihi</th>
+                    <th className="px-3.5 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase">Durum</th>
+                    <th className="px-3.5 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase">İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {history.map((h) => (
+                    <tr key={h.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3.5 py-2 font-medium text-slate-800">{h.name}</td>
+                      <td className="px-3.5 py-2 text-center text-slate-600">{h._count?.entries ?? 0}</td>
+                      <td className="px-3.5 py-2 text-center text-slate-500 text-[11px]">{new Date(h.createdAt).toLocaleString('tr-TR')}</td>
+                      <td className="px-3.5 py-2 text-center">
+                        {h.isActive ? (
+                          <span className="bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-2 py-0.5 rounded-full">Aktif</span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-500 text-[10px] font-medium px-2 py-0.5 rounded-full">Pasif</span>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-2 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {!h.isActive && (
+                            <button onClick={() => handleActivate(h.id)} className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-0.5 rounded hover:bg-indigo-50 transition">
+                              Aktif Yap
+                            </button>
+                          )}
+                          <button onClick={() => handleDelete(h.id, h.isActive)}
+                            className="p-1 rounded transition text-slate-400 hover:text-red-500 hover:bg-red-50"
+                            title={h.isActive ? 'Aktif programı sil' : 'Sil'}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -652,58 +892,6 @@ export default function TimetablePage() {
           />
         )}
       </ActionModal>
-
-      {history.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-            <History size={18} className="text-slate-500" />
-            <h3 className="font-bold text-slate-800">Program Geçmişi</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Program Adı</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Ders Sayısı</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Yükleme Tarihi</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Durum</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {history.map((h) => (
-                  <tr key={h.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-slate-800">{h.name}</td>
-                    <td className="px-4 py-3 text-center text-slate-600">{h._count?.entries ?? 0}</td>
-                    <td className="px-4 py-3 text-center text-slate-500 text-xs">{new Date(h.createdAt).toLocaleString('tr-TR')}</td>
-                    <td className="px-4 py-3 text-center">
-                      {h.isActive ? (
-                        <span className="bg-green-100 text-green-700 border border-green-200 text-xs font-semibold px-2 py-0.5 rounded-full">Aktif</span>
-                      ) : (
-                        <span className="bg-slate-100 text-slate-500 text-xs font-medium px-2 py-0.5 rounded-full">Pasif</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {!h.isActive && (
-                          <button onClick={() => handleActivate(h.id)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition">
-                            Aktif Yap
-                          </button>
-                        )}
-                        <button onClick={() => handleDelete(h.id, h.isActive)}
-                          className="p-1.5 rounded transition text-slate-500 hover:text-red-500 hover:bg-red-50"
-                          title={h.isActive ? 'Aktif programı sil' : 'Sil'}>
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       <ActionModal isOpen={isUploadModalOpen} onClose={closeUploadModal} title="Yeni Ders Programı Yükle">
         <div className="space-y-4">

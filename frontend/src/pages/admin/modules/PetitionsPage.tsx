@@ -6,6 +6,9 @@ import { useSettings } from '../../../context/SettingsContext';
 import { useReactToPrint } from 'react-to-print';
 import MesemNakilPrintTemplate, { MesemNakilData } from './print/MesemNakilPrintTemplate';
 import KayitDondurmaPrintTemplate, { KayitDondurmaData } from './print/KayitDondurmaPrintTemplate';
+import SinifDegisikligiPrintTemplate, { SinifDegisikligiData } from './print/SinifDegisikligiPrintTemplate';
+import AlanDegisikligiPrintTemplate, { AlanDegisikligiData } from './print/AlanDegisikligiPrintTemplate';
+import { VOCATIONAL_FIELDS } from './data/vocationalFields';
 import { FileBox, Search, Printer, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 
@@ -24,7 +27,7 @@ export default function PetitionsPage() {
   // Form State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [petitionType, setPetitionType] = useState<'MESEM_NAKIL' | 'KAYIT_DONDURMA' | null>(null);
+  const [petitionType, setPetitionType] = useState<'MESEM_NAKIL' | 'KAYIT_DONDURMA' | 'SINIF_DEGISIKLIGI' | 'ALAN_DEGISIKLIGI'>('MESEM_NAKIL');
 
   // Parent & Student Extra Info (Fetched from 360)
   const [studentTcNo, setStudentTcNo] = useState('');
@@ -36,6 +39,10 @@ export default function PetitionsPage() {
   // Specific Info
   const [mesemName, setMesemName] = useState('');
   const [freezeReason, setFreezeReason] = useState('');
+  const [classChangeReason, setClassChangeReason] = useState('');
+  const [currentField, setCurrentField] = useState('');
+  const [targetField, setTargetField] = useState('');
+  const [fieldChangeReason, setFieldChangeReason] = useState('');
   const [academicYear, setAcademicYear] = useState('');
   const [parentAddress, setParentAddress] = useState('');
   
@@ -73,6 +80,9 @@ export default function PetitionsPage() {
     setParentPhone('');
     setParentTcNo('');
     setParentAddress('');
+    setCurrentField('');
+    setTargetField('');
+    setFieldChangeReason('');
     
     if (settings?.academicYear) setAcademicYear(settings.academicYear);
 
@@ -111,6 +121,12 @@ export default function PetitionsPage() {
     }
     if (petitionType === 'KAYIT_DONDURMA' && !freezeReason) {
       return toast.error('Lütfen kayıt dondurma gerekçesini girin.');
+    }
+    if (petitionType === 'SINIF_DEGISIKLIGI' && !classChangeReason.trim()) {
+      return toast.error('Lütfen sınıf değişikliği gerekçesini girin.');
+    }
+    if (petitionType === 'ALAN_DEGISIKLIGI' && !targetField.trim()) {
+      return toast.error('Lütfen geçiş talep edilen alanı giriniz.');
     }
 
     setTimeout(() => {
@@ -160,6 +176,44 @@ export default function PetitionsPage() {
     date: documentDate
   });
 
+  const getSinifDegisikligiData = (): SinifDegisikligiData => ({
+    student: {
+      fullName: selectedStudent?.fullName || '',
+      tcNo: studentTcNo,
+      schoolNumber: selectedStudent?.schoolNumber || '',
+      className: selectedStudent?.className || ''
+    },
+    parent: {
+      fullName: parentName,
+      tcNo: parentTcNo,
+      phone: parentPhone,
+      relation: parentRelation,
+      address: parentAddress
+    },
+    reason: classChangeReason,
+    date: documentDate
+  });
+
+  const getAlanDegisikligiData = (): AlanDegisikligiData => ({
+    student: {
+      fullName: selectedStudent?.fullName || '',
+      tcNo: studentTcNo,
+      schoolNumber: selectedStudent?.schoolNumber || '',
+      className: selectedStudent?.className || ''
+    },
+    parent: {
+      fullName: parentName,
+      tcNo: parentTcNo,
+      phone: parentPhone,
+      relation: parentRelation,
+      address: parentAddress
+    },
+    currentField,
+    targetField,
+    reason: fieldChangeReason,
+    date: documentDate
+  });
+
   // Recent petitions history
   const [recentPetitions, setRecentPetitions] = useState<any[]>(() => {
     try {
@@ -191,6 +245,10 @@ export default function PetitionsPage() {
     setParentAddress(item.parentAddress || '');
     setMesemName(item.mesemName || '');
     setFreezeReason(item.freezeReason || '');
+    setClassChangeReason(item.classChangeReason || '');
+    setCurrentField(item.currentField || '');
+    setTargetField(item.targetField || '');
+    setFieldChangeReason(item.fieldChangeReason || '');
     setDocumentDate(item.date || new Date().toISOString().slice(0, 10));
 
     setTimeout(() => {
@@ -217,11 +275,23 @@ export default function PetitionsPage() {
     if (petitionType === 'KAYIT_DONDURMA' && !freezeReason) {
       return toast.error('Lütfen kayıt dondurma gerekçesini girin.');
     }
+    if (petitionType === 'SINIF_DEGISIKLIGI' && !classChangeReason.trim()) {
+      return toast.error('Lütfen sınıf değişikliği gerekçesini girin.');
+    }
+    if (petitionType === 'ALAN_DEGISIKLIGI' && !targetField.trim()) {
+      return toast.error('Lütfen geçiş talep edilen alanı giriniz.');
+    }
 
     const historyItem = {
       id: 'pet-' + Date.now(),
       type: petitionType,
-      typeLabel: petitionType === 'MESEM_NAKIL' ? 'MESEM Nakil Dilekçesi' : 'Kayıt Dondurma Dilekçesi',
+      typeLabel: petitionType === 'MESEM_NAKIL' 
+        ? 'MESEM Nakil Dilekçesi' 
+        : petitionType === 'KAYIT_DONDURMA' 
+        ? 'Kayıt Dondurma Dilekçesi' 
+        : petitionType === 'SINIF_DEGISIKLIGI'
+        ? 'Sınıf Değişikliği Dilekçesi'
+        : 'Alan Değişikliği Dilekçesi',
       student: selectedStudent,
       studentTcNo,
       parentName,
@@ -231,6 +301,10 @@ export default function PetitionsPage() {
       parentAddress,
       mesemName,
       freezeReason,
+      classChangeReason,
+      currentField,
+      targetField,
+      fieldChangeReason,
       date: documentDate,
       createdAt: new Date().toISOString()
     };
@@ -257,32 +331,119 @@ export default function PetitionsPage() {
           </h2>
           
           <form onSubmit={onPrintTrigger} className="space-y-6">
-            {/* Adım 1: Öğrenci Seçimi */}
+            {/* Adım 1: Dilekçe Türü */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">1</span>
-                <label className="text-sm font-semibold text-slate-700">Öğrenci Seçimi</label>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                  <label className="text-sm font-semibold text-slate-700">Dilekçe Türü</label>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">Lütfen tür seçin</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPetitionType('MESEM_NAKIL')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    petitionType === 'MESEM_NAKIL'
+                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/30 text-indigo-950 font-bold shadow-2xs'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-0.5">Nakil / Geçiş</div>
+                  <div className="text-xs font-bold text-slate-900">MESEM Nakil</div>
+                  <div className="text-[11px] text-slate-500 font-normal mt-0.5">Mesleki Eğitim Merkezine geçiş</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPetitionType('KAYIT_DONDURMA')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    petitionType === 'KAYIT_DONDURMA'
+                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/30 text-indigo-950 font-bold shadow-2xs'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-0.5">Kayıt İşlemleri</div>
+                  <div className="text-xs font-bold text-slate-900">Kayıt Dondurma</div>
+                  <div className="text-[11px] text-slate-500 font-normal mt-0.5">Mazeretle kaydı dondurma</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPetitionType('SINIF_DEGISIKLIGI')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    petitionType === 'SINIF_DEGISIKLIGI'
+                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/30 text-indigo-950 font-bold shadow-2xs'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-0.5">Şube İşlemleri</div>
+                  <div className="text-xs font-bold text-slate-900">Sınıf Değişikliği</div>
+                  <div className="text-[11px] text-slate-500 font-normal mt-0.5">Mazeretle şube değişikliği</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPetitionType('ALAN_DEGISIKLIGI')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    petitionType === 'ALAN_DEGISIKLIGI'
+                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/30 text-indigo-950 font-bold shadow-2xs'
+                      : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 mb-0.5">Alan / Dal</div>
+                  <div className="text-xs font-bold text-slate-900">Alan Değişikliği</div>
+                  <div className="text-[11px] text-slate-500 font-normal mt-0.5">Mesleki alan/bölüm geçişi</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Adım 2: Öğrenci Seçimi */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                  <label className="text-sm font-semibold text-slate-700">Öğrenci Seçimi</label>
+                </div>
+                {selectedStudent && (
+                  <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                    ✓ Seçildi
+                  </span>
+                )}
               </div>
 
               {selectedStudent ? (
                 <div className="flex justify-between items-center px-3 py-2.5 border border-indigo-200 bg-indigo-50/70 rounded-xl text-sm">
-                  <div>
-                    <span className="font-bold text-indigo-950">{selectedStudent.fullName}</span>
-                    <span className="text-xs text-indigo-700 ml-2">No: {selectedStudent.schoolNumber} • {selectedStudent.className}</span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                      {selectedStudent.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-indigo-950 text-xs truncate">{selectedStudent.fullName}</div>
+                      <div className="text-[11px] text-indigo-700">No: {selectedStudent.schoolNumber} • Sınıf: {selectedStudent.className}</div>
+                    </div>
                   </div>
-                  <button type="button" onClick={() => setSelectedStudent(null)} className="text-indigo-600 hover:text-indigo-800 font-semibold text-xs">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedStudent(null)}
+                    className="h-7 px-2.5 text-xs text-indigo-700 border-indigo-200 bg-white hover:bg-indigo-50"
+                  >
                     Değiştir
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                   <input 
                     type="text" 
                     placeholder="Öğrenci adı, okul numarası veya sınıf ara..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white placeholder:text-slate-400"
                   />
                   {searchQuery && (
                     <button
@@ -291,7 +452,7 @@ export default function PetitionsPage() {
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
                       title="Temizle"
                     >
-                      <X size={15} />
+                      <X size={14} />
                     </button>
                   )}
                   {searchQuery && (
@@ -301,14 +462,14 @@ export default function PetitionsPage() {
                           <div 
                             key={s.id} 
                             onClick={() => handleStudentSelect(s)} 
-                            className="px-4 py-2.5 hover:bg-indigo-50 cursor-pointer text-sm transition flex items-center justify-between"
+                            className="px-3.5 py-2 hover:bg-indigo-50 cursor-pointer text-xs transition flex items-center justify-between"
                           >
                             <span className="font-semibold text-slate-800">{s.fullName}</span>
-                            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">No: {s.schoolNumber} • {s.className}</span>
+                            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">No: {s.schoolNumber} • {s.className}</span>
                           </div>
                         ))
                       ) : (
-                        <div className="px-4 py-3 text-sm text-slate-500 text-center">Öğrenci bulunamadı</div>
+                        <div className="px-4 py-3 text-xs text-slate-500 text-center italic">Öğrenci bulunamadı</div>
                       )}
                     </div>
                   )}
@@ -316,47 +477,9 @@ export default function PetitionsPage() {
               )}
             </div>
 
-            {/* Adım 2: Dilekçe Türü */}
-            {selectedStudent && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">2</span>
-                  <label className="text-sm font-semibold text-slate-700">Dilekçe Türü</label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPetitionType('MESEM_NAKIL')}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      petitionType === 'MESEM_NAKIL'
-                        ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/40 text-indigo-950 font-bold'
-                        : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="text-xs uppercase tracking-wider text-indigo-600 mb-0.5">Nakil / Geçiş</div>
-                    <div className="text-sm font-semibold">MESEM Nakil Dilekçesi</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPetitionType('KAYIT_DONDURMA')}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      petitionType === 'KAYIT_DONDURMA'
-                        ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400/40 text-indigo-950 font-bold'
-                        : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="text-xs uppercase tracking-wider text-indigo-600 mb-0.5">Kayıt İşlemleri</div>
-                    <div className="text-sm font-semibold">Kayıt Dondurma Dilekçesi</div>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Adım 3: Belge Detayları */}
-            {selectedStudent && petitionType && (
-              <div className="space-y-4 pt-2 border-t border-slate-100">
+            {selectedStudent && (
+              <div className="space-y-4 pt-2 border-t border-slate-100 animate-in fade-in duration-150">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">3</span>
                   <h3 className="font-semibold text-slate-800 text-sm">Belge Detayları ve Veli Bilgileri</h3>
@@ -415,6 +538,70 @@ export default function PetitionsPage() {
                       </div>
                     </>
                   )}
+
+                  {petitionType === 'SINIF_DEGISIKLIGI' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Sınıf Değişikliği Gerekçesi</label>
+                      <textarea value={classChangeReason} onChange={(e) => setClassChangeReason(e.target.value)} className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white resize-none" rows={2} placeholder="Örn: Ders çalışma ortamı ve seçmeli ders uyumu vb." />
+                    </div>
+                  )}
+
+                  {petitionType === 'ALAN_DEGISIKLIGI' && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Mevcut Kayıtlı Alanı (Opsiyonel)</label>
+                          <input
+                            type="text"
+                            list="vocational-fields-list"
+                            value={currentField}
+                            onChange={(e) => setCurrentField(e.target.value)}
+                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white"
+                            placeholder="Örn: Bilişim Teknolojileri"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">
+                            Geçmek İstediği Alan <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            list="vocational-fields-list"
+                            value={targetField}
+                            onChange={(e) => setTargetField(e.target.value)}
+                            className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white font-medium"
+                            placeholder="Örn: Elektrik-Elektronik Teknolojisi"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <datalist id="vocational-fields-list">
+                        {VOCATIONAL_FIELDS.map((field) => (
+                          <option key={field} value={field} />
+                        ))}
+                      </datalist>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Alan Değişikliği Gerekçesi (Opsiyonel)</label>
+                        <textarea
+                          value={fieldChangeReason}
+                          onChange={(e) => setFieldChangeReason(e.target.value)}
+                          className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white resize-none"
+                          rows={2}
+                          placeholder="Örn: Öğrencinin mesleki ilgi ve kariyer hedeflerindeki değişiklik nedeniyle vb."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Veli İkametgah Adresi (Opsiyonel)</label>
+                        <textarea
+                          value={parentAddress}
+                          onChange={(e) => setParentAddress(e.target.value)}
+                          className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-white resize-none"
+                          rows={2}
+                          placeholder="Mahalle, Cadde/Sokak, Kapı No, İlçe/İl"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -429,7 +616,7 @@ export default function PetitionsPage() {
 
         {/* SAĞ KOLON: CANLI A4 DİLEKÇE ÖNİZLEMESİ */}
         <div className="xl:col-span-6 space-y-4">
-          <div className="bg-slate-100/90 rounded-xl border border-slate-200/80 p-4">
+          <div className="bg-slate-50/80 rounded-xl border border-slate-200/70 p-4 shadow-2xs">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -483,6 +670,63 @@ export default function PetitionsPage() {
                       nedeniyle Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği hükümleri doğrultusunda kaydının dondurulmasını talep ediyorum.
                     </p>
                     <p className="indent-6">Gereğini bilgilerinize arz ederim.</p>
+                  </div>
+                ) : petitionType === 'SINIF_DEGISIKLIGI' ? (
+                  <div className="space-y-4">
+                    <p className="text-justify indent-6 leading-relaxed">
+                      Velisi bulunduğum okulunuz{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.className : '......'}
+                      </strong>{' '}
+                      sınıfı,{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.schoolNumber : '......'}
+                      </strong>{' '}
+                      nolu öğrencisi{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.fullName : '...........................................'}
+                      </strong>
+                      'ın (T.C. No: <span className="font-mono">{studentTcNo || '...........................'}</span>),{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {classChangeReason || '....................................................................'}
+                      </strong>{' '}
+                      nedeniyle sınıf değişikliği yapılması hususunda;
+                    </p>
+                    <p className="indent-6">Gereğini arz ederim.</p>
+                  </div>
+                ) : petitionType === 'ALAN_DEGISIKLIGI' ? (
+                  <div className="space-y-4">
+                    <p className="text-justify indent-6 leading-relaxed">
+                      Velisi bulunduğum okulunuz{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.className : '......'}
+                      </strong>{' '}
+                      sınıfı,{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.schoolNumber : '......'}
+                      </strong>{' '}
+                      nolu öğrencisi{' '}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {selectedStudent ? selectedStudent.fullName : '...........................................'}
+                      </strong>
+                      'ın (T.C. No: <span className="font-mono">{studentTcNo || '...........................'}</span>),{' '}
+                      {currentField ? (
+                        <>halen kayıtlı bulunduğu <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">{currentField}</strong> alanından, </>
+                      ) : ''}
+                      <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
+                        {targetField || '...........................................'}
+                      </strong>{' '}
+                      alanına / bölümüne alan değişikliği işlemlerinin yapılmasını talep ediyorum.
+                    </p>
+                    {fieldChangeReason && (
+                      <p className="text-justify indent-6 text-slate-700">
+                        <strong>Gerekçe:</strong> {fieldChangeReason}
+                      </p>
+                    )}
+                    <p className="text-justify indent-6 leading-relaxed">
+                      Öğrencimin alan değişikliği talebinin Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği hükümleri ve kontenjan durumu doğrultusunda değerlendirilerek e-Okul sisteminde gerekli alan/dal geçiş işlemlerinin yapılması hususunda;
+                    </p>
+                    <p className="indent-6">Gereğini arz ederim.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-slate-400 font-sans text-center">
@@ -562,6 +806,8 @@ export default function PetitionsPage() {
         <div ref={printRef}>
           {petitionType === 'MESEM_NAKIL' && <MesemNakilPrintTemplate data={getMesemData()} settings={settings} />}
           {petitionType === 'KAYIT_DONDURMA' && <KayitDondurmaPrintTemplate data={getKayitDondurmaData()} settings={settings} />}
+          {petitionType === 'SINIF_DEGISIKLIGI' && <SinifDegisikligiPrintTemplate data={getSinifDegisikligiData()} settings={settings} />}
+          {petitionType === 'ALAN_DEGISIKLIGI' && <AlanDegisikligiPrintTemplate data={getAlanDegisikligiData()} settings={settings} />}
         </div>
       </div>
     </div>
