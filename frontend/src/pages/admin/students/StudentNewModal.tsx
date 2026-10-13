@@ -92,7 +92,7 @@ export function StudentNewModal({
             )}
           </div>
           <p className="text-xs text-gray-500 mb-4">
-            Telefon numarası ile veli hesabı otomatik oluşturulacaktır.
+            Öğrenci iletişim ve WhatsApp bildirimleri için veli bilgileri.
           </p>
 
           {newParents.map((p, idx) => (

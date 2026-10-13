@@ -7,7 +7,8 @@ import { useReactToPrint } from 'react-to-print';
 import {
   CalendarDays, UploadCloud, AlertTriangle, CheckCircle,
   Trash2, History, Printer, RefreshCw, BookOpen, Users,
-  BarChart2, ChevronDown, ChevronUp, ExternalLink, Tag
+  BarChart2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  ExternalLink, Tag
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -177,6 +178,101 @@ export default function TimetablePage() {
 
   useEffect(() => { if (viewMode === 'teacher' && selectedStaffId) handleView(selectedStaffId); }, [selectedStaffId, handleView, viewMode]);
   useEffect(() => { if (viewMode === 'class' && selectedClass) handleView(undefined, selectedClass); }, [selectedClass, handleView, viewMode]);
+
+  // Önceki / Sonraki ders programı gezinti durumu ve verileri
+  const currentNav = useMemo(() => {
+    if (viewMode === 'teacher') {
+      const list = filteredStaffList;
+      const index = list.findIndex((s: any) => s.id === selectedStaffId);
+      const hasPrev = index > 0;
+      const hasNext = index >= 0 ? index < list.length - 1 : list.length > 0;
+      const prevItem = hasPrev ? list[index - 1] : null;
+      const nextItem = index >= 0 ? (index < list.length - 1 ? list[index + 1] : null) : (list.length > 0 ? list[0] : null);
+      return {
+        index,
+        total: list.length,
+        hasPrev,
+        hasNext,
+        prevName: prevItem ? (prevItem.brans ? `${prevItem.name} (${prevItem.brans})` : prevItem.name) : null,
+        nextName: nextItem ? (nextItem.brans ? `${nextItem.name} (${nextItem.brans})` : nextItem.name) : null,
+      };
+    } else {
+      const list = filteredClassMetas;
+      const index = list.findIndex((c: any) => c.raw === selectedClass);
+      const hasPrev = index > 0;
+      const hasNext = index >= 0 ? index < list.length - 1 : list.length > 0;
+      const prevItem = hasPrev ? list[index - 1] : null;
+      const nextItem = index >= 0 ? (index < list.length - 1 ? list[index + 1] : null) : (list.length > 0 ? list[0] : null);
+      return {
+        index,
+        total: list.length,
+        hasPrev,
+        hasNext,
+        prevName: prevItem ? prevItem.displayName : null,
+        nextName: nextItem ? nextItem.displayName : null,
+      };
+    }
+  }, [viewMode, filteredStaffList, filteredClassMetas, selectedStaffId, selectedClass]);
+
+  const handleNavigatePrev = useCallback(() => {
+    if (viewMode === 'teacher') {
+      const list = filteredStaffList;
+      const idx = list.findIndex((s: any) => s.id === selectedStaffId);
+      if (idx > 0) {
+        setSelectedStaffId(list[idx - 1].id);
+      }
+    } else {
+      const list = filteredClassMetas;
+      const idx = list.findIndex((c: any) => c.raw === selectedClass);
+      if (idx > 0) {
+        setSelectedClass(list[idx - 1].raw);
+      }
+    }
+  }, [viewMode, filteredStaffList, filteredClassMetas, selectedStaffId, selectedClass]);
+
+  const handleNavigateNext = useCallback(() => {
+    if (viewMode === 'teacher') {
+      const list = filteredStaffList;
+      const idx = list.findIndex((s: any) => s.id === selectedStaffId);
+      if (idx === -1 && list.length > 0) {
+        setSelectedStaffId(list[0].id);
+      } else if (idx >= 0 && idx < list.length - 1) {
+        setSelectedStaffId(list[idx + 1].id);
+      }
+    } else {
+      const list = filteredClassMetas;
+      const idx = list.findIndex((c: any) => c.raw === selectedClass);
+      if (idx === -1 && list.length > 0) {
+        setSelectedClass(list[0].raw);
+      } else if (idx >= 0 && idx < list.length - 1) {
+        setSelectedClass(list[idx + 1].raw);
+      }
+    }
+  }, [viewMode, filteredStaffList, filteredClassMetas, selectedStaffId, selectedClass]);
+
+  // Klavye ok tuşları ile hızlı program değiştirme (sol ok: önceki, sağ ok: sonraki)
+  useEffect(() => {
+    const handleKeyDownNav = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (isUploadModalOpen || isClassUploadModalOpen || isClassNamesModalOpen || isCrossOpen) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' && currentNav.hasPrev) {
+        e.preventDefault();
+        handleNavigatePrev();
+      } else if (e.key === 'ArrowRight' && currentNav.hasNext) {
+        e.preventDefault();
+        handleNavigateNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDownNav);
+    return () => window.removeEventListener('keydown', handleKeyDownNav);
+  }, [currentNav.hasPrev, currentNav.hasNext, handleNavigatePrev, handleNavigateNext, isUploadModalOpen, isClassUploadModalOpen, isClassNamesModalOpen, isCrossOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleView(); };
 
@@ -451,26 +547,54 @@ export default function TimetablePage() {
               </button>
             </div>
 
-            {/* Searchable Select Input */}
-            <div className="flex-1 min-w-[200px]">
-              {viewMode === 'teacher' ? (
-                <SearchableSelect
-                  options={filteredStaffList.map((s: any) => ({ 
-                    value: s.id, 
-                    label: s.brans ? `${s.name} (${s.brans})` : s.name 
-                  }))}
-                  value={selectedStaffId}
-                  onChange={(val) => setSelectedStaffId(val)}
-                  placeholder={selectedBranchFilter !== 'ALL' ? `${selectedBranchFilter} öğretmeni seç...` : "Öğretmen ara ve seç..."}
-                />
-              ) : (
-                <SearchableSelect
-                  options={filteredClassMetas.map((c) => ({ value: c.raw, label: c.displayName }))}
-                  value={selectedClass}
-                  onChange={(val) => setSelectedClass(val)}
-                  placeholder={selectedGradeFilter !== 'ALL' ? `${selectedGradeFilter}. Sınıf ara ve seç...` : "Sınıf ara ve seç..."}
-                />
-              )}
+            {/* Searchable Select Input & Navigation Buttons */}
+            <div className="flex-1 min-w-[220px] flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleNavigatePrev}
+                disabled={!currentNav.hasPrev}
+                className="h-[38px] w-[38px] p-0 shrink-0 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-30 disabled:pointer-events-none"
+                title={currentNav.prevName ? `Önceki Program: ${currentNav.prevName} (← Sol Ok)` : 'Önceki program yok'}
+                aria-label="Önceki Program"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+
+              <div className="flex-1 min-w-0">
+                {viewMode === 'teacher' ? (
+                  <SearchableSelect
+                    options={filteredStaffList.map((s: any) => ({ 
+                      value: s.id, 
+                      label: s.brans ? `${s.name} (${s.brans})` : s.name 
+                    }))}
+                    value={selectedStaffId}
+                    onChange={(val) => setSelectedStaffId(val)}
+                    placeholder={selectedBranchFilter !== 'ALL' ? `${selectedBranchFilter} öğretmeni seç...` : "Öğretmen ara ve seç..."}
+                  />
+                ) : (
+                  <SearchableSelect
+                    options={filteredClassMetas.map((c) => ({ value: c.raw, label: c.displayName }))}
+                    value={selectedClass}
+                    onChange={(val) => setSelectedClass(val)}
+                    placeholder={selectedGradeFilter !== 'ALL' ? `${selectedGradeFilter}. Sınıf ara ve seç...` : "Sınıf ara ve seç..."}
+                  />
+                )}
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleNavigateNext}
+                disabled={!currentNav.hasNext}
+                className="h-[38px] w-[38px] p-0 shrink-0 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 disabled:opacity-30 disabled:pointer-events-none"
+                title={currentNav.nextName ? `Sonraki Program: ${currentNav.nextName} (→ Sağ Ok)` : 'Sonraki program yok'}
+                aria-label="Sonraki Program"
+              >
+                <ChevronRight size={16} />
+              </Button>
             </div>
 
             {/* Sınıf İsimlerini Düzenle (Class Mode only) */}
@@ -654,7 +778,36 @@ export default function TimetablePage() {
 
           {/* Screen Card Header */}
           <div className="px-3.5 py-2 bg-gradient-to-r from-slate-50 via-indigo-50/15 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 print:hidden w-full min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Previous / Next Navigator Controls */}
+              <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={handleNavigatePrev}
+                  disabled={!currentNav.hasPrev}
+                  className="p-1 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-slate-100 disabled:opacity-25 disabled:pointer-events-none transition"
+                  title={currentNav.prevName ? `Önceki Program: ${currentNav.prevName} (← Sol Ok)` : 'Önceki program yok'}
+                  aria-label="Önceki Program"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {currentNav.index >= 0 && (
+                  <span className="text-[11px] font-bold text-slate-700 px-1.5 select-none whitespace-nowrap">
+                    {currentNav.index + 1} / {currentNav.total}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleNavigateNext}
+                  disabled={!currentNav.hasNext}
+                  className="p-1 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-slate-100 disabled:opacity-25 disabled:pointer-events-none transition"
+                  title={currentNav.nextName ? `Sonraki Program: ${currentNav.nextName} (→ Sağ Ok)` : 'Sonraki program yok'}
+                  aria-label="Sonraki Program"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm">{viewTitle}</h3>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                 {viewMode === 'teacher' ? 'Öğretmen' : 'Sınıf'}

@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { 
   ArrowLeft, User, Users, FileText, AlertTriangle, ShieldAlert, 
-  MessageSquare, History, RefreshCw, KeyRound, ExternalLink, Download, 
+  MessageSquare, History, RefreshCw, ExternalLink, Download, 
   Send, Image as ImageIcon, CheckCircle2, Clock, X, Phone
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -104,7 +104,6 @@ export default function Student360Page() {
   const [data, setData] = useState<Student360Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [resettingParent, setResettingParent] = useState<string | null>(null);
   const [sendingConsent, setSendingConsent] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [downloadingAbsence, setDownloadingAbsence] = useState<string | null>(null);
@@ -132,25 +131,6 @@ export default function Student360Page() {
   useEffect(() => {
     load();
   }, [id]);
-
-  const resetPassword = async (parentId: string, parentName: string) => {
-    if (!await confirm(`${parentName} için yeni geçici şifre oluşturulsun mu?`)) return;
-    setResettingParent(parentId);
-    setMessage('');
-    try {
-      const res = await api.post(`/students/parents/${parentId}/reset-password`);
-      const password = res.data?.data?.temporaryPassword;
-      setMessage(password ? `${parentName} için yeni geçici şifre: ${password}` : 'Şifre başarıyla sıfırlandı.');
-      toast.success('Geçici şifre oluşturuldu.');
-      await load();
-    } catch (e: any) {
-      const errMsg = e?.response?.data?.message || 'Şifre sıfırlanamadı.';
-      setMessage(errMsg);
-      toast.error(errMsg);
-    } finally {
-      setResettingParent(null);
-    }
-  };
 
   const sendConsent = async (parentId: string, parentName: string) => {
     if (!await confirm(`${parentName} için WhatsApp onay isteği gönderilsin mi?`)) return;
@@ -337,23 +317,8 @@ export default function Student360Page() {
                     </span>
                   </div>
 
-                  <div className="text-xs text-slate-500 mt-2.5 pt-2.5 border-t border-slate-200/60">
-                    Kullanıcı Adı: <span className="font-medium text-slate-700">{p.user.username}</span> &nbsp;•&nbsp; 
-                    Durum: <span className="text-slate-600">{p.user.mustChangePassword ? 'İlk şifre değişimi bekleniyor' : 'Şifre aktif'}</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <Button 
-                      disabled={resettingParent === p.id} 
-                      onClick={() => resetPassword(p.id, p.fullName)} 
-                      variant="outline"
-                      className="text-xs py-1.5 px-2.5 h-auto"
-                      leftIcon={<KeyRound size={14} />}
-                    >
-                      {resettingParent === p.id ? 'Sıfırlanıyor...' : 'Geçici Şifre Sıfırla'}
-                    </Button>
-                    
-                    {p.waConsentStatus !== 'ACCEPTED' && (
+                  {p.waConsentStatus !== 'ACCEPTED' && (
+                    <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-200/60">
                       <Button 
                         disabled={sendingConsent === p.id} 
                         onClick={() => sendConsent(p.id, p.fullName)} 
@@ -363,8 +328,8 @@ export default function Student360Page() {
                       >
                         {sendingConsent === p.id ? 'Gönderiliyor...' : 'WhatsApp Onay İsteği Gönder'}
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

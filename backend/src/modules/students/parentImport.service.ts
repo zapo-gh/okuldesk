@@ -187,9 +187,8 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
   for (let i = 0; i < newUserPhones.length; i += 50) {
     const chunk = newUserPhones.slice(i, i + 50);
     await Promise.all(chunk.map(async (phone) => {
-      const rawPassword = generateTemporaryPassword();
-      generatedPasswordByPhone.set(phone, rawPassword);
-      hashByPhone.set(phone, await bcrypt.hash(rawPassword, 6));
+      const unusablePassword = crypto.randomBytes(32).toString('hex');
+      hashByPhone.set(phone, await bcrypt.hash(unusablePassword, 6));
     }));
   }
 
@@ -230,12 +229,10 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
           continue;
         }
       } else {
-        const rawPassword = generatedPasswordByPhone.get(entry.phone);
         const passwordHash = hashByPhone.get(entry.phone);
-        if (!rawPassword || !passwordHash) throw new Error('Geçici veli şifresi oluşturulamadı.');
-        const user = await prisma.user.create({ data: { username: entry.phone, password: passwordHash, role: 'PARENT', mustChangePassword: true } });
+        if (!passwordHash) throw new Error('Dahili veli kaydı hazırlanamadı.');
+        const user = await prisma.user.create({ data: { username: entry.phone, password: passwordHash, role: 'PARENT', mustChangePassword: false } });
         userId = user.id;
-        result.initialCredentials.push({ phone: entry.phone, password: rawPassword });
       }
 
       const newParent = await prisma.parent.create({ data: { userId, fullName: entry.fullName, contacts: { create: [{ name: 'Veli (İçe Aktarıldı)', phone: entry.phone, isPrimary: true }] }, students: { connect: { id: entry.studentId } } } });

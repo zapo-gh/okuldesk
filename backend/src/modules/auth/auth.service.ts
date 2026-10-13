@@ -20,6 +20,10 @@ export class AuthService {
       throw new AppError('Geçersiz kullanıcı adı veya şifre.', 401);
     }
 
+    if (user.role === 'PARENT') {
+      throw new AppError('Veli girişi bu sistemde aktif değildir. Sistem yalnızca okul yönetimi içindir.', 403);
+    }
+
     const expiresIn = rememberMe ? '30d' : config.jwt.expiresIn;
     const token = jwt.sign(
       { userId: user.id, role: user.role, mustChangePassword: user.mustChangePassword },

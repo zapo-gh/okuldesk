@@ -46,14 +46,13 @@ export class ParentAccountService {
     }
 
     let user = await db.user.findUnique({ where: { username: phone } });
-    let temporaryPassword: string | null = null;
     let isNewUser = false;
 
     if (!user) {
-      temporaryPassword = generateParentTemporaryPassword();
-      const password = await bcrypt.hash(temporaryPassword, 12);
+      // Veli hesabı açılması iptal edildi: Yalnızca veritabanı foreign key (Parent -> User) ilişkisi için pasif kayıt tutulur.
+      const unusablePassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       user = await db.user.create({
-        data: { username: phone, password, role: 'PARENT', mustChangePassword: true },
+        data: { username: phone, password: unusablePassword, role: 'PARENT', mustChangePassword: false },
       });
       isNewUser = true;
     } else if (user.role !== 'PARENT') {
@@ -73,7 +72,7 @@ export class ParentAccountService {
     
     const parent = { id: parentRaw.id, userId: parentRaw.userId, fullName: parentRaw.fullName, phone: parentRaw.contacts[0]?.phone || phone };
 
-    return { parent, temporaryPassword, isNewUser };
+    return { parent, temporaryPassword: null, isNewUser };
   }
 
   async updatePhone(parentId: string, phone: string) {
@@ -101,19 +100,8 @@ export class ParentAccountService {
     });
   }
 
-  async resetPassword(parentId: string, actorUserId: string) {
-    const parent = await prisma.parent.findUnique({ where: { id: parentId }, include: { user: true, contacts: { where: { isPrimary: true } } } });
-    if (!parent) throw new AppError('Veli bulunamadı.', 404);
-    if (parent.user.role !== 'PARENT') throw new AppError('Bu hesap veli hesabı değil.', 400);
-
-    const primaryPhone = parent.contacts[0]?.phone || '';
-
-    const temporaryPassword = generateParentTemporaryPassword();
-    const password = await bcrypt.hash(temporaryPassword, 12);
-    await prisma.user.update({ where: { id: parent.user.id }, data: { password, mustChangePassword: true } });
-
-    await AuditService.log(actorUserId, 'RESET_PARENT_PASSWORD', 'Parent', parentId, { phone: primaryPhone });
-    return { parentId, phone: primaryPhone, temporaryPassword, mustChangePassword: true };
+  async resetPassword(_parentId: string, _actorUserId: string) {
+    throw new AppError('Veli hesapları ve şifre yönetimi devre dışı bırakılmıştır.', 400);
   }
 
   async findByPhone(phone: string) {

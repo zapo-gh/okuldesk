@@ -496,16 +496,10 @@ export default function StudentListPage() {
       // Yeni eklenen tüm velileri sırayla kaydet
       for (const np of newEditParents) {
         if (np.fullName.trim() && np.phone.trim()) {
-          const response = await api.post(`/students/${editStudent.id}/parents`, {
+          await api.post(`/students/${editStudent.id}/parents`, {
             fullName: np.fullName.trim(),
             phone: np.phone.trim(),
           });
-
-          if (response.data?.data?.generatedPassword) {
-            toast(`✅ ${np.fullName.trim()} için yeni veli hesabı oluşturuldu.\n\nGeçici Şifre: ${response.data.data.generatedPassword}\n\nLütfen bu şifreyi veliye iletin. Veli ilk girişinde şifresini değiştirmek zorundadır.`);
-          } else if (response.data?.data?.isExistingUser) {
-            toast(`ℹ️ ${np.fullName.trim()} (${np.phone.trim()}) zaten kayıtlı.\nVeli mevcut hesabıyla bağlandı. Şifre değiştirilmedi.`);
-          }
         }
       }
 
@@ -708,8 +702,22 @@ export default function StudentListPage() {
               )}
             </div>
 
-            {/* Veli Bilgileriyle Yazdır Butonu (Arama satırının en sağında) */}
+            {/* Veli Bilgileriyle Yazdır & Seçiliyi Sil Butonları (Arama satırının en sağında) */}
             <div className="flex items-center gap-2 shrink-0">
+              {selectedIds.size > 0 && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="gap-1.5 h-9 px-3 text-xs font-bold shadow-2xs"
+                  title="Seçili öğrencileri sil"
+                >
+                  <Trash2 size={14} />
+                  <span>{bulkDeleting ? 'Siliniyor...' : `Seçiliyi Sil (${selectedIds.size})`}</span>
+                </Button>
+              )}
               <Button
                 type="button"
                 onClick={handlePrintStudents}
@@ -808,31 +816,42 @@ export default function StudentListPage() {
 
         {/* Action Bar (Delete / Summary) */}
         {!loading && displayClasses.length > 0 && (
-          <div className="flex justify-between items-center px-6 py-3 bg-indigo-50/50 border-b border-indigo-100/50 text-sm">
-            <div className="font-medium text-gray-700">
-              <span className="text-indigo-700 font-bold mr-2">
+          <div className="flex flex-wrap justify-between items-center px-6 py-2.5 bg-indigo-50/60 border-b border-indigo-100/70 text-sm gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-indigo-700 font-bold">
                 {search ? (displayClasses.some(c => c.name === activeClass) ? `Arama: "${search}" (${activeClass})` : `Arama: "${search}" (Tümü)`) : `Sınıf ${activeClass}`}
               </span> 
-              ({filteredStudents.length} öğrenci)
+              <span className="text-slate-600 font-medium">({filteredStudents.length} öğrenci)</span>
               
               {selectedIds.size > 0 && (
-                <span className="ml-3 text-indigo-600 font-bold">
-                  {selectedIds.size} Seçili
-                </span>
+                <div className="flex items-center gap-2 ml-1 pl-3 border-l border-indigo-200">
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">
+                    {selectedIds.size} Seçili
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg text-white bg-red-600 hover:bg-red-700 shadow-xs transition disabled:opacity-50 cursor-pointer"
+                    title="Seçili öğrencileri sil"
+                  >
+                    <Trash2 size={13} className="text-white" />
+                    <span>{bulkDeleting ? 'Siliniyor...' : `${selectedIds.size} Öğrenciyi Sil`}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-xs text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+                    title="Seçimi Kaldır"
+                  >
+                    Vazgeç
+                  </button>
+                </div>
               )}
             </div>
             
-            <div className="flex items-center gap-4">
-              {selectedIds.size > 0 && (
-                <Button 
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleting}
-                  className="px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center gap-1 font-medium transition disabled:opacity-50"
-                >
-                  {bulkDeleting ? 'Siliniyor...' : <><Trash2 size={14}/> {selectedIds.size} Öğrenciyi Sil</>}
-                </Button>
-              )}
-              <span className="text-gray-500">Toplam {students.length} Kayıt</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-slate-500">Toplam {students.length} Kayıt</span>
             </div>
           </div>
         )}
