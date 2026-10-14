@@ -85,6 +85,21 @@ export async function startServer(): Promise<void> {
   await prisma.$connect();
   console.log('✅ Database connected successfully');
 
+  // Geçici Quick Tunnel kalıntılarını temizle (restart sonrasında geçersizdir)
+  try {
+    const schoolSettings = await prisma.schoolSettings.findUnique({
+      where: { id: 'singleton' },
+      select: { publicBaseUrl: true },
+    });
+    if (schoolSettings?.publicBaseUrl?.includes('trycloudflare.com')) {
+      await prisma.schoolSettings.update({
+        where: { id: 'singleton' },
+        data: { publicBaseUrl: '' },
+      });
+      console.log('🧹 Eski geçici Cloudflare tünel adresi temizlendi.');
+    }
+  } catch {}
+
   await BackupService.runDailyBackup().catch((err: unknown) => {
     console.error('⚠️ Otomatik yedekleme başarısız oldu:', err);
   });

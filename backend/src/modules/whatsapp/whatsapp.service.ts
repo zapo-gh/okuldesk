@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { webcrypto } from 'crypto';
 import prisma from '../shared/utils/prisma';
+import { config } from '../shared/config';
 
 let Baileys: any = null;
 let QRCode: any = null;
@@ -22,17 +22,13 @@ let connectionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 let shuttingDown = false;
 let consecutiveFailures = 0;
 
-// Gönderilen ve henüz yanıtlanmamış onay istekleri (telefonun son 10 hanesi -> zaman damgası).
-const pendingConsent = new Map<string, number>();
-const CONSENT_PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const CONSENT_RESEND_MIN_MS = 10 * 60 * 1000;
+// Onay isteği gönderim sıklığını sınırlamak için basit zaman kaydı (telefon -> zaman)
+const lastConsentSentMap = new Map<string, number>();
 
 // Mesajlar arası bekleme (WhatsApp'ın spam algısını azaltmak için)
 let sendQueue: Promise<unknown> = Promise.resolve();
 const SEND_GAP_MIN_MS = 1500;
 const SEND_GAP_MAX_MS = 3000;
-
-import { config } from '../shared/config';
 
 function getAuthDir(): string {
   if (authDir) return authDir;
@@ -140,7 +136,7 @@ export async function initialize(): Promise<void> {
   try {
     // Node.js 18+ webcrypto built-in; eski sürümlerde manuel set gerekebilir.
     if (!globalThis.crypto) {
-      (globalThis as any).crypto = webcrypto;
+      (globalThis as any).crypto = require('crypto').webcrypto;
     }
 
     if (!Baileys) {
@@ -202,83 +198,7 @@ export async function initialize(): Promise<void> {
       }
     }, 20000);
 
-  sock.ev.on('messages.upsert', async (m: any) => {
-    if (socket !== sock) return;
-    // Geçmiş senkronizasyonundan gelen eski mesajları işleme
-    if (m.type && m.type !== 'notify') return;
-    try {
-      for (const msg of m.messages) {
-        if (!msg.message || msg.key.fromMe) continue;
-        const remoteJid: string | undefined = msg.key.remoteJid;
-        if (!remoteJid || remoteJid.includes('@g.us') || remoteJid.includes('@broadcast')) continue;
-
-        // Düğme yanıtı: selectedButtonId öncelikli, selectedDisplayText yedek, düz metin son
-        const buttonId =
-          msg.message.buttonsResponseMessage?.selectedButtonId ||
-          msg.message.templateButtonReplyMessage?.selectedId || '';
-        const buttonText = msg.message.buttonsResponseMessage?.selectedDisplayText || '';
-        const text = buttonId || msg.message.conversation || msg.message.extendedTextMessage?.text || buttonText || '';
-        if (!text) continue;
-
-        // Telefon numarasını belirle (@lid kimliklerinde gerçek numara ayrı alanda gelir)
-        let phoneJid: string | undefined = remoteJid;
-        if (remoteJid.endsWith('@lid')) {
-          phoneJid = msg.key.remoteJidAlt || msg.key.senderPn || undefined;
-          if (!phoneJid) {
-            try { phoneJid = await sock.signalRepository?.lidMapping?.getPNForLID?.(remoteJid); } catch {}
-          }
-        }
-        if (!phoneJid || !phoneJid.includes('@s.whatsapp.net')) continue;
-        const key = phoneKey(phoneJid.split('@')[0].split(':')[0]);
-        if (!key) continue;
-
-        const upperText = text.trim().toLocaleUpperCase('tr-TR');
-        const requestedAt = pendingConsent.get(key);
-        const hasPending = !!requestedAt && Date.now() - requestedAt < CONSENT_PENDING_TTL_MS;
-
-        let newStatus: 'ACCEPTED' | 'DECLINED' | null = null;
-        if (buttonId === 'CONSENT_YES') {
-          newStatus = 'ACCEPTED';
-        } else if (buttonId === 'CONSENT_NO') {
-          newStatus = 'DECLINED';
-        } else if (['EVET', 'KABUL', 'ONAYLIYORUM'].includes(upperText)) {
-          newStatus = 'ACCEPTED';
-        } else if (['HAYIR', 'IPTAL', 'İPTAL', 'RET', 'REDDEDİYORUM', 'REDDEDIYORUM', 'DUR', 'STOP'].includes(upperText)) {
-          newStatus = 'DECLINED';
-        } else if (hasPending && upperText === '1') {
-          // "1"/"2" gibi belirsiz yanıtlar yalnızca bekleyen bir onay isteği varken geçerli
-          newStatus = 'ACCEPTED';
-        } else if (hasPending && upperText === '2') {
-          newStatus = 'DECLINED';
-        }
-
-        if (!newStatus) continue;
-
-        const contacts = await findContactsByPhone(key);
-        if (contacts.length === 0) continue;
-
-        await prisma.parentContact.updateMany({
-          where: { id: { in: contacts.map(c => c.id) } },
-          data: { waConsentStatus: newStatus, waConsentDate: new Date() },
-        });
-        pendingConsent.delete(key);
-
-        const replyText = newStatus === 'ACCEPTED'
-          ? '✅ Okul bilgilendirme mesajları için onayınız alınmıştır. Teşekkür ederiz.'
-          : '❌ Okul bilgilendirme mesajlarını almayı reddettiniz. Size artık WhatsApp üzerinden okul bilgilendirmeleri gönderilmeyecektir.';
-
-        if (socket === sock && !shuttingDown) {
-          try { await sock.sendMessage(remoteJid, { text: replyText }); } catch (e) {
-            console.warn('Onay yanıtı gönderilemedi:', (e as any)?.message);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error handling incoming WhatsApp message:', error);
-    }
-  });
-
-  sock.ev.on('connection.update', async (update: any) => {
+    sock.ev.on('connection.update', async (update: any) => {
     const { connection, lastDisconnect, qr } = update;
 
     // Eski (yerini yeni sokete bırakmış) bağlantının olayları yok sayılır
@@ -451,45 +371,70 @@ async function checkConsent(phone: string): Promise<void> {
   }
 }
 
-export async function sendConsentRequest(phone: string): Promise<void> {
+export interface ConsentMessageDetails {
+  studentName?: string;
+  className?: string;
+  schoolNumber?: string;
+  parentName?: string;
+  schoolName?: string;
+  schoolPhone?: string;
+}
+
+export async function sendConsentRequest(
+  phone: string,
+  consentLink?: string,
+  details?: ConsentMessageDetails
+): Promise<void> {
   ensureConnected();
   const jid = toJid(phone);
   const key = phoneKey(phone);
 
-  const last = pendingConsent.get(key);
-  if (last && Date.now() - last < CONSENT_RESEND_MIN_MS) {
-    throw new Error('Bu veliye onay isteği az önce gönderildi. Lütfen birkaç dakika bekleyin.');
+  const last = lastConsentSentMap.get(key);
+  if (last && Date.now() - last < 60 * 1000) {
+    throw new Error('Bu veliye onay isteği az önce gönderildi. Lütfen 1 dakika bekleyin.');
   }
 
-  const text =
-    `Sayın Veli,\n\n` +
-    `Okulumuz, *devamsızlık bildirimleri, yazılı uyarılar ve okul bilgilendirmelerini* ` +
-    `WhatsApp üzerinden iletmek istemektedir.\n\n` +
-    `Bu bildirimleri almayı kabul ediyor musunuz?\n\n` +
-    `*1️⃣ EVET* — Kabul ediyorum, bildirim almak istiyorum.\n` +
-    `*2️⃣ HAYIR* — Reddediyorum, bildirim almak istemiyorum.\n\n` +
-    `Lütfen yalnızca *1* veya *2* yazarak yanıt veriniz.\n\n` +
-    `_OkulDesk · Okul Yönetim Sistemi_`;
+  const schoolClean = (details?.schoolName || 'Okul').trim();
+  const schoolUpper = schoolClean.toUpperCase();
+  const schoolTitle = `🏛️ *T.C. MİLLÎ EĞİTİM BAKANLIĞI*\n*${schoolUpper} MÜDÜRLÜĞÜ*\n_Resmi Veli Bilgilendirme ve KVKK Açık Rıza Hattı_\n\n`;
 
-  // Not: WhatsApp normal hesaplarda eski "buttons" formatını göstermediği için
-  // her zaman numaralı düz metin kullanılır.
+  const greeting = `Sayın Velimiz,\n\n`;
+
+  const linkPart = consentLink
+    ? `🔗 *Güvenli Mobil Onay Bağlantısı:*\n${consentLink}\n\n` +
+      `📌 *Bilgilendirme:* Yukarıdaki bağlantı, okulumuz tarafından öğrenciniz adına üretilmiş şifreli ve güvenli web onay formudur.\n\n`
+    : '\n';
+
+  const phonePart = details?.schoolPhone
+    ? `📞 *Tereddüt halinde teyit için okul tel:* ${details.schoolPhone}\n\n`
+    : '';
+
+  const text =
+    schoolTitle +
+    greeting +
+    `Okulumuz, öğrencimizin eğitim-öğretim sürecine ilişkin *devamsızlık bildirimleri, yazılı uyarılar ve resmi okul duyurularını* WhatsApp iletişim hattı üzerinden sizlere doğrudan ve hızlı şekilde iletmek istemektedir.\n\n` +
+    `6698 sayılı KVKK kapsamındaki Aydınlatma Metnini incelemek ve WhatsApp iletişim onay tercihinizi belirlemek için lütfen aşağıdaki güvenli bağlantıyı açınız:\n\n` +
+    linkPart +
+    `Tercihinizi ayrıca dilediğiniz takdirde okul idaremizden temin edebileceğiniz 2 sayfalık matbu formu elden imzalayarak da iletebilirsiniz.\n\n` +
+    phonePart +
+    `Saygılarımızla,\n*${schoolUpper} MÜDÜRLÜĞÜ*`;
+
   await enqueueSend(async () => {
     ensureConnected();
     await socket.sendMessage(jid, { text });
   });
 
-  pendingConsent.set(key, Date.now());
+  lastConsentSentMap.set(key, Date.now());
 
-  // Daha önce reddetmiş velinin durumunu tekrar beklemeye al
+  // İlgili telefon numarasına sahip tüm veli kayıtlarını PENDING yap
   const contacts = await findContactsByPhone(phone);
-  const declined = contacts.filter(c => c.waConsentStatus === 'DECLINED').map(c => c.id);
-  if (declined.length > 0) {
+  if (contacts.length > 0) {
     await prisma.parentContact.updateMany({
-      where: { id: { in: declined } },
+      where: { id: { in: contacts.map(c => c.id) } },
       data: { waConsentStatus: 'PENDING', waConsentDate: null },
     });
   }
-  console.log('📤 WhatsApp onay isteği gönderildi.');
+  console.log('📤 WhatsApp veli bilgilendirme ve onay formu linki gönderildi.');
 }
 
 export async function sendTextMessage(phone: string, text: string): Promise<void> {

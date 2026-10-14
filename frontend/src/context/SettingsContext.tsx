@@ -10,6 +10,10 @@ interface Settings {
   dutyRotationDates?: string; // JSON string → string[] (özel rotasyon tarihleri)
   dutyStartDate?: string | null; // "YYYY-MM-DD" — nöbet başlangıç tarihi
   classDisplayMap?: string; // JSON string: { [rawClassName: string]: displayName }
+  schoolAddress?: string;
+  schoolDistrictCity?: string;
+  schoolEmail?: string;
+  schoolPhone?: string;
 }
 
 interface SettingsContextType {

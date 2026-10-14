@@ -1,9 +1,21 @@
+export interface ParentInfo {
+  id: string;
+  contactId?: string;
+  fullName: string;
+  relation?: string;
+  phone: string;
+  waConsentStatus?: 'ACCEPTED' | 'DECLINED' | 'PENDING';
+  waConsentDate?: string | Date | null;
+  photoConsentStatus?: 'ACCEPTED' | 'DECLINED' | 'PENDING';
+  isPrimary?: boolean;
+}
+
 export interface Student {
   id: string;
   schoolNumber: string;
   fullName: string;
   className: string;
-  parents: { id: string; fullName: string; phone: string }[];
+  parents: ParentInfo[];
 }
 
 export interface AbsenteeismRecord {
@@ -16,5 +28,11 @@ export interface AbsenteeismRecord {
   createdAt: string;
   excusedDays?: number | null;
   unexcusedDays?: number | null;
-  student: { fullName: string; className: string; schoolNumber: string };
+  student: {
+    id?: string;
+    fullName: string;
+    className: string;
+    schoolNumber: string;
+    parents?: ParentInfo[];
+  };
 }

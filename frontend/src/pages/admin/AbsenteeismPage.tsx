@@ -175,7 +175,10 @@ export default function AbsenteeismPage() {
         unexcusedDays: record.unexcusedDays != null ? record.unexcusedDays : '',
       });
       setWaPreviewData(res.data.data);
-      setWaSelectedParents(new Set((res.data.data.messages as { phone: string }[]).map((m) => m.phone)));
+      const messages = (res.data.data.messages as any[]) || [];
+      const nonDeclined = messages.filter(m => m.waConsentStatus !== 'DECLINED').map(m => m.phone);
+      const initialSelection = nonDeclined.length > 0 ? nonDeclined : messages.map(m => m.phone);
+      setWaSelectedParents(new Set(initialSelection));
       
       if (res.data.data.hasPreviewImage) {
         setFullPageLoading(true);
@@ -201,7 +204,10 @@ export default function AbsenteeismPage() {
         unexcusedDays: waUnexcusedDays,
       });
       setWaPreviewData(res.data.data);
-      setWaSelectedParents(new Set((res.data.data.messages as { phone: string }[]).map((m) => m.phone)));
+      const messages = (res.data.data.messages as any[]) || [];
+      const nonDeclined = messages.filter(m => m.waConsentStatus !== 'DECLINED').map(m => m.phone);
+      const initialSelection = nonDeclined.length > 0 ? nonDeclined : messages.map(m => m.phone);
+      setWaSelectedParents(new Set(initialSelection));
     } catch (err: any) {
       setWaPreviewError(err.response?.data?.message || 'Önizleme yüklenemedi.');
     } finally {
@@ -237,6 +243,10 @@ export default function AbsenteeismPage() {
 
   const handleWaSend = async () => {
     if (!waRecord) return;
+    if (waSelectedParents.size === 0) {
+      toast.error('Lütfen devamsızlık mektubu gönderilecek en az bir veli seçiniz.');
+      return;
+    }
     const recordId = waRecord.id;
     setWaSendLoading(recordId);
     try {

@@ -48,6 +48,7 @@ const MODULES: PaletteModule[] = [
 
   // Sistem
   { title: 'WhatsApp Bağlantısı', path: '/admin/whatsapp', category: 'Sistem' },
+  { title: 'Veli Onay Yönetimi (WhatsApp & KVKK)', path: '/admin/whatsapp-consent', category: 'Sistem' },
   { title: 'Ayarlar', path: '/admin/settings', category: 'Sistem' },
   { title: 'Sistem İzlenebilirliği (Audit)', path: '/admin/audit-logs', category: 'Sistem' },
 

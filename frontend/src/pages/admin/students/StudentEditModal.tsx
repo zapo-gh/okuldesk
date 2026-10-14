@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ActionModal } from "../../../components/ui/ActionModal";
-import { ShieldAlert, Trash2, Lock, Unlock, AlertTriangle, RotateCcw, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, Trash2, Lock, Unlock, AlertTriangle, RotateCcw, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { Button } from '../../../components/ui/Button';
 import toast from 'react-hot-toast';
 
@@ -176,86 +176,123 @@ export function StudentEditModal({
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
-          <select
-            value={editForm.status}
-            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="ACTIVE">Aktif</option>
-            <option value="INACTIVE">Pasif</option>
-          </select>
-        </div>
 
         <div className="mt-6 border-t pt-4">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <h4 className="font-semibold text-gray-800">Veli Bilgileri</h4>
-              <p className="text-xs text-gray-500">Öğrenciye en fazla 2 veli tanımlanabilir.</p>
+              <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                <span>Veli Bilgileri</span>
+                <span className="text-xs font-normal text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                  1. Sıradaki veli asıl / öncelikli velidir
+                </span>
+              </h4>
+              <p className="text-xs text-gray-500">Öğrenciye en fazla 2 veli tanımlanabilir. Sistem bildirimleri ve onaylar 1. veliye gönderilir.</p>
             </div>
-            {editParents.length + newEditParents.length < 2 && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() =>
-                  setNewEditParents((prev) => [
-                    ...prev,
-                    { tempId: `temp-${Date.now()}-${Math.random()}`, fullName: "", phone: "" },
-                  ])
-                }
-                className="text-xs text-indigo-600 font-semibold hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-indigo-200 cursor-pointer flex items-center gap-1"
-              >
-                + Yeni Veli Ekle
-              </Button>
-            )}
+            <div>
+              {editParents.length + newEditParents.length < 2 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setNewEditParents((prev) => [
+                      ...prev,
+                      { tempId: `temp-${Date.now()}-${Math.random()}`, fullName: "", phone: "" },
+                    ])
+                  }
+                  className="text-xs text-indigo-600 font-semibold hover:bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 cursor-pointer flex items-center gap-1"
+                >
+                  + Yeni Veli Ekle
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Mevcut Kayıtlı Veliler */}
           {editParents.map((p, idx) => (
             <div
               key={p.id}
-              className="flex items-end gap-2 p-3 mb-3 bg-white rounded-xl shadow-sm border border-slate-200"
+              className={`p-3 mb-3 bg-white rounded-xl shadow-sm border transition-all ${
+                idx === 0
+                  ? 'border-indigo-300 ring-1 ring-indigo-200/60 bg-gradient-to-r from-indigo-50/30 to-white'
+                  : 'border-slate-200'
+              }`}
             >
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {idx + 1}. Veli Adı
-                </label>
-                <input
-                  type="text"
-                  value={p.fullName}
-                  onChange={(e) => {
-                    const up = [...editParents];
-                    up[idx].fullName = e.target.value;
-                    setEditParents(up);
-                  }}
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Ad Soyad"
-                />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      idx === 0
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {idx === 0 ? '1. Veli (Asıl Veli)' : '2. Veli (Yedek)'}
+                  </span>
+                  <span className={`text-[11px] ${idx === 0 ? 'text-indigo-700 font-medium' : 'text-slate-500'}`}>
+                    {idx === 0
+                      ? '• İlk kullanılacak öncelikli iletişim numarası (WhatsApp / Devamsızlık / SMS)'
+                      : '• Gerektiğinde ulaşılacak ikinci iletişim numarası'}
+                  </span>
+                </div>
+                {editParents.length === 2 && idx === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditParents([editParents[1], editParents[0]]);
+                      toast.success('1. ve 2. veli sırası değiştirildi. Onaylamak için Kaydet butonuna basınız.');
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition cursor-pointer shrink-0"
+                    title="1. ve 2. velinin yerini değiştir"
+                  >
+                    <ArrowUpDown size={13} className="text-indigo-600" />
+                    <span>Yer Değiştir</span>
+                  </button>
+                )}
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">Telefon</label>
-                <input
-                  type="text"
-                  value={p.phone}
-                  onChange={(e) => {
-                    const up = [...editParents];
-                    up[idx].phone = e.target.value;
-                    setEditParents(up);
-                  }}
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
-                  placeholder="05XX XXX XX XX"
-                />
+
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Veli Adı Soyadı
+                  </label>
+                  <input
+                    type="text"
+                    value={p.fullName}
+                    onChange={(e) => {
+                      const up = [...editParents];
+                      up[idx].fullName = e.target.value;
+                      setEditParents(up);
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Ad Soyad"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Telefon Numarası
+                  </label>
+                  <input
+                    type="text"
+                    value={p.phone}
+                    onChange={(e) => {
+                      const up = [...editParents];
+                      up[idx].phone = e.target.value;
+                      setEditParents(up);
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                    placeholder="05XX XXX XX XX"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleRemoveParent(p.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-md border border-red-100 shrink-0 cursor-pointer"
+                  title="Veliyi Sil"
+                >
+                  <Trash2 size={16} />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => handleRemoveParent(p.id)}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-md border border-red-100 shrink-0 cursor-pointer"
-                title="Veliyi Sil"
-              >
-                <Trash2 size={16} />
-              </Button>
             </div>
           ))}
 

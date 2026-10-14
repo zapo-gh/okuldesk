@@ -7,7 +7,7 @@ import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X, Printer, Download, ShieldCheck } from 'lucide-react';
+import { Users, Upload, FileSpreadsheet, Trash2, Plus, Edit, ShieldAlert, Search, X, Printer, FileText } from 'lucide-react';
 import { Student, ParsedStudent, ImportResult, ParentPreviewRow, ParentImportResult } from './students/types';
 import { StudentNewModal } from './students/StudentNewModal';
 import { StudentEditModal } from './students/StudentEditModal';
@@ -67,26 +67,6 @@ export default function StudentListPage() {
   const [parentDone, setParentDone] = useState<ParentImportResult | null>(null);
   const parentFileRef = useRef<HTMLInputElement>(null);
 
-  // WhatsApp Onay Export
-  const [exportingConsents, setExportingConsents] = useState(false);
-  const handleExportConsents = async () => {
-    setExportingConsents(true);
-    try {
-      const res = await api.get('/whatsapp/consents/export', { responseType: 'blob' });
-      const date = new Date().toISOString().slice(0, 10);
-      const url = URL.createObjectURL(res.data as Blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `WhatsApp_Iletisim_Onay_Listesi_${date}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('WhatsApp onay listesi Excel olarak indirildi.');
-    } catch (err: any) {
-      toast.error('Onay listesi indirilirken bir hata oluştu.');
-    } finally {
-      setExportingConsents(false);
-    }
-  };
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -250,15 +230,6 @@ export default function StudentListPage() {
     }
   };
 
-  const handleSendConsent = async (parentId: string) => {
-    try {
-      await api.post('/whatsapp/send-consent', { parentId });
-      toast('Onay isteği veliye WhatsApp üzerinden gönderildi.');
-      loadStudents();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Onay isteği gönderilemedi.');
-    }
-  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -462,26 +433,37 @@ export default function StudentListPage() {
       const trimmedName = editForm.fullName.trim();
       const trimmedClass = editForm.className.trim();
 
+      const newPrimaryParentId = editParents[0]?.id || null;
+
       await api.put(`/students/${editStudent.id}`, {
         schoolNumber: trimmedNumber,
         fullName: trimmedName,
         className: trimmedClass,
         status: editForm.status,
+        primaryParentId: newPrimaryParentId,
       });
 
       // Optimistik güncelleme ile arayüz anında güncellensin
       setStudents((prev) =>
-        prev.map((s) =>
-          s.id === editStudent.id
-            ? {
-                ...s,
-                schoolNumber: trimmedNumber,
-                fullName: trimmedName,
-                className: trimmedClass,
-                status: editForm.status,
-              }
-            : s
-        )
+        prev.map((s) => {
+          if (s.id !== editStudent.id) return s;
+          const updatedParents = editParents.map((p) => ({
+            id: p.id,
+            fullName: p.fullName.trim(),
+            phone: p.phone.trim(),
+            waConsentStatus: s.parents.find((op) => op.id === p.id)?.waConsentStatus || 'PENDING',
+            photoConsentStatus: s.parents.find((op) => op.id === p.id)?.photoConsentStatus || 'PENDING',
+          }));
+          return {
+            ...s,
+            schoolNumber: trimmedNumber,
+            fullName: trimmedName,
+            className: trimmedClass,
+            status: editForm.status,
+            primaryParentId: newPrimaryParentId,
+            parents: updatedParents,
+          };
+        })
       );
 
       for (const p of editParents) {
@@ -567,34 +549,33 @@ export default function StudentListPage() {
       render: (s) => <span className="font-bold text-gray-900">{s.fullName}</span>
     },
     {
-      header: 'Durum',
-      className: 'w-28',
-      render: (s) => <StatusBadge status={s.status} />
-    },
-    {
       header: 'Veli Bilgileri',
-      className: 'min-w-[460px]',
       render: (s) => (
-        <div className="flex items-center gap-2 flex-nowrap">
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto py-0.5">
           {s.parents.length > 0 ? (
             s.parents.map((p, pi) => (
-              <div key={pi} className="text-xs bg-gray-50 border border-gray-200/80 rounded-lg p-2 shrink-0 min-w-[210px] max-w-[260px]">
-                <div className="flex items-center justify-between gap-2 mb-1.5 whitespace-nowrap">
-                  <span className="font-semibold text-gray-800 text-xs truncate max-w-[130px]" title={p.fullName}>{p.fullName}</span>
-                  {p.phone && <span className="text-gray-500 text-xs font-mono shrink-0">{formatPhoneNumber(p.phone)}</span>}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {p.waConsentStatus === 'ACCEPTED' && <StatusBadge status="ACTIVE" customText="Onaylı" />}
-                  {p.waConsentStatus === 'DECLINED' && <StatusBadge status="REJECTED" customText="Reddedildi" />}
-                  {p.waConsentStatus === 'PENDING' && (
-                    <>
-                      <StatusBadge status="PENDING" customText="Bekliyor" />
-                      <Button variant="ghost" onClick={() => handleSendConsent(p.id)} className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-1.5 py-0.5 h-5 text-[11px] transition-colors rounded" title="Onay İste">
-                        Onay İste
-                      </Button>
-                    </>
-                  )}
-                </div>
+              <div
+                key={pi}
+                className={`text-xs rounded-md px-2 py-1 flex items-center gap-1.5 shrink-0 border whitespace-nowrap transition-all ${
+                  pi === 0
+                    ? 'bg-indigo-50/70 border-indigo-200 text-indigo-950 font-medium'
+                    : 'bg-gray-50 border-gray-200 text-gray-800'
+                }`}
+                title={pi === 0 ? '1. Veli (Öncelikli / Asıl İletişim Numarası)' : `${pi + 1}. Veli (Yedek İletişim Numarası)`}
+              >
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    pi === 0
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {pi === 0 ? '1. Veli' : `${pi + 1}. Veli`}
+                </span>
+                <span className="font-semibold text-gray-900" title={p.fullName}>{p.fullName}</span>
+                {p.phone && (
+                  <span className="text-gray-500 font-mono text-xs">{formatPhoneNumber(p.phone)}</span>
+                )}
               </div>
             ))
           ) : (
@@ -635,15 +616,6 @@ export default function StudentListPage() {
               className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
             >
               <Trash2 size={16} /> Tümünü Sil
-            </Button>
-            <Button 
-              onClick={handleExportConsents}
-              disabled={exportingConsents}
-              variant="outline"
-              title="Velilerden alınan WhatsApp onay durumlarını Excel listesi olarak indirir"
-              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
-            >
-              <Download size={16} /> Onayları İndir
             </Button>
             <Button 
               onClick={() => { resetParentModal(); setShowParentModal(true); }}
@@ -969,6 +941,7 @@ export default function StudentListPage() {
           )}
         </div>
       </div>
+
 
       {confirmModal}
     </div>

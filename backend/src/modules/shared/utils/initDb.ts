@@ -18,10 +18,29 @@ export async function initializeDatabase(): Promise<void> {
   }
   
   // SchoolSettings tablosunda dutyRoomStationMap kolonu yoksa otomatik ekle
-  try {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "SchoolSettings" ADD COLUMN "dutyRoomStationMap" TEXT DEFAULT '{}'`);
-  } catch {
-    // Kolon zaten var, yok say
+  const safeColumns = [
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "dutyRoomStationMap" TEXT DEFAULT \'{}\'',
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "publicBaseUrl" TEXT DEFAULT \'\'',
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "schoolAddress" TEXT DEFAULT \'\'',
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "schoolDistrictCity" TEXT DEFAULT \'\'',
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "schoolEmail" TEXT DEFAULT \'\'',
+    'ALTER TABLE "SchoolSettings" ADD COLUMN "schoolPhone" TEXT DEFAULT \'\'',
+    'ALTER TABLE "ParentContact" ADD COLUMN "photoConsentStatus" TEXT DEFAULT \'PENDING\'',
+    'ALTER TABLE "ParentContact" ADD COLUMN "photoConsentDate" DATETIME',
+    'ALTER TABLE "ParentContact" ADD COLUMN "consentSource" TEXT',
+    'ALTER TABLE "ParentContact" ADD COLUMN "consentToken" TEXT',
+    'ALTER TABLE "ParentContact" ADD COLUMN "consentTokenExpiresAt" DATETIME',
+    'ALTER TABLE "ParentContact" ADD COLUMN "consentIp" TEXT',
+    'ALTER TABLE "ParentContact" ADD COLUMN "consentUserAgent" TEXT',
+    'ALTER TABLE "Student" ADD COLUMN "primaryParentId" TEXT',
+  ];
+
+  for (const sql of safeColumns) {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch {
+      // Kolon zaten var, yok say
+    }
   }
 
   console.log('✅ SQLite PRAGMA ayarları uygulandı (WAL, FK=ON)');

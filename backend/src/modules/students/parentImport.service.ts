@@ -158,12 +158,12 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
 
   if (mode === 'preview') return result;
 
-  const parentEntries: { studentId: string; fullName: string; phone: string; rowNum: string }[] = [];
+  const parentEntries: { studentId: string; fullName: string; phone: string; rowNum: string; isFirstParent: boolean }[] = [];
   for (const row of rows) {
     const student = findMatchingStudent(row.schoolNumber, row.studentName);
     if (!student) continue;
-    if (row.parent1Name && row.parent1Phone) parentEntries.push({ studentId: student.id, fullName: row.parent1Name, phone: row.parent1Phone, rowNum: row.schoolNumber });
-    if (row.parent2Name && row.parent2Phone) parentEntries.push({ studentId: student.id, fullName: row.parent2Name, phone: row.parent2Phone, rowNum: row.schoolNumber });
+    if (row.parent1Name && row.parent1Phone) parentEntries.push({ studentId: student.id, fullName: row.parent1Name, phone: row.parent1Phone, rowNum: row.schoolNumber, isFirstParent: true });
+    if (row.parent2Name && row.parent2Phone) parentEntries.push({ studentId: student.id, fullName: row.parent2Name, phone: row.parent2Phone, rowNum: row.schoolNumber, isFirstParent: false });
   }
 
   const uniquePhones = [...new Set(parentEntries.map((e) => e.phone))];
@@ -200,6 +200,9 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
       const alreadyLinked = existing.students.some((s: any) => s.id === entry.studentId);
       await prisma.parent.update({ where: { id: existing.id }, data: { fullName: entry.fullName, ...(!alreadyLinked ? { students: { connect: { id: entry.studentId } } } : {}) } });
       if (!alreadyLinked) existing.students.push({ id: entry.studentId });
+      if (entry.isFirstParent) {
+        await prisma.student.update({ where: { id: entry.studentId }, data: { primaryParentId: existing.id } as any });
+      }
       result.parentsUpdated++;
     } catch (err: any) { result.errors.push(`${entry.rowNum} Veli: ${err.message}`); }
   }
@@ -213,6 +216,9 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
           await prisma.parent.update({ where: { id: alreadyCreated.id }, data: { students: { connect: { id: entry.studentId } } } });
           alreadyCreated.students.push({ id: entry.studentId });
         }
+        if (entry.isFirstParent) {
+          await prisma.student.update({ where: { id: entry.studentId }, data: { primaryParentId: alreadyCreated.id } as any });
+        }
         result.parentsUpdated++;
         continue;
       }
@@ -225,6 +231,9 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
           const alreadyLinked = existingUser.parent.students.some((s) => s.id === entry.studentId);
           const updatedParent = await prisma.parent.update({ where: { id: existingUser.parent.id }, data: { fullName: entry.fullName, ...(!alreadyLinked ? { students: { connect: { id: entry.studentId } } } : {}) } });
           createdParentByPhone.set(entry.phone, { id: updatedParent.id, students: [...existingUser.parent.students, ...(!alreadyLinked ? [{ id: entry.studentId }] : [])] });
+          if (entry.isFirstParent) {
+            await prisma.student.update({ where: { id: entry.studentId }, data: { primaryParentId: updatedParent.id } as any });
+          }
           result.parentsUpdated++;
           continue;
         }
@@ -235,8 +244,11 @@ export async function importParents(rows: ParsedParentRow[], mode: 'preview' | '
         userId = user.id;
       }
 
-      const newParent = await prisma.parent.create({ data: { userId, fullName: entry.fullName, contacts: { create: [{ name: 'Veli (İçe Aktarıldı)', phone: entry.phone, isPrimary: true }] }, students: { connect: { id: entry.studentId } } } });
+      const newParent = await prisma.parent.create({ data: { userId, fullName: entry.fullName, contacts: { create: [{ name: 'Veli', phone: entry.phone, isPrimary: true }] }, students: { connect: { id: entry.studentId } } } });
       createdParentByPhone.set(entry.phone, { id: newParent.id, students: [{ id: entry.studentId }] });
+      if (entry.isFirstParent) {
+        await prisma.student.update({ where: { id: entry.studentId }, data: { primaryParentId: newParent.id } as any });
+      }
       result.parentsCreated++;
     } catch (err: any) { result.errors.push(`${entry.rowNum} Veli: ${err.message}`); }
   }

@@ -18,10 +18,14 @@ export default function SettingsPage() {
   const [isRestoring, setIsRestoring] = useState(false);
 
   // ── Okul bilgileri ──
-  const [schoolName,    setSchoolName]    = useState('');
-  const [principalName, setPrincipalName] = useState('');
-  const [academicYear,  setAcademicYear]  = useState('2025-2026');
-  const [schoolSaving,  setSchoolSaving]  = useState(false);
+  const [schoolName,         setSchoolName]         = useState('');
+  const [principalName,      setPrincipalName]      = useState('');
+  const [academicYear,       setAcademicYear]       = useState('2025-2026');
+  const [schoolDistrictCity, setSchoolDistrictCity] = useState('');
+  const [schoolAddress,      setSchoolAddress]      = useState('');
+  const [schoolEmail,        setSchoolEmail]        = useState('');
+  const [schoolPhone,        setSchoolPhone]        = useState('');
+  const [schoolSaving,       setSchoolSaving]       = useState(false);
 
   // ── Şifre değiştir ──
   const [currentPassword, setCurrentPassword] = useState('');
@@ -40,6 +44,10 @@ export default function SettingsPage() {
       setSchoolName(d.schoolName || '');
       setPrincipalName(d.principalName || '');
       setAcademicYear(d.academicYear || '2025-2026');
+      setSchoolDistrictCity(d.schoolDistrictCity || '');
+      setSchoolAddress(d.schoolAddress || '');
+      setSchoolEmail(d.schoolEmail || '');
+      setSchoolPhone(d.schoolPhone || '');
     } catch {
       toast.error('Ayarlar yüklenemedi. Sayfayı yenileyin.');
     }
@@ -49,7 +57,15 @@ export default function SettingsPage() {
     e.preventDefault();
     setSchoolSaving(true);
     try {
-      await api.put('/settings', { schoolName, principalName, academicYear });
+      await api.put('/settings', {
+        schoolName,
+        principalName,
+        academicYear,
+        schoolDistrictCity,
+        schoolAddress,
+        schoolEmail,
+        schoolPhone,
+      });
       toast.success('Kurum bilgileri güncellendi.');
       refreshSettings();
     } catch { 
@@ -215,9 +231,9 @@ export default function SettingsPage() {
           <div className="p-6">
             <form onSubmit={handleSaveSchool} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Okul Adı</label>
-                  <input type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: Atatürk Anadolu Lisesi" />
+                  <input type="text" value={schoolName} onChange={e => setSchoolName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: Atatürk Mesleki ve Teknik Anadolu Lisesi" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Müdür Adı Soyadı</label>
@@ -226,6 +242,25 @@ export default function SettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Eğitim Yılı</label>
                   <input type="text" value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: 2025-2026" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">İlçe / İl</label>
+                  <input type="text" value={schoolDistrictCity} onChange={e => setSchoolDistrictCity(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: Osmangazi / BURSA" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Kurumsal Telefon Numarası</label>
+                  <input type="text" value={schoolPhone} onChange={e => setSchoolPhone(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: 0224 123 45 67" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Kurumsal E-Posta Adresi</label>
+                  <input type="email" value={schoolEmail} onChange={e => setSchoolEmail(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Örn: 123456@meb.k12.tr" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Okul Açık Adresi</label>
+                  <textarea rows={2} value={schoolAddress} onChange={e => setSchoolAddress(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 resize-none" placeholder="Örn: Santral Garaj Mah. Kıbrıs Şehitleri Cad. No: 4 Osmangazi / BURSA" />
+                  <p className="text-xs text-slate-500 mt-1">
+                    ℹ️ Bu bilgiler, veli KVKK bilgilendirme metinlerinde, matbu PDF formlarında ve web onay portalında veri sorumlusu olarak kullanılır.
+                  </p>
                 </div>
               </div>
               <div className="flex justify-end pt-2">

@@ -7,6 +7,9 @@ export interface ConsentStats {
   accepted: number;
   declined: number;
   pending: number;
+  photoAccepted: number;
+  photoDeclined: number;
+  photoPending: number;
 }
 
 export interface ConsentRow {
@@ -65,22 +68,29 @@ function formatDate(d: Date | null): string {
 
 export class WhatsAppConsentService {
   /**
-   * Onay istatistiklerini getirir
+   * Onay istatistiklerini getirir (hem WhatsApp hem Fotoğraf)
    */
   async getStats(): Promise<ConsentStats> {
-    const contacts = await prisma.parentContact.findMany({
+    const contacts: any[] = await (prisma.parentContact as any).findMany({
       where: { parent: { deletedAt: null } },
-      select: { waConsentStatus: true },
+      select: { waConsentStatus: true, photoConsentStatus: true },
     });
 
     let accepted = 0;
     let declined = 0;
     let pending = 0;
+    let photoAccepted = 0;
+    let photoDeclined = 0;
+    let photoPending = 0;
 
     for (const c of contacts) {
       if (c.waConsentStatus === 'ACCEPTED') accepted++;
       else if (c.waConsentStatus === 'DECLINED') declined++;
       else pending++;
+
+      if (c.photoConsentStatus === 'ACCEPTED') photoAccepted++;
+      else if (c.photoConsentStatus === 'DECLINED') photoDeclined++;
+      else photoPending++;
     }
 
     return {
@@ -88,7 +98,56 @@ export class WhatsAppConsentService {
       accepted,
       declined,
       pending,
+      photoAccepted,
+      photoDeclined,
+      photoPending,
     };
+  }
+
+  /**
+   * Tüm velilerin onay durum listesini döner
+   */
+  async getAllConsentsList() {
+    const contacts: any[] = await (prisma.parentContact as any).findMany({
+      where: { parent: { deletedAt: null } },
+      include: {
+        parent: {
+          include: {
+            students: {
+              where: { deletedAt: null },
+              select: { id: true, schoolNumber: true, fullName: true, className: true },
+            },
+          },
+        },
+      },
+      orderBy: [{ parent: { fullName: 'asc' } }],
+    });
+
+    return contacts.map((c: any) => {
+      const student = c.parent?.students?.[0];
+      return {
+        contactId: c.id,
+        parentId: c.parentId,
+        parentName: c.parent?.fullName || c.name,
+        phone: c.phone,
+        relation: c.name ? c.name.replace(/\s*\(İçe Aktarıldı\)/gi, '').trim() : 'Veli',
+        isPrimary: c.isPrimary,
+        waConsentStatus: c.waConsentStatus,
+        waConsentDate: c.waConsentDate,
+        photoConsentStatus: c.photoConsentStatus,
+        photoConsentDate: c.photoConsentDate,
+        consentSource: c.consentSource,
+        consentToken: c.consentToken,
+        consentIp: c.consentIp || null,
+        consentUserAgent: c.consentUserAgent || null,
+        student: student ? {
+          id: student.id,
+          fullName: student.fullName,
+          className: student.className,
+          schoolNumber: student.schoolNumber,
+        } : null,
+      };
+    });
   }
 
   /**

@@ -32,6 +32,7 @@ model Student {
   createdAt    DateTime @default(now())
 
   parents             Parent[]             @relation("StudentParents")
+  primaryParentId     String?              // İlk sırada yer alacak öncelikli / asıl veli ID'si
   absenteeisms        Absenteeism[]
   writtenWarnings     WrittenWarning[]
   dailyViolations     DailyViolation[]
@@ -58,12 +59,20 @@ model ParentContact {
   name            String // Ã–rn: Anne, Baba, Vasi
   phone           String
   isPrimary       Boolean   @default(false)
-  waConsentStatus String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
-  waConsentDate   DateTime?
+  waConsentStatus       String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  waConsentDate         DateTime?
+  photoConsentStatus    String    @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  photoConsentDate      DateTime?
+  consentSource         String?   // MANUAL, FORM, WEB, WHATSAPP
+  consentToken          String?   @unique
+  consentTokenExpiresAt DateTime?
+  consentIp             String?
+  consentUserAgent      String?
 
   parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
   @@index([phone])
+  @@index([consentToken])
 }
 
 model Absenteeism {
@@ -179,6 +188,11 @@ model SchoolSettings {
   dutyRoomStationMap String?  @default("{}") // JSON string: { [room: string]: stationId }
   classDisplayMap   String?   @default("{}") // JSON string: { [rawClassName: string]: displayName }
   lastRotationDate  DateTime?
+  publicBaseUrl     String?   @default("")
+  schoolAddress     String?   @default("")
+  schoolDistrictCity String?  @default("")
+  schoolEmail       String?   @default("")
+  schoolPhone       String?   @default("")
   updatedAt         DateTime  @updatedAt
 }
 

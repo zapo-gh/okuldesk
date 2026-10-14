@@ -14,6 +14,7 @@ const WarningsPage = React.lazy(() => import('./pages/admin/WarningsPage'));
 const ViolationsPage = React.lazy(() => import('./pages/admin/ViolationsPage'));
 const StaffPage = React.lazy(() => import('./pages/admin/StaffPage'));
 const WhatsAppPage = React.lazy(() => import('./pages/admin/WhatsAppPage'));
+const WhatsAppConsentPage = React.lazy(() => import('./pages/admin/WhatsAppConsentPage'));
 const GradeReportPage = React.lazy(() => import('./pages/admin/GradeReportPage'));
 const ParentMeetingPage = React.lazy(() => import('./pages/admin/ParentMeetingPage'));
 const ClassTeachersPage = React.lazy(() => import('./pages/admin/modules/ClassTeachersPage'));
@@ -107,6 +108,7 @@ function App() {
       <Route path="staff" element={<StaffPage />} />
       <Route path="class-teachers" element={<ClassTeachersPage />} />
       <Route path="whatsapp" element={<WhatsAppPage />} />
+      <Route path="whatsapp-consent" element={<WhatsAppConsentPage />} />
       <Route path="grade-reports" element={<GradeReportPage />} />
       <Route path="parent-meeting" element={<ParentMeetingPage />} />
       <Route path="parent-notification" element={<ParentNotificationPage />} />

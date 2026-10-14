@@ -100,14 +100,29 @@ export class Student360Service {
         status: student.status,
         createdAt: student.createdAt,
       },
-      parents: student.parents.map((p: any) => ({
-        id: p.id,
-        fullName: p.fullName,
-        phone: p.contacts?.[0]?.phone || '',
-        waConsentStatus: p.contacts?.[0]?.waConsentStatus || 'PENDING',
-        waConsentDate: p.contacts?.[0]?.waConsentDate,
-        user: p.user
-      })),
+      parents: (() => {
+        const list = student.parents.map((p: any) => ({
+          id: p.id,
+          contactId: p.contacts?.[0]?.id,
+          fullName: p.fullName,
+          phone: p.contacts?.[0]?.phone || '',
+          relation: p.contacts?.[0]?.name || 'Veli',
+          waConsentStatus: p.contacts?.[0]?.waConsentStatus || 'PENDING',
+          waConsentDate: p.contacts?.[0]?.waConsentDate,
+          photoConsentStatus: p.contacts?.[0]?.photoConsentStatus || 'PENDING',
+          photoConsentDate: p.contacts?.[0]?.photoConsentDate,
+          consentSource: p.contacts?.[0]?.consentSource,
+          user: p.user
+        }));
+        if ((student as any).primaryParentId && list.length > 1) {
+          const idx = list.findIndex((p: any) => p.id === (student as any).primaryParentId);
+          if (idx > 0) {
+            const [primary] = list.splice(idx, 1);
+            list.unshift(primary);
+          }
+        }
+        return list;
+      })(),
       absenteeisms: { summary: absenteeism, records: student.absenteeisms },
       warnings: { total: student.writtenWarnings.length, records: student.writtenWarnings },
       violations: {

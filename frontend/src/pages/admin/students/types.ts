@@ -4,7 +4,8 @@ export interface Student {
   fullName: string;
   className: string;
   status: string;
-  parents: { id: string; fullName: string; phone: string; waConsentStatus: string }[];
+  primaryParentId?: string | null;
+  parents: { id: string; contactId?: string; fullName: string; phone: string; waConsentStatus: string; photoConsentStatus?: string }[];
   _count: { absenteeisms: number };
 }
 

@@ -20,6 +20,11 @@ const updateSchema = z.object({
   dutyRoomStationMap: z.string().optional(),
   classDisplayMap: z.string().optional(),
   lastRotationDate: z.string().nullable().optional(),
+  publicBaseUrl: z.string().optional(),
+  schoolAddress: z.string().optional(),
+  schoolDistrictCity: z.string().optional(),
+  schoolEmail: z.string().optional(),
+  schoolPhone: z.string().optional(),
 });
 
 export class SettingsController {

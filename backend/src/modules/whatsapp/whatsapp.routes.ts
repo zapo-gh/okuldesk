@@ -42,6 +42,10 @@ router.post('/send-consent', authMiddleware, adminOnly, whatsappController.sendC
 
 // WhatsApp İletişim Onay Yönetimi (İstatistik, Excel Export ve Import)
 router.get('/consents/stats', authMiddleware, adminOnly, whatsappController.getConsentStats);
+router.get('/consents/list', authMiddleware, adminOnly, whatsappController.getConsentList);
+router.post('/consents/manual', authMiddleware, adminOnly, whatsappController.manualUpdateConsent);
+router.get('/consents/pdf/contact/:contactId', authMiddleware, adminOnly, whatsappController.downloadConsentPdf);
+router.get('/consents/pdf/class/:className', authMiddleware, adminOnly, whatsappController.downloadClassConsentPdf);
 router.get('/consents/export', authMiddleware, adminOnly, whatsappController.exportConsents);
 router.post(
   '/consents/import',
@@ -52,5 +56,15 @@ router.post(
   validateMagicBytes(excelMimes),
   whatsappController.importConsents
 );
+
+// Cloudflare Tünel Yönetimi
+router.get('/tunnel/status', authMiddleware, adminOnly, whatsappController.getTunnelStatus);
+router.post('/tunnel/start', authMiddleware, adminOnly, whatsappController.startTunnel);
+router.post('/tunnel/stop', authMiddleware, adminOnly, whatsappController.stopTunnel);
+
+// Firebase Bulut Senkronizasyonu
+router.get('/firebase/status', authMiddleware, adminOnly, whatsappController.getFirebaseStatus);
+router.post('/firebase/sync', authMiddleware, adminOnly, whatsappController.syncFirebaseConsents);
+router.post('/firebase/upload', authMiddleware, adminOnly, whatsappController.uploadFirebaseConsents);
 
 export default router;

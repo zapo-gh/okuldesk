@@ -15,6 +15,7 @@ import {
   FileText,
   FileCheck,
   MessageSquare,
+  ShieldCheck,
   Settings,
   Activity,
   LogOut,
@@ -275,6 +276,7 @@ export default function AdminLayout() {
           {!collapsed && <span className="text-xs font-bold text-teal-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Sistem</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
           <NavItem to="/admin/whatsapp" icon={MessageSquare} label="WhatsApp Bağlantısı" onClick={closeSidebar} collapsed={collapsed} />
+          <NavItem to="/admin/whatsapp-consent" icon={ShieldCheck} label="Veli Onay Yönetimi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/settings" icon={Settings} label="Ayarlar" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/audit-logs" icon={Activity} label="Sistem İzlenebilirliği (Audit)" onClick={closeSidebar} collapsed={collapsed} />
         </nav>

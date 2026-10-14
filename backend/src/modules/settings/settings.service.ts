@@ -27,6 +27,11 @@ class SettingsService {
       dutyRoomStationMap: (settings as any).dutyRoomStationMap ?? '{}',
       classDisplayMap: (settings as any).classDisplayMap ?? '{}',
       lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
+      publicBaseUrl: (settings as any).publicBaseUrl ?? '',
+      schoolAddress: (settings as any).schoolAddress ?? '',
+      schoolDistrictCity: (settings as any).schoolDistrictCity ?? '',
+      schoolEmail: (settings as any).schoolEmail ?? '',
+      schoolPhone: (settings as any).schoolPhone ?? '',
     };
   }
 
@@ -43,6 +48,11 @@ class SettingsService {
     dutyRoomStationMap?: string;
     classDisplayMap?: string;
     lastRotationDate?: string | null;
+    publicBaseUrl?: string;
+    schoolAddress?: string;
+    schoolDistrictCity?: string;
+    schoolEmail?: string;
+    schoolPhone?: string;
   }) {
     const settings = await prisma.schoolSettings.upsert({
       where: { id: SINGLETON_ID },
@@ -59,6 +69,11 @@ class SettingsService {
         dutyStartDate: data.dutyStartDate ?? null,
         dutyRoomStationMap: data.dutyRoomStationMap ?? '{}',
         classDisplayMap: data.classDisplayMap ?? '{}',
+        publicBaseUrl: data.publicBaseUrl ?? '',
+        schoolAddress: data.schoolAddress ?? '',
+        schoolDistrictCity: data.schoolDistrictCity ?? '',
+        schoolEmail: data.schoolEmail ?? '',
+        schoolPhone: data.schoolPhone ?? '',
       } as any,
       update: {
         ...(data.schoolName !== undefined && { schoolName: data.schoolName }),
@@ -72,6 +87,11 @@ class SettingsService {
         ...(data.dutyStartDate !== undefined && { dutyStartDate: data.dutyStartDate }),
         ...(data.dutyRoomStationMap !== undefined && { dutyRoomStationMap: data.dutyRoomStationMap }),
         ...(data.classDisplayMap !== undefined && { classDisplayMap: data.classDisplayMap }),
+        ...(data.publicBaseUrl !== undefined && { publicBaseUrl: data.publicBaseUrl }),
+        ...(data.schoolAddress !== undefined && { schoolAddress: data.schoolAddress }),
+        ...(data.schoolDistrictCity !== undefined && { schoolDistrictCity: data.schoolDistrictCity }),
+        ...(data.schoolEmail !== undefined && { schoolEmail: data.schoolEmail }),
+        ...(data.schoolPhone !== undefined && { schoolPhone: data.schoolPhone }),
         ...(data.lastRotationDate !== undefined && {
           lastRotationDate: data.lastRotationDate ? new Date(data.lastRotationDate) : null,
         }),
@@ -91,6 +111,11 @@ class SettingsService {
       dutyRoomStationMap: (settings as any).dutyRoomStationMap ?? '{}',
       classDisplayMap: (settings as any).classDisplayMap ?? '{}',
       lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
+      publicBaseUrl: (settings as any).publicBaseUrl ?? '',
+      schoolAddress: (settings as any).schoolAddress ?? '',
+      schoolDistrictCity: (settings as any).schoolDistrictCity ?? '',
+      schoolEmail: (settings as any).schoolEmail ?? '',
+      schoolPhone: (settings as any).schoolPhone ?? '',
     };
   }
 }

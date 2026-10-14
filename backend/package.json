@@ -1,6 +1,6 @@
 {
   "name": "okuldesk-backend",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "OkulDesk - Backend",
   "main": "dist/server.js",
   "bin": "dist/server.js",
@@ -39,6 +39,7 @@
     "sharp": "^0.34.5",
     "string-similarity": "^4.0.4",
     "tesseract.js": "^7.0.0",
+    "untun": "^0.2.2",
     "uuid": "^9.0.0",
     "xlsx": "^0.18.5",
     "zod": "^3.22.4"

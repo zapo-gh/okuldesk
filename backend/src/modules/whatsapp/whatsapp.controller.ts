@@ -7,6 +7,10 @@ import { getFullPageBuffer } from '../absenteeism/pdfPreview.service';
 import { settingsService } from '../settings/settings.service';
 import prisma from '../shared/utils/prisma';
 import { whatsappConsentService } from './whatsappConsent.service';
+import { tunnelService } from './tunnel.service';
+import { firebaseSyncService } from './firebaseSync.service';
+import { getOrCreateConsentToken } from './webConsent.controller';
+import { generateConsentFormPdf, generateMultipleConsentFormsPdf } from './consentPdf.generator';
 
 // ── Devamsızlık mesaj şablonları (varsayılan) ─────────────────────────────────
 // Kullanıcı Settings sayfasından kendi şablonunu girebilir.
@@ -184,7 +188,7 @@ export const whatsappController = {
       // Seçili velileri filtrele (frontend'den gelen selectedPhones dizisi)
       const selectedPhones = parseSelectedPhones(req.body.selectedPhones);
       const filteredParents = (selectedPhones && selectedPhones.length > 0)
-        ? parents.filter(p => selectedPhones.includes(p.phone))
+        ? (parents as any[]).filter((p: any) => selectedPhones.includes(p.phone))
         : parents;
 
       if (filteredParents.length === 0) {
@@ -314,9 +318,13 @@ export const whatsappController = {
       const previewPath: string | null = (record as any).previewPath ?? null;
       const hasPreviewImage = !!previewPath && fs.existsSync(previewPath);
 
-      const messages = parents.map(parent => ({
+      const messages = parents.map((parent: any) => ({
         parent: parent.fullName,
+        relation: parent.relation || 'Veli',
         phone: parent.phone,
+        waConsentStatus: parent.waConsentStatus || 'PENDING',
+        waConsentDate: parent.waConsentDate || null,
+        isPrimary: !!parent.isPrimary,
         message: buildAbsenteeismMessage({
           template: templateText,
           studentName: record.student.fullName,
@@ -476,32 +484,254 @@ export const whatsappController = {
     } catch (err) { next(err); }
   },
 
-  sendConsentRequestToParent: async (req: Request, res: Response, next: NextFunction) => {
+  sendConsentRequestToParent: async (req: Request, res: Response, _next: NextFunction) => {
     try {
       const { parentId } = req.body;
       if (!parentId || typeof parentId !== 'string') {
-        res.status(400).json({ message: 'parentId gerekli.' });
+        res.status(400).json({ success: false, message: 'parentId gerekli.' });
+        return;
+      }
+
+
+      // 2. WhatsApp bağlantı kontrolü
+      const waStatus = whatsappService.getStatus();
+      if (waStatus.status !== 'connected') {
+        res.status(400).json({
+          success: false,
+          message: 'WhatsApp bağlı değil. Lütfen "WhatsApp Bağlantısı" sayfasından karekodu okutarak oturum açınız.',
+        });
         return;
       }
 
       const parent = await prisma.parent.findUnique({
         where: { id: parentId },
-        include: { contacts: { where: { isPrimary: true } } },
+        include: {
+          contacts: { where: { isPrimary: true } },
+          students: {
+            where: { deletedAt: null },
+            select: { fullName: true, className: true, schoolNumber: true },
+          },
+        },
       });
 
       if (!parent || parent.deletedAt) {
-        res.status(404).json({ message: 'Veli bulunamadı.' });
+        res.status(404).json({ success: false, message: 'Veli bulunamadı.' });
         return;
       }
 
-      const primaryPhone = parent.contacts[0]?.phone?.trim();
-      if (!primaryPhone) {
-        res.status(400).json({ message: 'Veli telefon numarası bulunamadı.' });
+      const primaryContact = parent.contacts[0];
+      const primaryPhone = primaryContact?.phone?.trim();
+      if (!primaryContact || !primaryPhone) {
+        res.status(400).json({ success: false, message: 'Veli telefon numarası bulunamadı.' });
         return;
       }
 
-      await whatsappService.sendConsentRequest(primaryPhone);
-      res.json({ message: 'Onay isteği gönderildi.' });
+      const token = await getOrCreateConsentToken(primaryContact.id);
+      
+      // Firebase Firestore'a veli ve öğrenci kaydını hazırla/yükle
+      try {
+        await firebaseSyncService.uploadSingleContactToFirestore(primaryContact.id);
+      } catch (fbErr: any) {
+        console.warn('[Firebase] Firestore yükleme uyarısı:', fbErr?.message || fbErr);
+      }
+
+      // Kalıcı ve resmi Google .web.app onay bağlantısı
+      const webConsentLink = firebaseSyncService.getConsentWebUrl(token);
+      const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+
+      await whatsappService.sendConsentRequest(primaryPhone, webConsentLink, {
+        schoolName: settings?.schoolName || undefined,
+        schoolPhone: (settings as any)?.schoolPhone || undefined,
+      });
+
+      res.json({
+        success: true,
+        message: 'Onay isteği ve güvenli web formu bağlantısı veliye iletildi.',
+        webConsentLink,
+        hasTunnel: true,
+      });
+    } catch (err: any) {
+      console.error('[WhatsApp Consent] Hata:', err?.message || err);
+      res.status(400).json({
+        success: false,
+        message: err?.message || 'Onay isteği gönderilemedi.',
+      });
+    }
+  },
+
+  getConsentList: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const list = await whatsappConsentService.getAllConsentsList();
+      res.json({ success: true, data: list });
+    } catch (err) { next(err); }
+  },
+
+  manualUpdateConsent: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { contactId, waConsentStatus, photoConsentStatus } = req.body;
+      if (!contactId) {
+        res.status(400).json({ message: 'contactId gerekli.' });
+        return;
+      }
+
+      const now = new Date();
+      const updateData: any = {
+        consentSource: 'MANUAL',
+      };
+
+      if (waConsentStatus && ['ACCEPTED', 'DECLINED', 'PENDING'].includes(waConsentStatus)) {
+        updateData.waConsentStatus = waConsentStatus;
+        updateData.waConsentDate = waConsentStatus === 'PENDING' ? null : now;
+      }
+
+      if (photoConsentStatus && ['ACCEPTED', 'DECLINED', 'PENDING'].includes(photoConsentStatus)) {
+        updateData.photoConsentStatus = photoConsentStatus;
+        updateData.photoConsentDate = photoConsentStatus === 'PENDING' ? null : now;
+      }
+
+      const updated = await prisma.parentContact.update({
+        where: { id: contactId },
+        data: updateData,
+      });
+
+      res.json({ success: true, message: 'Veli rıza durumu başarıyla güncellendi.', data: updated });
+    } catch (err) { next(err); }
+  },
+
+  downloadConsentPdf: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { contactId } = req.params;
+      const contact = await prisma.parentContact.findUnique({
+        where: { id: contactId },
+        include: {
+          parent: {
+            include: {
+              students: {
+                where: { deletedAt: null },
+                select: { fullName: true, className: true, schoolNumber: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!contact || !contact.parent) {
+        res.status(404).json({ message: 'Veli kaydı bulunamadı.' });
+        return;
+      }
+
+      const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+      const student = contact.parent.students[0] || {
+        fullName: '',
+        className: '',
+        schoolNumber: '',
+      };
+
+      const pdfBuffer = await generateConsentFormPdf({
+        schoolName: settings?.schoolName || 'OKUL',
+        schoolAddress: settings?.schoolAddress || '',
+        schoolDistrictCity: settings?.schoolDistrictCity || '',
+        schoolEmail: settings?.schoolEmail || '',
+        schoolPhone: settings?.schoolPhone || '',
+        studentName: student.fullName,
+        className: student.className,
+        schoolNumber: student.schoolNumber,
+        parentName: contact.parent.fullName || contact.name,
+        parentPhone: contact.phone,
+        relation: contact.name,
+        waConsentStatus: contact.waConsentStatus,
+        waConsentDate: contact.waConsentDate,
+        consentSource: contact.consentSource,
+        consentIp: (contact as any).consentIp,
+        consentToken: contact.consentToken,
+      });
+
+      const filename = `KVKK_Onay_Formu_${student.schoolNumber || 'Veli'}_${student.fullName.replace(/\s+/g, '_') || 'Form'}.pdf`;
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Content-Length': String(pdfBuffer.length),
+      });
+      res.send(pdfBuffer);
+    } catch (err) { next(err); }
+  },
+
+  downloadClassConsentPdf: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { className } = req.params;
+      const students = await prisma.student.findMany({
+        where: { className, deletedAt: null },
+        include: {
+          parents: {
+            where: { deletedAt: null },
+            include: {
+              contacts: {
+                where: { isPrimary: true },
+              },
+            },
+          },
+        },
+        orderBy: { schoolNumber: 'asc' },
+      });
+
+      if (students.length === 0) {
+        res.status(404).json({ message: 'Bu sınıfta kayıtlı öğrenci bulunamadı.' });
+        return;
+      }
+
+      const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+      const list = students.map((s) => {
+        const parent = s.parents[0];
+        const contact = parent?.contacts[0];
+        return {
+          schoolName: settings?.schoolName || 'OKUL',
+          schoolAddress: settings?.schoolAddress || '',
+          schoolDistrictCity: settings?.schoolDistrictCity || '',
+          schoolEmail: settings?.schoolEmail || '',
+          schoolPhone: settings?.schoolPhone || '',
+          studentName: s.fullName,
+          className: s.className,
+          schoolNumber: s.schoolNumber,
+          parentName: parent?.fullName || '....................',
+          parentPhone: contact?.phone || '....................',
+          relation: contact?.name || 'Veli',
+          waConsentStatus: contact?.waConsentStatus || 'PENDING',
+          waConsentDate: contact?.waConsentDate,
+          consentSource: contact?.consentSource,
+          consentIp: (contact as any)?.consentIp,
+          consentToken: contact?.consentToken,
+        };
+      });
+
+      const pdfBuffer = await generateMultipleConsentFormsPdf(list);
+      const filename = `KVKK_Onay_Formlari_Sinif_${className.replace(/\s+/g, '_')}.pdf`;
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Content-Length': String(pdfBuffer.length),
+      });
+      res.send(pdfBuffer);
+    } catch (err) { next(err); }
+  },
+
+  getTunnelStatus: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await tunnelService.getStatus();
+      res.json({ success: true, data: status });
+    } catch (err) { next(err); }
+  },
+
+  startTunnel: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await tunnelService.start();
+      res.json({ success: true, data: status });
+    } catch (err) { next(err); }
+  },
+
+  stopTunnel: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = await tunnelService.stop();
+      res.json({ success: true, data: status });
     } catch (err) { next(err); }
   },
 
@@ -536,6 +766,38 @@ export const whatsappController = {
       const mode = req.query.mode === 'import' ? 'import' : 'preview';
       const result = await whatsappConsentService.importFromExcel(req.file.buffer, mode);
       res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+  },
+
+  getFirebaseStatus: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const status = firebaseSyncService.getStatus();
+      res.json({ success: true, data: status });
+    } catch (err) { next(err); }
+  },
+
+  syncFirebaseConsents: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await firebaseSyncService.syncConsentsFromFirebase();
+      res.json({
+        success: true,
+        message: result.updatedLocally > 0
+          ? `${result.updatedLocally} adet yeni veli onayı buluttan çekilerek işlendi.`
+          : 'Yeni onay bulunamadı, veritabanı güncel.',
+        data: result,
+      });
+    } catch (err) { next(err); }
+  },
+
+  uploadFirebaseConsents: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { className } = req.body;
+      const result = await firebaseSyncService.uploadClassConsentsToFirestore(className);
+      res.json({
+        success: true,
+        message: `${result.uploaded} veli kaydı Firebase bulutuna başarıyla yüklendi.`,
+        data: result,
+      });
     } catch (err) { next(err); }
   },
 };

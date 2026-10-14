@@ -19,6 +19,7 @@ const updateStudentSchema = z.object({
   fullName: z.string().trim().min(1).optional(),
   className: z.string().trim().min(1).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  primaryParentId: z.string().uuid().nullable().optional(),
 });
 
 export class StudentsController {

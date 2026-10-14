@@ -4,12 +4,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../services/api';
 import { 
   ArrowLeft, User, Users, FileText, AlertTriangle, ShieldAlert, 
-  MessageSquare, History, RefreshCw, ExternalLink, Download, 
-  Send, Image as ImageIcon, CheckCircle2, Clock, X, Phone
+  MessageSquare, History, RefreshCw, ExternalLink, Download, Printer,
+  Send, Image as ImageIcon, CheckCircle2, Clock, X, Phone, Edit3
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useConfirm } from '../../hooks/useConfirm';
 import { formatPhoneNumber } from '../../utils/formatters';
+import { ManualConsentModal, ConsentContactData } from './whatsapp/ManualConsentModal';
+import { printPdfBlob } from '../../utils/printPdf';
 
 interface Student360Data {
   student: { 
@@ -22,10 +24,15 @@ interface Student360Data {
   };
   parents: Array<{ 
     id: string; 
+    contactId?: string;
     fullName: string; 
     phone: string; 
+    relation?: string;
     waConsentStatus: string; 
     waConsentDate: string | null; 
+    photoConsentStatus?: string;
+    photoConsentDate?: string | null;
+    consentSource?: string | null;
     user: { 
       username: string; 
       mustChangePassword: boolean;
@@ -111,6 +118,25 @@ export default function Student360Page() {
   const [busyViolation, setBusyViolation] = useState<string | null>(null);
   const [source, setSource] = useState<any>(null);
   const [showSource, setShowSource] = useState(false);
+  const [selectedConsentContact, setSelectedConsentContact] = useState<ConsentContactData | null>(null);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [downloadingConsentPdf, setDownloadingConsentPdf] = useState<string | null>(null);
+
+  const handlePrintConsentPdf = async (contactId?: string) => {
+    if (!contactId) return;
+    setDownloadingConsentPdf(contactId);
+    try {
+      const res = await api.get(`/whatsapp/consents/pdf/contact/${contactId}`, {
+        responseType: 'blob',
+      });
+      printPdfBlob(res.data as Blob);
+      toast.success('Yazdırma ekranı açıldı.');
+    } catch {
+      toast.error('PDF oluşturulurken hata oluştu.');
+    } finally {
+      setDownloadingConsentPdf(null);
+    }
+  };
 
   const load = async () => {
     if (!id) return;
@@ -306,19 +332,22 @@ export default function Student360Page() {
                         <span>{formatPhoneNumber(p.phone)}</span>
                       </div>
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium w-fit ${
-                      p.waConsentStatus === 'ACCEPTED' 
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : p.waConsentStatus === 'DECLINED'
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}>
-                      WhatsApp: {consentLabel[p.waConsentStatus] || p.waConsentStatus}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium w-fit ${
+                        p.waConsentStatus === 'ACCEPTED' 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : p.waConsentStatus === 'DECLINED'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        WhatsApp: {consentLabel[p.waConsentStatus] || p.waConsentStatus}
+                      </span>
+                    </div>
                   </div>
 
-                  {p.waConsentStatus !== 'ACCEPTED' && (
-                    <div className="flex flex-wrap gap-2 mt-3 pt-2.5 border-t border-slate-200/60">
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-200/60">
+                    {/* Fikir 1: Onay İste (WhatsApp + Web Linki) */}
+                    {p.waConsentStatus !== 'ACCEPTED' && (
                       <Button 
                         disabled={sendingConsent === p.id} 
                         onClick={() => sendConsent(p.id, p.fullName)} 
@@ -328,8 +357,50 @@ export default function Student360Page() {
                       >
                         {sendingConsent === p.id ? 'Gönderiliyor...' : 'WhatsApp Onay İsteği Gönder'}
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Fikir 3: Manuel Düzenle */}
+                    {p.contactId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedConsentContact({
+                            contactId: p.contactId!,
+                            parentId: p.id,
+                            parentName: p.fullName,
+                            phone: p.phone,
+                            relation: p.relation,
+                            studentName: data.student.fullName,
+                            className: data.student.className,
+                            schoolNumber: data.student.schoolNumber,
+                            waConsentStatus: p.waConsentStatus,
+                            photoConsentStatus: p.photoConsentStatus,
+                            consentSource: p.consentSource || undefined,
+                          });
+                          setIsConsentModalOpen(true);
+                        }}
+                        className="text-xs py-1.5 px-2.5 h-auto text-slate-700 border-slate-200 hover:bg-slate-100"
+                        leftIcon={<Edit3 size={14} />}
+                      >
+                        Manuel Düzenle
+                      </Button>
+                    )}
+
+                    {/* 2 Sayfalık KVKK Formu Yazdır (PDF) */}
+                    {p.contactId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={downloadingConsentPdf === p.contactId}
+                        onClick={() => handlePrintConsentPdf(p.contactId)}
+                        className="text-xs py-1.5 px-2.5 h-auto text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                        leftIcon={<Printer size={14} />}
+                      >
+                        {downloadingConsentPdf === p.contactId ? 'Hazırlanıyor...' : '2 Sayfalık Formu Yazdır (PDF)'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -539,6 +610,14 @@ export default function Student360Page() {
           </div>
         </div>
       )}
+
+      {/* Manuel Açık Rıza Düzenleme Modalı (Fikir 3) */}
+      <ManualConsentModal
+        isOpen={isConsentModalOpen}
+        onClose={() => setIsConsentModalOpen(false)}
+        contact={selectedConsentContact}
+        onSuccess={() => load()}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import prisma from '../shared/utils/prisma';
 import { config } from '../shared/config';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { generateAbsenteeismPreview, deletePreviewFile, extractAbsenceDays } from './pdfPreview.service';
+import { StudentsService } from '../students/students.service';
 
 export class AbsenteeismService {
   getArchiveFolderPath(): string {
@@ -85,15 +86,32 @@ export class AbsenteeismService {
         ],
         include: {
           student: {
-            select: { fullName: true, className: true, schoolNumber: true },
+            select: {
+              id: true,
+              fullName: true,
+              className: true,
+              schoolNumber: true,
+              primaryParentId: true,
+              parents: {
+                where: { deletedAt: null },
+                include: {
+                  contacts: true,
+                },
+              },
+            },
           },
         },
       }),
       prisma.absenteeism.count({ where }),
     ]);
 
+    const mappedRecords = records.map((r: any) => ({
+      ...r,
+      student: StudentsService.mapStudentParents(r.student),
+    }));
+
     return {
-      records,
+      records: mappedRecords,
       pagination: {
         page,
         limit,
@@ -109,17 +127,19 @@ export class AbsenteeismService {
       include: {
         student: {
           select: {
+            id: true,
             fullName: true,
             className: true,
             schoolNumber: true,
+            primaryParentId: true,
             parents: { 
+              where: { deletedAt: null },
               include: { 
-                contacts: { where: { isPrimary: true } }
+                contacts: true,
               } 
             },
           },
         },
-
       },
     });
 
@@ -127,18 +147,9 @@ export class AbsenteeismService {
       throw new AppError('Devamsızlık kaydı bulunamadı.', 404);
     }
 
-    // Geriye dönük uyumluluk için map et
     return {
       ...record,
-      student: {
-        ...record.student,
-        parents: record.student.parents.map((p: any) => ({
-          id: p.id,
-          fullName: p.fullName,
-          phone: p.contacts?.[0]?.phone || '',
-          waConsentStatus: p.contacts?.[0]?.waConsentStatus || 'PENDING'
-        }))
-      }
+      student: StudentsService.mapStudentParents(record.student),
     };
   }
 

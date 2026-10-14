@@ -8,16 +8,35 @@ export class StudentsService {
     return s.replace(/\S+/g, (word) => word[0].toLocaleUpperCase('tr-TR') + word.slice(1).toLocaleLowerCase('tr-TR'));
   }
 
-  private static mapStudentParents(student: any) {
+  public static mapStudentParents(student: any) {
     if (!student) return student;
+    const mappedParents = student.parents?.map((p: any) => {
+      const contact = p.contacts?.find((c: any) => c.isPrimary) || p.contacts?.[0];
+      return {
+        id: p.id,
+        contactId: contact?.id,
+        fullName: p.fullName,
+        relation: contact?.name || 'Veli',
+        phone: contact?.phone || '',
+        waConsentStatus: contact?.waConsentStatus || 'PENDING',
+        waConsentDate: contact?.waConsentDate || null,
+        photoConsentStatus: contact?.photoConsentStatus || 'PENDING',
+        isPrimary: student.primaryParentId ? p.id === student.primaryParentId : false,
+      };
+    }) || [];
+
+    // primaryParentId belirtilmişse o veliyi her zaman ilk sıraya (index 0) al
+    if (student.primaryParentId && mappedParents.length > 1) {
+      const idx = mappedParents.findIndex((p: any) => p.id === student.primaryParentId);
+      if (idx > 0) {
+        const [primary] = mappedParents.splice(idx, 1);
+        mappedParents.unshift(primary);
+      }
+    }
+
     return {
       ...student,
-      parents: student.parents?.map((p: any) => ({
-        id: p.id,
-        fullName: p.fullName,
-        phone: p.contacts?.[0]?.phone || '',
-        waConsentStatus: p.contacts?.[0]?.waConsentStatus || 'PENDING'
-      })) || []
+      parents: mappedParents
     };
   }
 
@@ -81,10 +100,15 @@ export class StudentsService {
 
     return prisma.$transaction(async (tx) => {
       const student = await tx.student.create({ data: studentData });
+      let firstParentId: string | null = null;
       for (const input of parents ?? []) {
         if (!input.fullName?.trim() || !input.phone?.trim()) continue;
         const account = await parentAccountService.ensureParent(tx, input);
+        if (!firstParentId) firstParentId = account.parent.id;
         await tx.student.update({ where: { id: student.id }, data: { parents: { connect: { id: account.parent.id } } } });
+      }
+      if (firstParentId) {
+        await tx.student.update({ where: { id: student.id }, data: { primaryParentId: firstParentId } as any });
       }
       const newStudent = await tx.student.findUnique({ where: { id: student.id }, include: { parents: { include: { contacts: { where: { isPrimary: true } } } } } });
       return StudentsService.mapStudentParents(newStudent);
@@ -93,7 +117,7 @@ export class StudentsService {
 
   async update(
     id: string,
-    data: { schoolNumber?: string; fullName?: string; className?: string; status?: 'ACTIVE' | 'INACTIVE' },
+    data: { schoolNumber?: string; fullName?: string; className?: string; status?: 'ACTIVE' | 'INACTIVE'; primaryParentId?: string | null },
     userId?: string
   ) {
     const student = await prisma.student.findUnique({ where: { id } });
@@ -116,7 +140,15 @@ export class StudentsService {
       }
     }
 
-    return prisma.student.update({ where: { id }, data });
+    const updated = await prisma.student.update({
+      where: { id },
+      data: data as any,
+      include: {
+        parents: { include: { contacts: { where: { isPrimary: true } } } },
+      },
+    });
+
+    return StudentsService.mapStudentParents(updated);
   }
 
   async delete(id: string, userId: string) {
