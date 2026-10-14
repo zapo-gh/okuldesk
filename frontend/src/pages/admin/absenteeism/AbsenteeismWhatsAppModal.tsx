@@ -37,6 +37,7 @@ interface Props {
   handleCropMouseDown: (edge: "top" | "bottom") => (e: React.MouseEvent) => void;
   waSelectedParents: Set<string>;
   setWaSelectedParents: React.Dispatch<React.SetStateAction<Set<string>>>;
+  waConnected?: boolean;
 }
 
 export function AbsenteeismWhatsAppModal({
@@ -61,6 +62,7 @@ export function AbsenteeismWhatsAppModal({
   handleCropMouseDown,
   waSelectedParents,
   setWaSelectedParents,
+  waConnected = true,
 }: Props) {
   const selectedCount = waSelectedParents.size;
 
@@ -69,8 +71,11 @@ export function AbsenteeismWhatsAppModal({
       isOpen={isOpen}
       onClose={onClose}
       title="WhatsApp Devamsızlık Mektubu Gönderimi"
+      submitDisabled={!waConnected || !!waSendLoading || selectedCount === 0 || waPreviewLoading}
       submitText={
-        waSendLoading
+        !waConnected
+          ? "⚠️ WhatsApp Bağlantısı Gerekli"
+          : waSendLoading
           ? "Gönderiliyor..."
           : selectedCount === 0
           ? "Veli Seçilmedi"
@@ -84,6 +89,27 @@ export function AbsenteeismWhatsAppModal({
     >
       {waRecord && (
         <div className="space-y-4">
+          {/* WhatsApp Bağlantı Uyarısı */}
+          {!waConnected && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start justify-between gap-3 text-amber-900 text-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-amber-950 text-sm">WhatsApp Bağlantısı Bulunamadı</div>
+                  <p className="mt-0.5 text-amber-800 leading-relaxed">
+                    Veliye WhatsApp üzerinden bildirim gönderebilmek için sol menüdeki <strong>WhatsApp İletişim</strong> bölümünden telefonunuzun kamerasıyla QR kodu taratıp bağlantı kurmalısınız.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/admin/whatsapp"
+                className="shrink-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition shadow-xs"
+              >
+                WhatsApp'a Git
+              </a>
+            </div>
+          )}
+
           {/* Öğrenci Bilgi Kartı */}
           <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3.5 text-sm flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">

@@ -428,6 +428,7 @@ export default function AbsenteeismPage() {
         handleCropMouseDown={handleCropMouseDown}
         waSelectedParents={waSelectedParents}
         setWaSelectedParents={setWaSelectedParents}
+        waConnected={waConnected}
       />
 
       {/* 3. PDF Viewer Modal */}

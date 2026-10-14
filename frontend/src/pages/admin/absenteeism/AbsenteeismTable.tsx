@@ -233,20 +233,31 @@ const RecordRow = ({
       {/* İşlemler */}
       <td className="px-4 py-3 text-right">
         <div className="flex justify-end gap-1.5">
-          {waConnected && (
+          {r.waSentAt ? (
             <Button
               variant="ghost"
               onClick={onPreview}
-              disabled={waSendLoading === r.id || !!r.waSentAt}
+              disabled={waSendLoading === r.id}
+              className="text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+              title="Devamsızlık Mektubu Gönderildi - Tekrar Gönder"
+            >
+              <Smartphone size={13} className="text-emerald-600" />
+              <span>Tekrar Gönder</span>
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={onPreview}
+              disabled={waSendLoading === r.id}
               className="text-emerald-700 hover:text-emerald-900 bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-              title="Veliye Devamsızlık Mektubu Gönder"
+              title={waConnected ? "Veliye Devamsızlık Mektubu Gönder" : "Veliye WhatsApp Mesajı Gönder (Bağlantı Gerekli)"}
             >
               {waSendLoading === r.id ? (
                 <div className="w-3.5 h-3.5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Smartphone size={13} />
               )}
-              {!r.waSentAt && "Gönder"}
+              <span>Gönder</span>
             </Button>
           )}
           <button

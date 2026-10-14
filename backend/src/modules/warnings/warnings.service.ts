@@ -9,6 +9,8 @@ import { generateWarningPdf } from './pdfGenerator';
 import { findBehaviorByCode, WARNING_BEHAVIORS, getBehaviorsByCategory, getSanctionScope } from './warningBehaviors';
 import { normalizePhone } from '../notifications/notifications.service';
 
+import { StudentsService } from '../students/students.service';
+
 function fmtDate(date: Date): string {
   const d = new Date(date);
   const dd = d.getDate().toString().padStart(2, '0');
@@ -39,15 +41,32 @@ export class WarningsService {
         ],
         include: {
           student: {
-            select: { fullName: true, className: true, schoolNumber: true },
+            select: {
+              id: true,
+              fullName: true,
+              className: true,
+              schoolNumber: true,
+              primaryParentId: true,
+              parents: {
+                where: { deletedAt: null },
+                include: {
+                  contacts: true,
+                },
+              },
+            },
           },
         },
       }),
       prisma.writtenWarning.count({ where }),
     ]);
 
+    const mappedRecords = records.map((r: any) => ({
+      ...r,
+      student: StudentsService.mapStudentParents(r.student),
+    }));
+
     return {
-      records,
+      records: mappedRecords,
       pagination: {
         page,
         limit,
@@ -62,7 +81,19 @@ export class WarningsService {
       where: { id, deletedAt: null },
       include: {
         student: {
-          select: { fullName: true, className: true, schoolNumber: true },
+          select: {
+            id: true,
+            fullName: true,
+            className: true,
+            schoolNumber: true,
+            primaryParentId: true,
+            parents: {
+              where: { deletedAt: null },
+              include: {
+                contacts: true,
+              },
+            },
+          },
         },
       },
     });
@@ -71,7 +102,10 @@ export class WarningsService {
       throw new AppError('Yazılı uyarı kaydı bulunamadı.', 404);
     }
 
-    return record;
+    return {
+      ...record,
+      student: StudentsService.mapStudentParents(record.student),
+    };
   }
 
   async getWarningCount(studentId: string): Promise<number> {

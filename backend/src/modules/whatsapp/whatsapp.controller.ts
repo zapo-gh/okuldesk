@@ -3,6 +3,7 @@ import fs from 'fs';
 import sharp from 'sharp';
 import { whatsappService } from './whatsapp.service';
 import { absenteeismService } from '../absenteeism/absenteeism.service';
+import { warningsService } from '../warnings/warnings.service';
 import { getFullPageBuffer } from '../absenteeism/pdfPreview.service';
 import { settingsService } from '../settings/settings.service';
 import prisma from '../shared/utils/prisma';
@@ -351,42 +352,28 @@ export const whatsappController = {
   },
 
   /** POST /api/whatsapp/send/warning/:id
-   *  Yazılı uyarı PDF + mesajı tüm velilere gönderir
+   *  Yazılı uyarı mesajı (ve opsiyonel PDF belgesi) seçili velilere gönderir
    */
   async sendWarning(req: Request, res: Response, next: NextFunction) {
     try {
-      const record = await prisma.writtenWarning.findUnique({
-        where: { id: req.params.id },
-        include: {
-          student: {
-            select: {
-              fullName: true, className: true, schoolNumber: true,
-              parents: { include: { contacts: { where: { isPrimary: true } } } },
-            },
-          },
-        },
-      });
-
+      const record = await warningsService.getById(req.params.id);
       if (!record) {
         res.status(404).json({ success: false, message: 'Yazılı uyarı kaydı bulunamadı.' });
         return;
       }
 
-      const parentsRaw = record.student.parents;
-      if (!parentsRaw || parentsRaw.length === 0) {
+      const parentsRaw = record.student?.parents || [];
+      if (parentsRaw.length === 0) {
         res.status(400).json({ success: false, message: 'Bu öğrenciye tanımlı veli bulunamadı.' });
         return;
       }
       
-      // Boş telefon numarası olan velileri dışla
-      const parents = parentsRaw
-        .map((p: any) => ({ fullName: p.fullName, phone: (p.contacts?.[0]?.phone || '') as string }))
-        .filter(p => p.phone.trim().length > 0);
+      const parents = parentsRaw.filter((p: any) => p.phone && p.phone.trim().length > 0);
 
       // Seçili velileri filtrele (frontend'den gelen selectedPhones dizisi)
       const selectedPhones = parseSelectedPhones(req.body.selectedPhones);
       const filteredParents = (selectedPhones && selectedPhones.length > 0)
-        ? parents.filter(p => selectedPhones.includes(p.phone))
+        ? parents.filter((p: any) => selectedPhones.includes(p.phone))
         : parents;
 
       if (filteredParents.length === 0) {
@@ -394,20 +381,43 @@ export const whatsappController = {
         return;
       }
 
+      const settings = await settingsService.get();
+      const schoolName = settings.schoolName || 'Okul Yönetimi';
+
+      // PDF dosyasını kontrol et (mevcut değilse oluşturulur)
+      let pdfPath: string | null = null;
+      try {
+        const pdfInfo = await warningsService.servePdf(record.id);
+        if (pdfInfo && pdfInfo.fullPath && fs.existsSync(pdfInfo.fullPath)) {
+          pdfPath = pdfInfo.fullPath;
+        }
+      } catch (err) {
+        console.warn('Yazılı uyarı PDF dosyasını alma/oluşturma hatası:', err);
+      }
+
+      const sendAsPdf = req.body.sendAsPdf !== false;
       const results: { parent: string; phone: string; ok: boolean; error?: string }[] = [];
 
       for (const parent of filteredParents) {
         const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
         const msg =
+          `📩 *ÖĞRENCİ YAZILI UYARI BİLGİLENDİRMESİ*\n` +
+          `_(${record.warningNumber}. Yazılı Uyarı / Tutanak)_\n\n` +
           `${greeting}\n\n` +
-          `Öğrenciniz ${record.student.fullName} (${record.student.className} sınıfı, ` +
-          `No: ${record.student.schoolNumber}) ${record.warningNumber}. yazılı uyarı almıştır.\n\n` +
-          `Davranış: ${record.behaviorText}\n` +
-          (record.description ? `Açıklama: ${record.description}\n` : '') +
-          `\nSaygılarımızla,\nOkul Yönetimi`;
+          `Okulumuz *${schoolName}* bünyesinde öğrenim gören öğrencimiz *${record.student.fullName}* (${record.student.className} sınıfı, No: ${record.student.schoolNumber}) hakkında okul içi kurallar doğrultusunda *${record.warningNumber}. yazılı uyarı tutanağı* düzenlenmiştir.\n\n` +
+          `▫️ *İlgili Davranış:* ${record.behaviorText}\n` +
+          (record.description ? `▫️ *Açıklama / Detay:* ${record.description}\n` : '') +
+          `\nÖğrencimizin okul kurallarına uyumu ve olumlu davranış gelişiminin desteklenmesi adına konunun takibini rica ederiz.\n\n` +
+          `Saygılarımızla,\n*${schoolName}*`;
 
         try {
-          await whatsappService.sendTextMessage(parent.phone, msg);
+          if (sendAsPdf && pdfPath) {
+            const safeName = record.student.fullName.replace(/\s+/g, '_');
+            const fileName = `yazili_uyari_${safeName}_${record.warningNumber}.pdf`;
+            await whatsappService.sendMessageWithPDF(parent.phone, msg, pdfPath, fileName);
+          } else {
+            await whatsappService.sendTextMessage(parent.phone, msg);
+          }
           results.push({ parent: parent.fullName, phone: parent.phone, ok: true });
         } catch (err: any) {
           results.push({ parent: parent.fullName, phone: parent.phone, ok: false, error: err.message });
@@ -431,46 +441,45 @@ export const whatsappController = {
    */
   async previewWarning(req: Request, res: Response, next: NextFunction) {
     try {
-      const record = await prisma.writtenWarning.findUnique({
-        where: { id: req.params.id },
-        include: {
-          student: {
-            select: {
-              fullName: true, className: true, schoolNumber: true,
-              parents: { include: { contacts: { where: { isPrimary: true } } } },
-            },
-          },
-        },
-      });
-
+      const record = await warningsService.getById(req.params.id);
       if (!record) {
         res.status(404).json({ success: false, message: 'Yazılı uyarı kaydı bulunamadı.' });
         return;
       }
 
-      const parentsRaw = record.student.parents;
-      if (!parentsRaw || parentsRaw.length === 0) {
+      const parents = record.student?.parents || [];
+      if (parents.length === 0) {
         res.status(400).json({ success: false, message: 'Bu öğrenciye tanımlı veli bulunamadı.' });
         return;
       }
-      
-      // Boş telefon numarası olan velileri dışla
-      const parents = parentsRaw
-        .map((p: any) => ({ fullName: p.fullName, phone: (p.contacts?.[0]?.phone || '') as string }))
-        .filter(p => p.phone.trim().length > 0);
 
-      const messages = parents.map((parent: any) => {
-        const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
-        const msg =
-          `${greeting}\n\n` +
-          `Öğrenciniz ${record.student.fullName} (${record.student.className} sınıfı, ` +
-          `No: ${record.student.schoolNumber}) ${record.warningNumber}. yazılı uyarı almıştır.\n\n` +
-          `Davranış: ${record.behaviorText}\n` +
-          (record.description ? `Açıklama: ${record.description}\n` : '') +
-          `\nSaygılarımızla,\nOkul Yönetimi`;
+      const settings = await settingsService.get();
+      const schoolName = settings.schoolName || 'Okul Yönetimi';
 
-        return { parent: parent.fullName, phone: parent.phone, message: msg };
-      });
+      const messages = parents
+        .filter((p: any) => p.phone && p.phone.trim().length > 0)
+        .map((parent: any) => {
+          const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
+          const msg =
+            `📩 *ÖĞRENCİ YAZILI UYARI BİLGİLENDİRMESİ*\n` +
+            `_(${record.warningNumber}. Yazılı Uyarı / Tutanak)_\n\n` +
+            `${greeting}\n\n` +
+            `Okulumuz *${schoolName}* bünyesinde öğrenim gören öğrencimiz *${record.student.fullName}* (${record.student.className} sınıfı, No: ${record.student.schoolNumber}) hakkında okul içi kurallar doğrultusunda *${record.warningNumber}. yazılı uyarı tutanağı* düzenlenmiştir.\n\n` +
+            `▫️ *İlgili Davranış:* ${record.behaviorText}\n` +
+            (record.description ? `▫️ *Açıklama / Detay:* ${record.description}\n` : '') +
+            `\nÖğrencimizin okul kurallarına uyumu ve olumlu davranış gelişiminin desteklenmesi adına konunun takibini rica ederiz.\n\n` +
+            `Saygılarımızla,\n*${schoolName}*`;
+
+          return {
+            parent: parent.fullName,
+            relation: parent.relation || 'Veli',
+            phone: parent.phone,
+            isPrimary: !!parent.isPrimary,
+            waConsentStatus: parent.waConsentStatus || 'PENDING',
+            waConsentDate: parent.waConsentDate || null,
+            message: msg,
+          };
+        });
 
       res.json({
         success: true,
@@ -478,6 +487,8 @@ export const whatsappController = {
           studentName: record.student.fullName,
           className: record.student.className,
           warningNumber: record.warningNumber,
+          behaviorText: record.behaviorText,
+          description: record.description,
           messages,
         },
       });
