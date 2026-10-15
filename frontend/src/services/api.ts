@@ -1,12 +1,40 @@
 import axios from 'axios';
 
-const isTauri = Boolean(
+export const isTauri = Boolean(
   (typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).__TAURI_INTERNALS__)) ||
   (typeof window !== 'undefined' && (window.location.protocol === 'tauri:' || window.location.hostname === 'tauri.localhost'))
 );
 
+export const DEFAULT_SERVER_URL = import.meta.env.VITE_API_URL || (isTauri ? 'http://127.0.0.1:4000/api' : '/api');
+
+export const getEffectiveServerUrl = (): string => {
+  const custom = localStorage.getItem('okuldesk_server_url');
+  if (custom && custom.trim()) {
+    const clean = custom.trim().replace(/\/+$/, '');
+    return clean.endsWith('/api') ? clean : `${clean}/api`;
+  }
+  return DEFAULT_SERVER_URL;
+};
+
+export const setCustomServerUrl = (url: string | null) => {
+  if (!url || !url.trim()) {
+    localStorage.removeItem('okuldesk_server_url');
+  } else {
+    let clean = url.trim().replace(/\/+$/, '');
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = `http://${clean}`;
+    }
+    const finalUrl = clean.endsWith('/api') ? clean : `${clean}/api`;
+    localStorage.setItem('okuldesk_server_url', finalUrl);
+  }
+};
+
+export const isClientMode = (): boolean => {
+  return Boolean(localStorage.getItem('okuldesk_server_url'));
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (isTauri ? 'http://127.0.0.1:4000/api' : '/api'),
+  baseURL: getEffectiveServerUrl(),
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
@@ -14,6 +42,8 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  // Dinamik olarak seçili sunucu adresini uygula
+  config.baseURL = getEffectiveServerUrl();
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

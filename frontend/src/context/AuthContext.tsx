@@ -2,11 +2,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import api from '../services/api';
 import { isTokenExpired } from '../utils/jwt';
 
-interface User {
+export interface User {
   id: string;
   username: string;
-  role: 'ADMIN' | 'PARENT';
+  fullName?: string;
+  role: 'ADMIN' | 'USER' | 'PARENT' | string;
+  permissions?: string[];
+  isActive?: boolean;
   mustChangePassword: boolean;
+  staffId?: string | null;
+  staffName?: string | null;
+  staffTitle?: string | null;
 }
 
 interface AuthContextType {
@@ -15,6 +21,7 @@ interface AuthContextType {
   login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   clearMustChangePassword: () => void;
+  hasPermission: (permissionKey: string) => boolean;
   isLoading: boolean;
 }
 
@@ -86,8 +93,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const hasPermission = (permissionKey: string): boolean => {
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+    const perms = user.permissions || [];
+    return perms.includes('*') || perms.includes(permissionKey);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, clearMustChangePassword, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, clearMustChangePassword, hasPermission, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

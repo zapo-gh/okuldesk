@@ -22,6 +22,7 @@ const ClassTeachersPage = React.lazy(() => import('./pages/admin/modules/ClassTe
 const ParentNotificationPage = React.lazy(() => import('./pages/admin/ParentNotificationPage'));
 const TebligPage = React.lazy(() => import('./pages/admin/TebligPage'));
 const SettingsPage = React.lazy(() => import('./pages/admin/SettingsPage'));
+const UsersPage = React.lazy(() => import('./pages/admin/UsersPage'));
 const AuditLogPage = React.lazy(() => import('./pages/admin/AuditLogPage'));
 const MatbuEvraklarPage = React.lazy(() => import('./pages/admin/MatbuEvraklarPage'));
 const DutySchedulePage = React.lazy(() => import('./pages/admin/modules/DutySchedulePage'));
@@ -48,28 +49,24 @@ const TimetablePage = React.lazy(() => import('./pages/admin/modules/TimetablePa
 const CoverAssignmentPage = React.lazy(() => import('./pages/admin/modules/CoverAssignmentPage'));
 const FolderSpinePage = React.lazy(() => import('./pages/admin/modules/FolderSpinePage'));
 
+import { getEffectiveServerUrl, setCustomServerUrl, isClientMode } from './services/api';
+import { NetworkSetupModal } from './components/NetworkSetupModal';
+import { WifiOff, Search, RefreshCw, Laptop } from 'lucide-react';
+import { Button } from './components/ui/Button';
+
 const PageLoader = () => <div className="flex h-full w-full items-center justify-center min-h-[300px]"><div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent opacity-70" /></div>;
 
 function App() {
   const [backendReady, setBackendReady] = React.useState(false);
+  const [connectionFailed, setConnectionFailed] = React.useState(false);
+  const [isNetworkModalOpen, setIsNetworkModalOpen] = React.useState(false);
+
+  const serverUrl = getEffectiveServerUrl();
+  const healthUrl = serverUrl.endsWith('/api') ? `${serverUrl}/health` : `${serverUrl}/api/health`;
+
   React.useEffect(() => {
     let mounted = true;
-
-    // Tauri ortamı tespiti — window.__TAURI__ veya özel protocol varlığı
-    const isTauri =
-      typeof window !== 'undefined' &&
-      ((window as any).__TAURI__ ||
-        (window as any).__TAURI_INTERNALS__ ||
-        window.location.protocol === 'tauri:' ||
-        window.location.hostname === 'tauri.localhost');
-
-    // URL belirleme: env var > Tauri sabit > web aynı origin
-    const healthUrl = import.meta.env.VITE_API_URL
-      ? `${import.meta.env.VITE_API_URL}/health`
-      : isTauri
-        ? 'http://127.0.0.1:4000/api/health'
-        : '/api/health';
-
+    let attempts = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const checkHealth = async () => {
@@ -77,25 +74,113 @@ function App() {
         const res = await fetch(healthUrl);
         if (res.ok && mounted) {
           setBackendReady(true);
+          setConnectionFailed(false);
         } else if (mounted) {
+          attempts += 1;
+          if (attempts >= 4) {
+            setConnectionFailed(true);
+          }
           retryTimer = setTimeout(checkHealth, 1500);
         }
       } catch {
-        if (mounted) retryTimer = setTimeout(checkHealth, 1500);
+        if (mounted) {
+          attempts += 1;
+          if (attempts >= 4) {
+            setConnectionFailed(true);
+          }
+          retryTimer = setTimeout(checkHealth, 1500);
+        }
       }
     };
 
     checkHealth();
 
-    // Cleanup: component unmount edilirse retry zamanlayıcısı ve state güncellemesi durdurulur
     return () => {
       mounted = false;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, []);
+  }, [healthUrl]);
 
+  if (connectionFailed && !backendReady) {
+    return (
+      <div className="flex flex-col h-screen w-full items-center justify-center bg-slate-950 text-white p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-center space-y-4">
+          <div className="mx-auto w-14 h-14 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center">
+            <WifiOff size={28} />
+          </div>
 
-  if (!backendReady) return <div className="flex flex-col h-screen w-full items-center justify-center bg-slate-950 text-white"><div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mb-4" /><p className="text-slate-400">Sistem başlatılıyor, lütfen bekleyin...</p></div>;
+          <div>
+            <h2 className="text-xl font-bold text-white">Ana Sunucuya Bağlanılamadı</h2>
+            <p className="text-xs text-slate-400 mt-1 font-mono break-all bg-slate-950/60 py-1.5 px-3 rounded-lg border border-slate-800 inline-block">
+              {serverUrl}
+            </p>
+          </div>
+
+          <p className="text-sm text-slate-300 leading-relaxed">
+            {isClientMode()
+              ? 'OkulDesk ana bilgisayarına erişilemedi. Ana bilgisayarın açık ve aynı Wi-Fi/kablo ağına bağlı olduğundan emin olun.'
+              : 'Yerel veritabanı servisi yanıt vermiyor. Yeniden deneyebilir veya ağdaki başka bir ana bilgisayara bağlanabilirsiniz.'}
+          </p>
+
+          <div className="pt-2 flex flex-col gap-2.5">
+            <Button
+              variant="primary"
+              onClick={() => setIsNetworkModalOpen(true)}
+              className="w-full justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white"
+            >
+              <Search size={16} />
+              Ağdaki Ana Bilgisayarı Tara / Sunucu Değiştir
+            </Button>
+
+            {isClientMode() && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCustomServerUrl(null);
+                  window.location.reload();
+                }}
+                className="w-full justify-center gap-2 text-slate-300 hover:text-white border-slate-700 hover:bg-slate-800"
+              >
+                <Laptop size={16} />
+                Yerel Bilgisayar Moduna Dön
+              </Button>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConnectionFailed(false);
+                window.location.reload();
+              }}
+              className="w-full justify-center gap-2 text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800"
+            >
+              <RefreshCw size={15} />
+              Yeniden Bağlanmayı Dene
+            </Button>
+          </div>
+        </div>
+
+        <NetworkSetupModal
+          isOpen={isNetworkModalOpen}
+          onClose={() => setIsNetworkModalOpen(false)}
+          onSuccess={() => {
+            setIsNetworkModalOpen(false);
+            window.location.reload();
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (!backendReady) {
+    return (
+      <div className="flex flex-col h-screen w-full items-center justify-center bg-slate-950 text-white">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mb-4" />
+        <p className="text-slate-400">Sistem başlatılıyor, lütfen bekleyin...</p>
+        <p className="text-xs text-slate-600 mt-2 font-mono">{serverUrl}</p>
+      </div>
+    );
+  }
 
   return <AuthProvider><SettingsProvider><Suspense fallback={<PageLoader />}><Routes>
     <Route path="/login" element={<LoginPage />} />
@@ -140,6 +225,7 @@ function App() {
       <Route path="invoice-tracking" element={<InvoiceTrackingPage />} />
       <Route path="folder-spines" element={<FolderSpinePage />} />
       <Route path="audit-logs" element={<AuditLogPage />} />
+      <Route path="users" element={<UsersPage />} />
       <Route path="settings" element={<SettingsPage />} />
     </Route>
     <Route path="/" element={<Navigate to="/login" replace />} />

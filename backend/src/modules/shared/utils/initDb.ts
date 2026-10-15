@@ -33,6 +33,9 @@ export async function initializeDatabase(): Promise<void> {
     'ALTER TABLE "ParentContact" ADD COLUMN "consentIp" TEXT',
     'ALTER TABLE "ParentContact" ADD COLUMN "consentUserAgent" TEXT',
     'ALTER TABLE "Student" ADD COLUMN "primaryParentId" TEXT',
+    'ALTER TABLE "User" ADD COLUMN "fullName" TEXT DEFAULT \'\'',
+    'ALTER TABLE "User" ADD COLUMN "permissions" TEXT DEFAULT \'[]\'',
+    'ALTER TABLE "User" ADD COLUMN "isActive" BOOLEAN DEFAULT 1',
   ];
 
   for (const sql of safeColumns) {

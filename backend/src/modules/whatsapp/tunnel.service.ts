@@ -4,7 +4,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import fs from 'node:fs';
 
-interface TunnelState {
+export interface TunnelState {
   active: boolean;
   url: string | null;
   startedAt: Date | null;

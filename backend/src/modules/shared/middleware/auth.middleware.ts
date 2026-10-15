@@ -9,6 +9,8 @@ export interface JwtPayload {
   userId: string;
   role: string;
   mustChangePassword?: boolean;
+  fullName?: string;
+  permissions?: string[];
 }
 
 declare global {
@@ -29,17 +31,19 @@ export const authMiddleware = async (req: Request, _res: Response, next: NextFun
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
 
-    // mustChangePassword is persisted in the database. Do not rely solely on
-    // the JWT claim because the claim is intentionally immutable until token
-    // expiry and would otherwise keep a user locked out after a successful
-    // password change.
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true, mustChangePassword: true },
-    });
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT id, role, mustChangePassword, fullName, permissions, isActive FROM "User" WHERE id = ? LIMIT 1',
+      decoded.userId
+    );
+    const user = rows && rows[0];
 
     if (!user) {
       throw new AppError('Kullanıcı bulunamadı.', 401);
+    }
+
+    const isUserActive = user.isActive === 1 || user.isActive === true || user.isActive === null;
+    if (!isUserActive) {
+      throw new AppError('Hesabınız yönetici tarafından askıya alınmıştır.', 403);
     }
 
     if (user.mustChangePassword) {
@@ -50,12 +54,23 @@ export const authMiddleware = async (req: Request, _res: Response, next: NextFun
       }
     }
 
-    // Use the database role as the authoritative value so a role change takes
-    // effect immediately without waiting for the old JWT to expire.
+    let parsedPermissions: string[] = [];
+    if (user.role === 'ADMIN') {
+      parsedPermissions = ['*'];
+    } else {
+      try {
+        parsedPermissions = JSON.parse((user as any).permissions || '[]');
+      } catch {
+        parsedPermissions = [];
+      }
+    }
+
     req.user = {
       userId: decoded.userId,
       role: user.role as JwtPayload['role'],
       mustChangePassword: user.mustChangePassword,
+      fullName: (user as any).fullName || '',
+      permissions: parsedPermissions,
     };
 
     requestContext.run({ userId: decoded.userId, role: user.role }, () => {
@@ -74,4 +89,20 @@ export const adminOnly = (req: Request, _res: Response, next: NextFunction) => {
     return next(new AppError('Bu işlem için yönetici yetkisi gereklidir.', 403));
   }
   next();
+};
+
+export const requirePermission = (permissionKey: string) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('Yetkilendirme gerekli.', 401));
+    }
+    if (req.user.role === 'ADMIN') {
+      return next();
+    }
+    const perms = req.user.permissions || [];
+    if (perms.includes('*') || perms.includes(permissionKey)) {
+      return next();
+    }
+    return next(new AppError(`Bu işlem için '${permissionKey}' yetkisi gereklidir.`, 403));
+  };
 };

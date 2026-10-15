@@ -6,10 +6,12 @@ import { AppError } from '../shared/middleware/errorHandler.middleware';
 
 export class AuthService {
   async login(username: string, password: string, rememberMe = false) {
-    const user = await prisma.user.findUnique({
-      where: { username },
-      include: { staff: true, parent: true }
-    });
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT id, username, password, fullName, role, permissions, isActive, mustChangePassword FROM "User" WHERE username = ? LIMIT 1',
+      username
+    );
+
+    const user = rows && rows[0];
 
     if (!user) {
       throw new AppError('Geçersiz kullanıcı adı veya şifre.', 401);
@@ -24,9 +26,25 @@ export class AuthService {
       throw new AppError('Veli girişi bu sistemde aktif değildir. Sistem yalnızca okul yönetimi içindir.', 403);
     }
 
+    const isUserActive = user.isActive === 1 || user.isActive === true || user.isActive === null;
+    if (!isUserActive) {
+      throw new AppError('Hesabınız yönetici tarafından askıya alınmıştır. Lütfen okul idaresi ile iletişime geçin.', 403);
+    }
+
+    let permissions: string[] = [];
+    if (user.role === 'ADMIN') {
+      permissions = ['*'];
+    } else {
+      try {
+        permissions = JSON.parse(user.permissions || '[]');
+      } catch {
+        permissions = [];
+      }
+    }
+
     const expiresIn = rememberMe ? '30d' : config.jwt.expiresIn;
     const token = jwt.sign(
-      { userId: user.id, role: user.role, mustChangePassword: user.mustChangePassword },
+      { userId: user.id, role: user.role, mustChangePassword: user.mustChangePassword === 1 || user.mustChangePassword === true, permissions },
       config.jwt.secret,
       { expiresIn } as jwt.SignOptions,
     );
@@ -36,35 +54,44 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        fullName: user.fullName || user.username,
         role: user.role,
-        mustChangePassword: user.mustChangePassword,
-        staffId: user.staff?.id || null,
-        staffName: user.staff?.name || null,
-        staffTitle: user.staff?.title || null,
-        parentId: user.parent?.id || null,
+        permissions,
+        mustChangePassword: user.mustChangePassword === 1 || user.mustChangePassword === true,
       },
     };
   }
 
   async getProfile(userId: string) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        mustChangePassword: true,
-        createdAt: true,
-        staff: true,
-        parent: true,
-      },
-    });
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT id, username, fullName, role, permissions, isActive, mustChangePassword, createdAt FROM "User" WHERE id = ? LIMIT 1',
+      userId
+    );
+
+    const user = rows && rows[0];
 
     if (!user) {
       throw new AppError('Kullanıcı bulunamadı.', 404);
     }
 
-    return user;
+    let parsedPermissions: string[] = [];
+    if (user.role === 'ADMIN') {
+      parsedPermissions = ['*'];
+    } else {
+      try {
+        parsedPermissions = JSON.parse(user.permissions || '[]');
+      } catch {
+        parsedPermissions = [];
+      }
+    }
+
+    return {
+      ...user,
+      fullName: user.fullName || user.username,
+      isActive: user.isActive === 1 || user.isActive === true || user.isActive === null,
+      mustChangePassword: user.mustChangePassword === 1 || user.mustChangePassword === true,
+      permissions: parsedPermissions,
+    };
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {

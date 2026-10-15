@@ -15,12 +15,23 @@ export const loginLimiter = rateLimit({
   },
 });
 
-// Normal API trafiği için makul bir üst sınır. Sağlık kontrolü de bu limiter'ın
-// altında olduğundan masaüstü istemcisinin polling davranışı için yeterli pay bırakır.
 export const generalLimiter = rateLimit({
   ...commonOptions,
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 3000,
+  skip: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    return (
+      ip === '127.0.0.1' ||
+      ip === '::1' ||
+      ip.includes('127.0.0.1') ||
+      ip.startsWith('192.168.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('::ffff:192.168.') ||
+      ip.startsWith('::ffff:10.') ||
+      ip.startsWith('::ffff:127.0.0.1')
+    );
+  },
   message: {
     success: false,
     message: 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.',

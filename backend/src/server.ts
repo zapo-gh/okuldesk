@@ -10,6 +10,7 @@ import { initializeDatabase } from './modules/shared/utils/initDb';
 import * as whatsappService from './modules/whatsapp/whatsapp.service';
 import bcrypt from 'bcryptjs';
 import { BackupService } from './modules/shared/utils/backup.service';
+import { networkService } from './modules/network/network.service';
 
 let httpServer: http.Server | null = null;
 
@@ -105,8 +106,8 @@ export async function startServer(): Promise<void> {
   });
 
   await new Promise<void>((resolve, reject) => {
-    httpServer = app.listen(config.port, '127.0.0.1', () => {
-      console.log(`🚀 Server running on port ${config.port}`);
+    httpServer = app.listen(config.port, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${config.port} (0.0.0.0)`);
       console.log(`📋 Environment: ${config.nodeEnv}`);
       resolve();
     });
@@ -118,12 +119,17 @@ export async function startServer(): Promise<void> {
     });
   });
 
+  // Ağ içi cihaz keşfi için LAN Beacon başlat
+  networkService.startLanBeacon();
+
   // Kayıtlı WhatsApp oturumu varsa arka planda otomatik bağlan
   whatsappService.autoConnect().catch(() => {});
 }
 
 async function gracefulShutdown(signal: string) {
   console.log(`\n${signal} alındı, kapatılıyor...`);
+
+  networkService.stopLanBeacon();
 
   await new Promise<void>((resolve) => {
     if (httpServer) {

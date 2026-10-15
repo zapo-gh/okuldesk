@@ -14,7 +14,10 @@ model User {
   id                 String   @id @default(uuid())
   username           String   @unique
   password           String
-  role               String   @default("PARENT")
+  fullName           String?  @default("")
+  role               String   @default("USER")
+  permissions        String?  @default("[]")
+  isActive           Boolean  @default(true)
   mustChangePassword Boolean  @default(false)
   createdAt          DateTime @default(now())
 

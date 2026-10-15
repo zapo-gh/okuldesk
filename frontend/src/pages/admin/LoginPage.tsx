@@ -2,14 +2,21 @@ import toast from 'react-hot-toast';
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { GraduationCap, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { GraduationCap, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Network } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { getEffectiveServerUrl, isClientMode } from '../../services/api';
+import { NetworkSetupModal } from '../../components/NetworkSetupModal';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === '1');
+  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
+
+  const serverUrl = getEffectiveServerUrl();
+  const isClient = isClientMode();
+  const cleanServerHost = serverUrl.replace(/^https?:\/\//, '').replace(/\/api$/, '');
   
   const [loading, setLoading] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
@@ -170,6 +177,30 @@ export default function LoginPage() {
             {!loading && <ArrowRight size={17} />}
           </Button>
         </form>
+
+        {/* Ağ & Sunucu Bağlantı Durumu */}
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center gap-1.5 truncate max-w-[210px]" title={serverUrl}>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${isClient ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'}`} />
+            <span className="truncate font-medium text-slate-600">
+              {isClient ? `İstemci: ${cleanServerHost}` : 'Ana Bilgisayar (Yerel)'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsNetworkModalOpen(true)}
+            className="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors flex items-center gap-1 cursor-pointer hover:underline shrink-0"
+          >
+            <Network size={13} />
+            {isClient ? 'Sunucuyu Değiştir' : 'Ana PC\'ye Bağlan'}
+          </button>
+        </div>
+
+        {/* Ağ Kurulum Modalı */}
+        <NetworkSetupModal
+          isOpen={isNetworkModalOpen}
+          onClose={() => setIsNetworkModalOpen(false)}
+        />
       </div>
     </div>
   );

@@ -13,10 +13,10 @@ router.get('/backup', authMiddleware, adminOnly, settingsController.backup);
 // POST /api/settings/restore - upload SQLite database to replace current DB
 router.post('/restore', authMiddleware, adminOnly, upload.single('dbfile'), settingsController.restore);
 
-// GET /api/settings - get school settings
-router.get('/', authMiddleware, adminOnly, settingsController.get);
+// GET /api/settings - get school settings (herhangi bir oturum açmış personel okuyabilir)
+router.get('/', authMiddleware, settingsController.get);
 
-// PUT /api/settings - update school settings
+// PUT /api/settings - update school settings (yalnızca admin)
 router.put('/', authMiddleware, adminOnly, settingsController.update);
 
 export default router;

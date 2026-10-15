@@ -43,6 +43,9 @@ import invoiceRoutes from './modules/invoice/invoice.routes';
 import studentLeaveRoutes from './modules/student-leave/student-leave.routes';
 import timetableRoutes from './modules/timetable/timetable.routes';
 import dailyAbsenteeismRoutes from './modules/dailyAbsenteeism/dailyAbsenteeism.routes';
+import networkRoutes from './modules/network/network.routes';
+import usersRoutes from './modules/users/users.routes';
+import os from 'os';
 
 import { renderWebConsentPage, submitWebConsent } from './modules/whatsapp/webConsent.controller';
 
@@ -74,7 +77,25 @@ app.get('/onay/:token', renderWebConsentPage);
 app.get('/api/public/consent/:token', renderWebConsentPage);
 app.post('/api/public/consent/:token', submitWebConsent);
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/api/health', async (_req, res) => {
+  let schoolName = 'OkulDesk';
+  try {
+    const settings = await prisma.schoolSettings.findUnique({
+      where: { id: 'singleton' },
+      select: { schoolName: true },
+    });
+    if (settings?.schoolName) schoolName = settings.schoolName;
+  } catch {}
+
+  res.json({
+    status: 'ok',
+    app: 'okuldesk',
+    hostname: os.hostname(),
+    schoolName,
+    port: config.port,
+    timestamp: new Date().toISOString(),
+  });
+});
 app.get('/api/health/ready', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -86,6 +107,8 @@ app.get('/api/health/ready', async (_req, res) => {
 });
 
 app.use('/api', generalLimiter);
+app.use('/api/network', networkRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/students/360', student360Routes);

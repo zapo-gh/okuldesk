@@ -41,7 +41,8 @@ import {
   Building2,
   FileBox,
   Receipt,
-  FolderArchive
+  FolderArchive,
+  UserCog
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import { CommandPalette } from './ui/CommandPalette';
@@ -82,7 +83,7 @@ function NavItem({ to, icon: Icon, label, onClick, collapsed, end }: NavItemProp
 }
 
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobil drawer için
@@ -209,78 +210,59 @@ export default function AdminLayout() {
           {!collapsed && <span className="text-xs font-bold text-cyan-300/80 uppercase tracking-wider mb-2 mt-1 px-3">Genel</span>}
           {collapsed && <div className="h-2" />}
           <NavItem to="/admin" icon={LayoutDashboard} label="Gösterge Paneli" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/students" icon={Users} label="Öğrenci Listesi" onClick={closeSidebar} collapsed={collapsed} />
+          {hasPermission('students') && <NavItem to="/admin/students" icon={Users} label="Öğrenci Listesi" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Öğrenci İşlemleri */}
           {!collapsed && <span className="text-xs font-bold text-purple-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Öğrenci İşlemleri</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-          <NavItem to="/admin/parent-leave" icon={FileSignature} label="Veli İzin Dilekçesi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/petitions" icon={FileBox} label="Veli Dilekçeleri" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/absenteeism" icon={Mail} label="Devamsızlık Mektubu" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/daily-absenteeism" icon={BellRing} label="Anlık Devamsızlık (WA)" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/warnings" icon={AlertTriangle} label="Yazılı Uyarılar" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/violations" icon={ShieldAlert} label="İhlal Takibi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/grade-reports" icon={TrendingDown} label="Başarısızlık Riski Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/parent-notification" icon={Bell} label="ÖMYK Devamsızlık Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/matbu-evraklar" icon={Printer} label="Kayıt Evrakları" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/parent-meeting" icon={FileText} label="Veli Toplantısı İmza Sirküsü" onClick={closeSidebar} collapsed={collapsed} />
+          {hasPermission('parent-leave') && <NavItem to="/admin/parent-leave" icon={FileSignature} label="Veli İzin Dilekçesi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('petitions') && <NavItem to="/admin/petitions" icon={FileBox} label="Veli Dilekçeleri" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('absenteeism') && <NavItem to="/admin/absenteeism" icon={Mail} label="Devamsızlık Mektubu" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('daily-absenteeism') && <NavItem to="/admin/daily-absenteeism" icon={BellRing} label="Anlık Devamsızlık (WA)" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('warnings') && <NavItem to="/admin/warnings" icon={AlertTriangle} label="Yazılı Uyarılar" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('violations') && <NavItem to="/admin/violations" icon={ShieldAlert} label="İhlal Takibi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('grade-reports') && <NavItem to="/admin/grade-reports" icon={TrendingDown} label="Başarısızlık Riski Bildirimi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('parent-notification') && <NavItem to="/admin/parent-notification" icon={Bell} label="ÖMYK Devamsızlık Bildirimi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('matbu-evraklar') && <NavItem to="/admin/matbu-evraklar" icon={Printer} label="Kayıt Evrakları" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('parent-meeting') && <NavItem to="/admin/parent-meeting" icon={FileText} label="Veli Toplantısı İmza Sirküsü" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Eğitim & Öğretim */}
           {!collapsed && <span className="text-xs font-bold text-emerald-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Eğitim & Öğretim</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-          <NavItem to="/admin/duty-schedule" icon={CalendarRange} label="Nöbet Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/timetable" icon={CalendarDays} label="Ders Programı" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/cover-assignments" icon={UserCheck} label="Boş Ders Doldurma" onClick={closeSidebar} collapsed={collapsed} />
-          {/* [GELECEKTE GELİŞTİRİLECEK] Öğretmenler Kurulu
-          <NavItem to="/admin/board-meeting" icon={UsersRound} label="Öğretmenler Kurulu" onClick={closeSidebar} collapsed={collapsed} />
-          */}
-          {/* [GELECEKTE GELİŞTİRİLECEK] Sosyal Etkinlik Planı
-          <NavItem to="/admin/social-activity" icon={PartyPopper} label="Sosyal Etkinlik Planı" onClick={closeSidebar} collapsed={collapsed} />
-          */}
-          <NavItem to="/admin/student-club" icon={Trophy} label="Öğrenci Kulüpleri" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/class-teachers" icon={UsersRound} label="Sınıf Rehber Öğretmenleri" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/folder-spines" icon={FolderArchive} label="Klasör Sırtlığı" onClick={closeSidebar} collapsed={collapsed} />
+          {hasPermission('duty-schedule') && <NavItem to="/admin/duty-schedule" icon={CalendarRange} label="Nöbet Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('timetable') && <NavItem to="/admin/timetable" icon={CalendarDays} label="Ders Programı" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('cover-assignments') && <NavItem to="/admin/cover-assignments" icon={UserCheck} label="Boş Ders Doldurma" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('student-club') && <NavItem to="/admin/student-club" icon={Trophy} label="Öğrenci Kulüpleri" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('class-teachers') && <NavItem to="/admin/class-teachers" icon={UsersRound} label="Sınıf Rehber Öğretmenleri" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('folder-spines') && <NavItem to="/admin/folder-spines" icon={FolderArchive} label="Klasör Sırtlığı" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Personel & İnsan Kaynakları */}
           {!collapsed && <span className="text-xs font-bold text-blue-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Personel & İnsan Kayn.</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-          <NavItem to="/admin/staff" icon={UserCheck} label="Personel Havuzu" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/attendance-sheet" icon={FileSignature} label="Personel İmza Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/teblig" icon={FileCheck} label="Tebliğ – Tebellüğ Belgesi" onClick={closeSidebar} collapsed={collapsed} />
-          {/* [GELECEKTE GELİŞTİRİLECEK] Personel Nakil Bildirimi
-          <NavItem to="/admin/staff-transfer" icon={ArrowRightLeft} label="Personel Nakil Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
-          */}
+          {hasPermission('staff') && <NavItem to="/admin/staff" icon={UserCheck} label="Personel Havuzu" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('attendance-sheet') && <NavItem to="/admin/attendance-sheet" icon={FileSignature} label="Personel İmza Çizelgesi" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('teblig') && <NavItem to="/admin/teblig" icon={FileCheck} label="Tebliğ – Tebellüğ Belgesi" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Kurullar & Planlama */}
           {!collapsed && <span className="text-xs font-bold text-orange-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Kurullar & Planlama</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-
-          <NavItem to="/admin/commission" icon={Network} label="Kurul ve Komisyonlar" onClick={closeSidebar} collapsed={collapsed} />
-
-          {/* [GELECEKTE GELİŞTİRİLECEK] Okul Gezi Planı
-          <NavItem to="/admin/field-trip" icon={Bus} label="Okul Gezi Planı" onClick={closeSidebar} collapsed={collapsed} />
-          */}
-          <NavItem to="/admin/commemorative-days" icon={Flag} label="Belirli Gün ve Haftalar" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/holidays" icon={CalendarOff} label="Resmi Tatiller" onClick={closeSidebar} collapsed={collapsed} />
+          {hasPermission('commission') && <NavItem to="/admin/commission" icon={Network} label="Kurul ve Komisyonlar" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('commemorative-days') && <NavItem to="/admin/commemorative-days" icon={Flag} label="Belirli Gün ve Haftalar" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('holidays') && <NavItem to="/admin/holidays" icon={CalendarOff} label="Resmi Tatiller" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Satın Alma & Mali İşler */}
           {!collapsed && <span className="text-xs font-bold text-rose-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Satın Alma & Mali İşler</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-          <NavItem to="/admin/invoice-tracking" icon={Receipt} label="Fatura & Ödenek Takip" onClick={closeSidebar} collapsed={collapsed} />
-          {/* [GELECEKTE GELİŞTİRİLECEK] Doğrudan Temin (22/d)
-          <NavItem to="/admin/procurement" icon={FileSignature} label="Doğrudan Temin (22/d)" onClick={closeSidebar} collapsed={collapsed} />
-          */}
-          {/* [GELECEKTE GELİŞTİRİLECEK] Firma Rehberi
-          <NavItem to="/admin/supplier" icon={Building2} label="Firma Rehberi" onClick={closeSidebar} collapsed={collapsed} />
-          */}
+          {hasPermission('invoice-tracking') && <NavItem to="/admin/invoice-tracking" icon={Receipt} label="Fatura & Ödenek Takip" onClick={closeSidebar} collapsed={collapsed} />}
 
           {/* Sistem */}
           {!collapsed && <span className="text-xs font-bold text-teal-300/80 uppercase tracking-wider mb-2 mt-4 px-3">Sistem</span>}
           {collapsed && <div className="h-3 border-t border-white/10 my-1.5" />}
-          <NavItem to="/admin/whatsapp" icon={MessageSquare} label="WhatsApp Bağlantısı" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/whatsapp-consent" icon={ShieldCheck} label="Veli Onay Yönetimi" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/settings" icon={Settings} label="Ayarlar" onClick={closeSidebar} collapsed={collapsed} />
-          <NavItem to="/admin/audit-logs" icon={Activity} label="Sistem İzlenebilirliği (Audit)" onClick={closeSidebar} collapsed={collapsed} />
+          {hasPermission('whatsapp') && <NavItem to="/admin/whatsapp" icon={MessageSquare} label="WhatsApp Bağlantısı" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('whatsapp-consent') && <NavItem to="/admin/whatsapp-consent" icon={ShieldCheck} label="Veli Onay Yönetimi" onClick={closeSidebar} collapsed={collapsed} />}
+          {(hasPermission('users') || user?.role === 'ADMIN') && <NavItem to="/admin/users" icon={UserCog} label="Kullanıcı & Yetkiler" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('settings') && <NavItem to="/admin/settings" icon={Settings} label="Ayarlar" onClick={closeSidebar} collapsed={collapsed} />}
+          {hasPermission('audit-logs') && <NavItem to="/admin/audit-logs" icon={Activity} label="Sistem İzlenebilirliği (Audit)" onClick={closeSidebar} collapsed={collapsed} />}
         </nav>
 
         {/* Alt Bilgi & Çıkış */}
@@ -289,10 +271,10 @@ export default function AdminLayout() {
             <>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-white/90 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {user?.username || 'Yönetici'}
+                  {user?.fullName || user?.username || 'Yönetici'}
                 </div>
                 <div className="text-xs text-white/40 mt-px flex items-center gap-2">
-                  <span>Yetkili Hesap</span>
+                  <span>{user?.role === 'ADMIN' ? 'Yönetici (Admin)' : 'İdareci / Kullanıcı'}</span>
                   <span className="bg-white/10 px-1.5 rounded-sm text-[10px]">v{packageJson.version}</span>
                 </div>
               </div>
