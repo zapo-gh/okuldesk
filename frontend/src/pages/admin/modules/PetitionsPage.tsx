@@ -63,7 +63,7 @@ export default function PetitionsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/students?limit=1000');
+      const res = await api.get('/students?limit=3000');
       setStudents(res.data.data.students || []);
     } catch (err: any) {
       toast.error('Öğrenci verileri yüklenirken hata oluştu');
@@ -134,11 +134,29 @@ export default function PetitionsPage() {
     }, 100);
   };
 
-  const filteredStudents = students.filter(s => 
-    s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.schoolNumber.includes(searchQuery) ||
-    s.className.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  const normalizeTr = (str: string) =>
+    (str || '')
+      .replace(/İ/g, 'i')
+      .replace(/I/g, 'ı')
+      .replace(/ı/g, 'i')
+      .toLocaleLowerCase('tr-TR')
+      .trim();
+
+  const filteredStudents = students.filter(s => {
+    if (!searchQuery.trim()) return false;
+    const q = normalizeTr(searchQuery);
+    const nameNorm = normalizeTr(s.fullName);
+    const classNorm = normalizeTr(s.className);
+    const noNorm = s.schoolNumber ? String(s.schoolNumber).trim() : '';
+
+    return (
+      nameNorm.includes(q) ||
+      classNorm.includes(q) ||
+      noNorm.includes(searchQuery.trim()) ||
+      s.fullName.toLocaleLowerCase('tr-TR').includes(searchQuery.toLocaleLowerCase('tr-TR')) ||
+      s.className.toLocaleLowerCase('tr-TR').includes(searchQuery.toLocaleLowerCase('tr-TR'))
+    );
+  }).slice(0, 25);
 
   const getMesemData = (): MesemNakilData => ({
     student: {

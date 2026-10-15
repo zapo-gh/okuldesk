@@ -5,7 +5,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { useSettings } from '../../../context/SettingsContext';
 import { useReactToPrint } from 'react-to-print';
 import ParentLeavePrintTemplate from './print/ParentLeavePrintTemplate';
-import { FileSignature, Plus, Search, Printer, X } from 'lucide-react';
+import { FileSignature, Plus, Search, Printer, X, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 
 interface Student {
@@ -63,15 +63,15 @@ export default function ParentLeavePage() {
 
   useEffect(() => {
     fetchData();
-  }, [settings?.academicYear]);
+  }, []);
 
   const fetchData = async () => {
-    if (!settings?.academicYear) return;
     setLoading(true);
     try {
-      const res = await api.get('/students?limit=1000');
+      const res = await api.get('/students?limit=3000');
       setStudents(res.data.data.students || []);
     } catch (err: any) {
+      console.error('Öğrenci verileri yüklenirken hata oluştu:', err);
       toast.error('Öğrenci verileri yüklenirken hata oluştu');
     } finally {
       setLoading(false);
@@ -164,11 +164,29 @@ export default function ParentLeavePage() {
     setReason('');
   };
 
-  const filteredStudents = students.filter(s => 
-    s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.schoolNumber.includes(searchQuery) ||
-    s.className.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  const normalizeTr = (str: string) =>
+    (str || '')
+      .replace(/İ/g, 'i')
+      .replace(/I/g, 'ı')
+      .replace(/ı/g, 'i')
+      .toLocaleLowerCase('tr-TR')
+      .trim();
+
+  const filteredStudents = students.filter(s => {
+    if (!searchQuery.trim()) return false;
+    const q = normalizeTr(searchQuery);
+    const nameNorm = normalizeTr(s.fullName);
+    const classNorm = normalizeTr(s.className);
+    const noNorm = s.schoolNumber ? String(s.schoolNumber).trim() : '';
+
+    return (
+      nameNorm.includes(q) ||
+      classNorm.includes(q) ||
+      noNorm.includes(searchQuery.trim()) ||
+      s.fullName.toLocaleLowerCase('tr-TR').includes(searchQuery.toLocaleLowerCase('tr-TR')) ||
+      s.className.toLocaleLowerCase('tr-TR').includes(searchQuery.toLocaleLowerCase('tr-TR'))
+    );
+  }).slice(0, 25);
 
   const schoolName = settings?.schoolName || '................................................... LİSESİ';
 
@@ -200,13 +218,20 @@ export default function ParentLeavePage() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    {loading ? (
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin">
+                        <Loader2 size={16} />
+                      </div>
+                    ) : (
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    )}
                     <input 
                       type="text" 
-                      placeholder="Öğrenci adı, no veya sınıf ara..."
+                      placeholder={loading ? "Öğrenciler yükleniyor..." : "Öğrenci adı, no veya sınıf ara..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      disabled={loading}
+                      className="w-full pl-9 pr-9 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50"
                     />
                     {searchQuery && (
                       <button
@@ -219,7 +244,7 @@ export default function ParentLeavePage() {
                       </button>
                     )}
                     {searchQuery && (
-                      <div className="absolute z-50 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100">
+                      <div className="absolute z-50 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
                         {filteredStudents.length > 0 ? (
                           filteredStudents.map(s => (
                             <div 
@@ -231,8 +256,12 @@ export default function ParentLeavePage() {
                               <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">No: {s.schoolNumber} • {s.className}</span>
                             </div>
                           ))
+                        ) : students.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-amber-700 bg-amber-50 text-center">
+                            ⚠️ Sistemde kayıtlı öğrenci bulunamadı. Lütfen sol menüdeki <strong>Öğrenci Listesi</strong> sayfasından öğrencileri yükleyin.
+                          </div>
                         ) : (
-                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Öğrenci bulunamadı</div>
+                          <div className="px-4 py-3 text-sm text-slate-500 text-center">Eşleşen öğrenci bulunamadı</div>
                         )}
                       </div>
                     )}
