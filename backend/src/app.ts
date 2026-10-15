@@ -42,6 +42,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import invoiceRoutes from './modules/invoice/invoice.routes';
 import studentLeaveRoutes from './modules/student-leave/student-leave.routes';
 import timetableRoutes from './modules/timetable/timetable.routes';
+import dailyAbsenteeismRoutes from './modules/dailyAbsenteeism/dailyAbsenteeism.routes';
 
 import { renderWebConsentPage, submitWebConsent } from './modules/whatsapp/webConsent.controller';
 
@@ -119,6 +120,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/invoice', invoiceRoutes);
 app.use('/api/student-leave', studentLeaveRoutes);
 app.use('/api/timetable', timetableRoutes);
+app.use('/api/daily-absenteeism', dailyAbsenteeismRoutes);
 
 const frontendDist = path.resolve(__dirname, 'public');
 if (fs.existsSync(frontendDist)) {

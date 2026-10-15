@@ -10,6 +10,7 @@ const DashboardPage = React.lazy(() => import('./pages/admin/DashboardPage'));
 const StudentListPage = React.lazy(() => import('./pages/admin/StudentListPage'));
 const Student360Page = React.lazy(() => import('./pages/admin/Student360Page'));
 const AbsenteeismPage = React.lazy(() => import('./pages/admin/AbsenteeismPage'));
+const DailyAbsenteeismPage = React.lazy(() => import('./pages/admin/DailyAbsenteeismPage'));
 const WarningsPage = React.lazy(() => import('./pages/admin/WarningsPage'));
 const ViolationsPage = React.lazy(() => import('./pages/admin/ViolationsPage'));
 const StaffPage = React.lazy(() => import('./pages/admin/StaffPage'));
@@ -103,6 +104,7 @@ function App() {
       <Route path="students" element={<StudentListPage />} />
       <Route path="students/:id" element={<Student360Page />} />
       <Route path="absenteeism" element={<AbsenteeismPage />} />
+      <Route path="daily-absenteeism" element={<DailyAbsenteeismPage />} />
       <Route path="warnings" element={<WarningsPage />} />
       <Route path="violations" element={<ViolationsPage />} />
       <Route path="staff" element={<StaffPage />} />

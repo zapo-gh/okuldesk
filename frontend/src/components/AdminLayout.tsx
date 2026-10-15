@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   TrendingDown,
   Bell,
+  BellRing,
   FileText,
   FileCheck,
   MessageSquare,
@@ -216,6 +217,7 @@ export default function AdminLayout() {
           <NavItem to="/admin/parent-leave" icon={FileSignature} label="Veli İzin Dilekçesi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/petitions" icon={FileBox} label="Veli Dilekçeleri" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/absenteeism" icon={Mail} label="Devamsızlık Mektubu" onClick={closeSidebar} collapsed={collapsed} />
+          <NavItem to="/admin/daily-absenteeism" icon={BellRing} label="Anlık Devamsızlık (WA)" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/warnings" icon={AlertTriangle} label="Yazılı Uyarılar" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/violations" icon={ShieldAlert} label="İhlal Takibi" onClick={closeSidebar} collapsed={collapsed} />
           <NavItem to="/admin/grade-reports" icon={TrendingDown} label="Başarısızlık Riski Bildirimi" onClick={closeSidebar} collapsed={collapsed} />
