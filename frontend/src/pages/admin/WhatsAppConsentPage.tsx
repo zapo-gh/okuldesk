@@ -158,8 +158,12 @@ export default function WhatsAppConsentPage() {
       const res = await api.get(`/whatsapp/consents/pdf/contact/${contact.contactId}`, {
         responseType: 'blob',
       });
-      printPdfBlob(res.data as Blob);
-      toast.success('Yazdırma ekranı açıldı.', { id: toastId });
+      printPdfBlob(res.data as Blob, {
+        title: `${contact.studentName || 'Öğrenci'} - Veli KVKK ve Onay Formu`,
+        subtitle: `${contact.className || ''} • No: ${contact.schoolNumber || ''} • Veli: ${contact.parentName || 'Veli'} (${contact.phone})`,
+        fileName: `KVKK_Onay_${(contact.studentName || 'Ogrenci').replace(/\s+/g, '_')}.pdf`,
+      });
+      toast.success('Yazdırma ve önizleme ekranı açıldı.', { id: toastId });
     } catch {
       toast.error('PDF formu hazırlanırken bir hata oluştu.');
     }
@@ -176,8 +180,12 @@ export default function WhatsAppConsentPage() {
       const res = await api.get(`/whatsapp/consents/pdf/class/${encodeURIComponent(selectedClass)}`, {
         responseType: 'blob',
       });
-      printPdfBlob(res.data as Blob);
-      toast.success(`${selectedClass} sınıfının tüm formları yazdırma ekranına aktarıldı.`);
+      printPdfBlob(res.data as Blob, {
+        title: `${selectedClass} Sınıfı - Tüm Veli Onay Formları`,
+        subtitle: `${selectedClass} sınıfında kayıtlı tüm öğrencilerin resmi MEB onay formları birleştirildi.`,
+        fileName: `${selectedClass}_Sinifi_Veli_Onay_Formlari.pdf`,
+      });
+      toast.success(`${selectedClass} sınıfının tüm formları yazdırma ve önizleme ekranına aktarıldı.`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Sınıf PDF formu oluşturulamadı.');
     } finally {
