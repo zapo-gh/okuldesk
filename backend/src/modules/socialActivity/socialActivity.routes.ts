@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { socialActivityService } from '../shared/services/moduleServices';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware } from '../shared/middleware/auth.middleware';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { z } from 'zod';
 import { generateSingleActivityPdf, generateAllActivitiesPdf } from './socialActivityPdf.generator';
@@ -15,14 +15,16 @@ const createSchema = z.object({
 
 const router = Router();
 
-router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.use(authMiddleware);
+
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ay = (req.query.academicYear as string) || '2025-2026';
     res.json({ success: true, data: await socialActivityService.getAll(ay) });
   } catch (e) { next(e); }
 });
 
-router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = createSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -30,7 +32,7 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, 
   } catch (e) { next(e); }
 });
 
-router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = createSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -40,12 +42,12 @@ router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response
   catch (e) { next(e); }
 });
 
-router.delete('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await socialActivityService.delete(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });
 
-router.post('/generate-single-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/generate-single-pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pdfBuffer = await generateSingleActivityPdf(req.body);
     const fileName = `etkinlik-onay.pdf`;
@@ -60,7 +62,7 @@ router.post('/generate-single-pdf', authMiddleware, adminOnly, async (req: Reque
   }
 });
 
-router.post('/generate-all-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/generate-all-pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pdfBuffer = await generateAllActivitiesPdf(req.body);
     const fileName = `ek7a-plani.pdf`;

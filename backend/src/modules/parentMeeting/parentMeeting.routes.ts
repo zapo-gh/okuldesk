@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { parentMeetingController } from './parentMeeting.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 
 const router = Router();
 
-router.use(authMiddleware, adminOnly);
+router.use(authMiddleware, requirePermission('parent-meeting'));
 
 router.get('/classes', parentMeetingController.getClasses);
 router.post('/data', parentMeetingController.getData);

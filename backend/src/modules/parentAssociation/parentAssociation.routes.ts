@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { parentAssociationService } from '../shared/services/moduleServices';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware } from '../shared/middleware/auth.middleware';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { z } from 'zod';
 import { generateParentAssociationMeetingPdf } from './parentAssociationPdf.generator';
@@ -20,8 +20,10 @@ const memberSchema = z.object({
 
 const router = Router();
 
+router.use(authMiddleware);
+
 // Toplantılar
-router.post('/meetings/generate-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/meetings/generate-pdf', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pdfBuffer = await generateParentAssociationMeetingPdf(req.body);
     const fileName = `oab-karar-tutanagi.pdf`;
@@ -36,14 +38,14 @@ router.post('/meetings/generate-pdf', authMiddleware, adminOnly, async (req: Req
   }
 });
 
-router.get('/meetings', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/meetings', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ay = (req.query.academicYear as string) || '2025-2026';
     res.json({ success: true, data: await parentAssociationService.getMeetings(ay) });
   } catch (e) { next(e); }
 });
 
-router.post('/meetings', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/meetings', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = meetingSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -51,7 +53,7 @@ router.post('/meetings', authMiddleware, adminOnly, async (req: Request, res: Re
   } catch (e) { next(e); }
 });
 
-router.put('/meetings/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/meetings/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = meetingSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -61,20 +63,20 @@ router.put('/meetings/:id', authMiddleware, adminOnly, async (req: Request, res:
   catch (e) { next(e); }
 });
 
-router.delete('/meetings/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/meetings/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await parentAssociationService.deleteMeeting(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });
 
 // Üyeler
-router.get('/members', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ay = (req.query.academicYear as string) || '2025-2026';
     res.json({ success: true, data: await parentAssociationService.getMembers(ay) });
   } catch (e) { next(e); }
 });
 
-router.post('/members', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = memberSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -82,7 +84,7 @@ router.post('/members', authMiddleware, adminOnly, async (req: Request, res: Res
   } catch (e) { next(e); }
 });
 
-router.put('/members/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/members/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = memberSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -92,7 +94,7 @@ router.put('/members/:id', authMiddleware, adminOnly, async (req: Request, res: 
   catch (e) { next(e); }
 });
 
-router.delete('/members/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/members/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await parentAssociationService.deleteMember(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });

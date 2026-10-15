@@ -83,7 +83,7 @@ export const adminOnly = (req: Request, _res: Response, next: NextFunction) => {
   next();
 };
 
-export const requirePermission = (permissionKey: string) => {
+export const requirePermission = (permissionKey: string | string[]) => {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('Yetkilendirme gerekli.', 401));
@@ -92,9 +92,14 @@ export const requirePermission = (permissionKey: string) => {
       return next();
     }
     const perms = req.user.permissions || [];
-    if (perms.includes('*') || perms.includes(permissionKey)) {
+    if (perms.includes('*')) {
       return next();
     }
-    return next(new AppError(`Bu işlem için '${permissionKey}' yetkisi gereklidir.`, 403));
+    const requiredKeys = Array.isArray(permissionKey) ? permissionKey : [permissionKey];
+    const hasAny = requiredKeys.some((k) => perms.includes(k));
+    if (hasAny) {
+      return next();
+    }
+    return next(new AppError(`Bu işlem için yetkiniz bulunmamaktadır (${requiredKeys.join(', ')}).`, 403));
   };
 };

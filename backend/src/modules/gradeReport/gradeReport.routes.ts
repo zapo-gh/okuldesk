@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { gradeReportController } from './gradeReport.controller';
 import { karneUpload } from './karneUpload.middleware';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import { validateMagicBytes } from '../shared/middleware/magicByteValidator.middleware';
 import { uploadLimiter, expensiveOperationLimiter } from '../shared/middleware/rateLimit.middleware';
 
 const router = Router();
 
-router.use(authMiddleware, adminOnly);
+router.use(authMiddleware, requirePermission('grade-reports'));
 
 /** Karne yükle + analiz et */
 router.post(

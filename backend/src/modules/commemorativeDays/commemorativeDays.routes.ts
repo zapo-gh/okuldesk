@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { commemorativeDaysService } from '../shared/services/moduleServices';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { z } from 'zod';
 
@@ -14,14 +14,16 @@ const createSchema = z.object({
 
 const router = Router();
 
-router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.use(authMiddleware, requirePermission('commemorative-days'));
+
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ay = (req.query.academicYear as string) || '2025-2026';
     res.json({ success: true, data: await commemorativeDaysService.getAll(ay) });
   } catch (e) { next(e); }
 });
 
-router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = createSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -29,7 +31,7 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, 
   } catch (e) { next(e); }
 });
 
-router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = createSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -39,7 +41,7 @@ router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response
   catch (e) { next(e); }
 });
 
-router.delete('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await commemorativeDaysService.delete(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });

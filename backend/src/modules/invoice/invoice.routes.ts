@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { invoiceController } from './invoice.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import multer from 'multer';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 
@@ -18,11 +18,13 @@ const upload = multer({
 
 const router = Router();
 
-router.get('/', authMiddleware, adminOnly, invoiceController.getAll);
-router.post('/', authMiddleware, adminOnly, invoiceController.create);
-router.post('/parse-pdf', authMiddleware, adminOnly, upload.single('file'), invoiceController.parseInvoice);
-router.put('/:id', authMiddleware, adminOnly, invoiceController.update);
-router.put('/:id/status', authMiddleware, adminOnly, invoiceController.updateStatus);
-router.delete('/:id', authMiddleware, adminOnly, invoiceController.delete);
+router.use(authMiddleware, requirePermission('invoice-tracking'));
+
+router.get('/', invoiceController.getAll);
+router.post('/', invoiceController.create);
+router.post('/parse-pdf', upload.single('file'), invoiceController.parseInvoice);
+router.put('/:id', invoiceController.update);
+router.put('/:id/status', invoiceController.updateStatus);
+router.delete('/:id', invoiceController.delete);
 
 export default router;

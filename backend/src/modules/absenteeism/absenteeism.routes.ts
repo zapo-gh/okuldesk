@@ -1,33 +1,36 @@
 import { Router } from 'express';
 import { absenteeismController } from './absenteeism.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import { pdfUpload } from './pdfUpload.middleware';
 import { validateMagicBytes } from '../shared/middleware/magicByteValidator.middleware';
 import { uploadLimiter } from '../shared/middleware/rateLimit.middleware';
 
 const router = Router();
 
-// Admin routes
-router.get('/stats', authMiddleware, adminOnly, absenteeismController.getStats);
-router.get('/', authMiddleware, adminOnly, absenteeismController.getAll);
-router.get('/warning-count/:studentId', authMiddleware, adminOnly, absenteeismController.getWarningCount);
-router.get('/:id', authMiddleware, adminOnly, absenteeismController.getById);
+router.use(authMiddleware);
+
+// Okuma rotaları
+router.get('/stats', requirePermission('absenteeism'), absenteeismController.getStats);
+router.get('/', requirePermission('absenteeism'), absenteeismController.getAll);
+router.get('/warning-count/:studentId', requirePermission(['absenteeism', 'students', 'warnings']), absenteeismController.getWarningCount);
+router.get('/:id', requirePermission('absenteeism'), absenteeismController.getById);
+
+// Mektup oluşturma ve silme
 router.post(
   '/',
-  authMiddleware,
-  adminOnly,
+  requirePermission('absenteeism'),
   uploadLimiter,
   pdfUpload.single('pdf'),
   validateMagicBytes(['application/pdf', 'image/jpeg', 'image/png']),
   absenteeismController.create,
 );
-router.delete('/:id', authMiddleware, adminOnly, absenteeismController.delete);
+router.delete('/:id', requirePermission('absenteeism'), absenteeismController.delete);
 
-// PDF serving routes (admin only)
-router.get('/:id/pdf', authMiddleware, adminOnly, absenteeismController.servePdf);
-router.get('/:id/pdf/download', authMiddleware, adminOnly, absenteeismController.downloadPdf);
-router.post('/open-archive-folder', authMiddleware, adminOnly, absenteeismController.openArchiveFolder);
-router.post('/:id/open', authMiddleware, adminOnly, absenteeismController.openPdfInSystem);
-router.post('/:id/show-in-folder', authMiddleware, adminOnly, absenteeismController.showInFolder);
+// PDF servis rotaları
+router.get('/:id/pdf', requirePermission('absenteeism'), absenteeismController.servePdf);
+router.get('/:id/pdf/download', requirePermission('absenteeism'), absenteeismController.downloadPdf);
+router.post('/open-archive-folder', requirePermission('absenteeism'), absenteeismController.openArchiveFolder);
+router.post('/:id/open', requirePermission('absenteeism'), absenteeismController.openPdfInSystem);
+router.post('/:id/show-in-folder', requirePermission('absenteeism'), absenteeismController.showInFolder);
 
 export default router;

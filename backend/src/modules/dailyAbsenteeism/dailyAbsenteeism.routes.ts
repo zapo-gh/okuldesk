@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { dailyAbsenteeismController } from './dailyAbsenteeism.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 
 const router = Router();
 
-router.use(authMiddleware, adminOnly);
+router.use(authMiddleware, requirePermission('daily-absenteeism'));
 
 router.post('/lookup-numbers', (req, res, next) => dailyAbsenteeismController.lookupNumbers(req, res, next));
 router.get('/students-by-class', (req, res, next) => dailyAbsenteeismController.getStudentsByClass(req, res, next));

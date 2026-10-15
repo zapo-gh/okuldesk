@@ -1,23 +1,29 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { staffController } from './staff.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 
 const router = Router();
 import { generateGuidanceReportPdf } from './guidanceReportPdf.generator';
 import { generateClassTeachersListPdf } from './classTeachersListPdf.generator';
 
-router.get('/', authMiddleware, adminOnly, staffController.getAll);
-router.get('/deleted', authMiddleware, adminOnly, staffController.getDeleted);
-router.get('/class/:className', authMiddleware, adminOnly, staffController.getByClass);
-router.post('/bulk', authMiddleware, adminOnly, staffController.bulkCreate);
-router.post('/bulk-restore', authMiddleware, adminOnly, staffController.bulkRestore);
-router.post('/bulk-delete', authMiddleware, adminOnly, staffController.bulkDelete);
-router.post('/', authMiddleware, adminOnly, staffController.create);
-router.put('/:id', authMiddleware, adminOnly, staffController.update);
-router.put('/:id/restore', authMiddleware, adminOnly, staffController.restore);
-router.delete('/:id', authMiddleware, adminOnly, staffController.delete);
+router.use(authMiddleware);
 
-router.post('/generate-guidance-report-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+// Okuma rotaları (öğretmen/personel listesi tüm ilgili modüllerce okunabilir)
+router.get('/', staffController.getAll);
+router.get('/deleted', requirePermission('staff'), staffController.getDeleted);
+router.get('/class/:className', staffController.getByClass);
+
+// Personel ekleme / güncelleme / silme rotaları
+router.post('/bulk', requirePermission('staff'), staffController.bulkCreate);
+router.post('/bulk-restore', requirePermission('staff'), staffController.bulkRestore);
+router.post('/bulk-delete', requirePermission('staff'), staffController.bulkDelete);
+router.post('/', requirePermission('staff'), staffController.create);
+router.put('/:id', requirePermission('staff'), staffController.update);
+router.put('/:id/restore', requirePermission('staff'), staffController.restore);
+router.delete('/:id', requirePermission('staff'), staffController.delete);
+
+// Rapor ve PDF rotaları
+router.post('/generate-guidance-report-pdf', requirePermission(['staff', 'class-teachers']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pdfBuffer = await generateGuidanceReportPdf(req.body);
     const safeName = (req.body.staffName || 'rapor').replace(/[^\w\s]/g, '_').trim().replace(/\s+/g, '-');
@@ -34,7 +40,7 @@ router.post('/generate-guidance-report-pdf', authMiddleware, adminOnly, async (r
   }
 });
 
-router.post('/generate-class-teachers-list-pdf', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/generate-class-teachers-list-pdf', requirePermission(['staff', 'class-teachers']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const pdfBuffer = await generateClassTeachersListPdf(req.body);
     const fileName = `sinif-rehber-ogretmenleri.pdf`;

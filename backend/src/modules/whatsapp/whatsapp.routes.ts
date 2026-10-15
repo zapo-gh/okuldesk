@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { whatsappController } from './whatsapp.controller';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import { validateMagicBytes } from '../shared/middleware/magicByteValidator.middleware';
 import { uploadLimiter } from '../shared/middleware/rateLimit.middleware';
 import { config } from '../shared/config';
@@ -30,27 +30,35 @@ const excelMimes = [
   'application/x-cfb',
 ];
 
-router.get('/status', authMiddleware, adminOnly, whatsappController.getStatus);
-router.post('/connect', authMiddleware, adminOnly, whatsappController.connect);
-router.post('/disconnect', authMiddleware, adminOnly, whatsappController.disconnect);
-router.post('/send/absenteeism/:id', authMiddleware, adminOnly, whatsappController.sendAbsenteeism);
-router.post('/preview/absenteeism/:id', authMiddleware, adminOnly, whatsappController.previewAbsenteeism);
-router.get('/full-image/absenteeism/:id', authMiddleware, adminOnly, whatsappController.fullImageAbsenteeism);
-router.post('/send/warning/:id', authMiddleware, adminOnly, whatsappController.sendWarning);
-router.post('/preview/warning/:id', authMiddleware, adminOnly, whatsappController.previewWarning);
-router.post('/send-consent', authMiddleware, adminOnly, whatsappController.sendConsentRequestToParent);
+router.use(authMiddleware);
+
+// WhatsApp genel durumu (tüm oturum açmış kullanıcılar görebilir)
+router.get('/status', whatsappController.getStatus);
+
+// WhatsApp oturum yönetimi ('whatsapp' yetkisi)
+router.post('/connect', requirePermission('whatsapp'), whatsappController.connect);
+router.post('/disconnect', requirePermission('whatsapp'), whatsappController.disconnect);
+
+// Devamsızlık mektubu WhatsApp gönderimleri
+router.post('/send/absenteeism/:id', requirePermission(['absenteeism', 'daily-absenteeism', 'whatsapp']), whatsappController.sendAbsenteeism);
+router.post('/preview/absenteeism/:id', requirePermission(['absenteeism', 'daily-absenteeism', 'whatsapp']), whatsappController.previewAbsenteeism);
+router.get('/full-image/absenteeism/:id', requirePermission(['absenteeism', 'daily-absenteeism', 'whatsapp']), whatsappController.fullImageAbsenteeism);
+
+// Uyarı mektubu WhatsApp gönderimleri
+router.post('/send/warning/:id', requirePermission(['warnings', 'whatsapp']), whatsappController.sendWarning);
+router.post('/preview/warning/:id', requirePermission(['warnings', 'whatsapp']), whatsappController.previewWarning);
+router.post('/send-consent', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.sendConsentRequestToParent);
 
 // WhatsApp İletişim Onay Yönetimi (İstatistik, Excel Export ve Import)
-router.get('/consents/stats', authMiddleware, adminOnly, whatsappController.getConsentStats);
-router.get('/consents/list', authMiddleware, adminOnly, whatsappController.getConsentList);
-router.post('/consents/manual', authMiddleware, adminOnly, whatsappController.manualUpdateConsent);
-router.get('/consents/pdf/contact/:contactId', authMiddleware, adminOnly, whatsappController.downloadConsentPdf);
-router.get('/consents/pdf/class/:className', authMiddleware, adminOnly, whatsappController.downloadClassConsentPdf);
-router.get('/consents/export', authMiddleware, adminOnly, whatsappController.exportConsents);
+router.get('/consents/stats', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.getConsentStats);
+router.get('/consents/list', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.getConsentList);
+router.post('/consents/manual', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.manualUpdateConsent);
+router.get('/consents/pdf/contact/:contactId', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.downloadConsentPdf);
+router.get('/consents/pdf/class/:className', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.downloadClassConsentPdf);
+router.get('/consents/export', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.exportConsents);
 router.post(
   '/consents/import',
-  authMiddleware,
-  adminOnly,
+  requirePermission(['whatsapp-consent', 'whatsapp']),
   uploadLimiter,
   excelUpload.single('file'),
   validateMagicBytes(excelMimes),
@@ -58,13 +66,13 @@ router.post(
 );
 
 // Cloudflare Tünel Yönetimi
-router.get('/tunnel/status', authMiddleware, adminOnly, whatsappController.getTunnelStatus);
-router.post('/tunnel/start', authMiddleware, adminOnly, whatsappController.startTunnel);
-router.post('/tunnel/stop', authMiddleware, adminOnly, whatsappController.stopTunnel);
+router.get('/tunnel/status', requirePermission(['whatsapp', 'settings']), whatsappController.getTunnelStatus);
+router.post('/tunnel/start', requirePermission(['whatsapp', 'settings']), whatsappController.startTunnel);
+router.post('/tunnel/stop', requirePermission(['whatsapp', 'settings']), whatsappController.stopTunnel);
 
 // Firebase Bulut Senkronizasyonu
-router.get('/firebase/status', authMiddleware, adminOnly, whatsappController.getFirebaseStatus);
-router.post('/firebase/sync', authMiddleware, adminOnly, whatsappController.syncFirebaseConsents);
-router.post('/firebase/upload', authMiddleware, adminOnly, whatsappController.uploadFirebaseConsents);
+router.get('/firebase/status', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.getFirebaseStatus);
+router.post('/firebase/sync', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.syncFirebaseConsents);
+router.post('/firebase/upload', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.uploadFirebaseConsents);
 
 export default router;

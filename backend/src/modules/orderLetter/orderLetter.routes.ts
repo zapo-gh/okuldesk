@@ -1,11 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware } from '../shared/middleware/auth.middleware';
 import prisma from '../shared/utils/prisma';
 
 const router = Router();
 
+router.use(authMiddleware);
+
 // Tüm sipariş mektuplarını getir
-router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const { academicYear } = req.query;
     const letters = await prisma.orderLetter.findMany({
@@ -27,7 +29,7 @@ router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response) =
 });
 
 // Yeni sipariş mektubu ekle
-router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { subject, supplierName, supplierId, supplierAddress, date, deliveryDate, academicYear, procurementId, items, notes, extraData } = req.body;
     const letter = await prisma.orderLetter.create({
@@ -60,7 +62,7 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response) 
 });
 
 // Sipariş mektubu güncelle
-router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { subject, supplierName, supplierId, supplierAddress, date, deliveryDate, academicYear, procurementId, items, notes, extraData } = req.body;
@@ -96,7 +98,7 @@ router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response
 });
 
 // Sipariş mektubu sil
-router.delete('/:id', authMiddleware, adminOnly, async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     await prisma.orderLetter.delete({ where: { id } });

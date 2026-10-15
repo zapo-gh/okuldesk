@@ -1,8 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { studentClubService } from '../shared/services/moduleServices';
-import { authMiddleware, adminOnly } from '../shared/middleware/auth.middleware';
+import { authMiddleware, requirePermission } from '../shared/middleware/auth.middleware';
 import { AppError } from '../shared/middleware/errorHandler.middleware';
 import { z } from 'zod';
+import multer from 'multer';
+import { parseClubListPdf } from './utils/clubListParser';
+import prisma from '../shared/utils/prisma';
 
 const clubSchema = z.object({
   name: z.string().min(1), description: z.string().optional(),
@@ -19,16 +22,19 @@ const memberSchema = z.object({
 });
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.use(authMiddleware, requirePermission('student-club'));
 
 // Kulüpler
-router.get('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ay = (req.query.academicYear as string) || '2025-2026';
     res.json({ success: true, data: await studentClubService.getAll(ay) });
   } catch (e) { next(e); }
 });
 
-router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = clubSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -36,7 +42,7 @@ router.post('/', authMiddleware, adminOnly, async (req: Request, res: Response, 
   } catch (e) { next(e); }
 });
 
-router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = clubSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -46,18 +52,18 @@ router.put('/:id', authMiddleware, adminOnly, async (req: Request, res: Response
   catch (e) { next(e); }
 });
 
-router.delete('/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await studentClubService.delete(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });
 
 // Üyeler
-router.get('/:id/members', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
   try { res.json({ success: true, data: await studentClubService.getMembers(req.params.id) }); }
   catch (e) { next(e); }
 });
 
-router.post('/members', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = memberSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
@@ -65,18 +71,12 @@ router.post('/members', authMiddleware, adminOnly, async (req: Request, res: Res
   } catch (e) { next(e); }
 });
 
-router.delete('/members/:id', authMiddleware, adminOnly, async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/members/:id', async (req: Request, res: Response, next: NextFunction) => {
   try { await studentClubService.removeMember(req.params.id); res.json({ success: true }); }
   catch (e) { next(e); }
 });
 
-import multer from 'multer';
-import { parseClubListPdf } from './utils/clubListParser';
-import prisma from '../shared/utils/prisma';
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-router.post('/upload-pdf', authMiddleware, adminOnly, upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/upload-pdf', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const file = req.file;
     if (!file) throw new AppError('Lütfen bir PDF dosyası seçin.', 400);
