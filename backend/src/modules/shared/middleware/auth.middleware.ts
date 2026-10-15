@@ -46,14 +46,6 @@ export const authMiddleware = async (req: Request, _res: Response, next: NextFun
       throw new AppError('Hesabınız yönetici tarafından askıya alınmıştır.', 403);
     }
 
-    if (user.mustChangePassword) {
-      const allowedPaths = ['/auth/change-password', '/auth/profile', '/auth/logout'];
-      const isAllowed = allowedPaths.some((p) => req.originalUrl.includes(p));
-      if (!isAllowed) {
-        throw new AppError('Lütfen devam etmeden önce varsayılan şifrenizi değiştirin.', 403);
-      }
-    }
-
     let parsedPermissions: string[] = [];
     if (user.role === 'ADMIN') {
       parsedPermissions = ['*'];

@@ -129,7 +129,7 @@ class UsersService {
     }
 
     await prisma.$executeRawUnsafe(
-      'INSERT INTO "User" (id, username, password, fullName, role, permissions, isActive, mustChangePassword, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)',
+      'INSERT INTO "User" (id, username, password, fullName, role, permissions, isActive, mustChangePassword, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)',
       newId,
       username,
       hashedPassword,
@@ -211,7 +211,7 @@ class UsersService {
     const hashedPassword = await bcrypt.hash(newPlainPassword, 12);
 
     await prisma.$executeRawUnsafe(
-      'UPDATE "User" SET password = ?, mustChangePassword = 1 WHERE id = ?',
+      'UPDATE "User" SET password = ?, mustChangePassword = 0 WHERE id = ?',
       hashedPassword,
       id
     );

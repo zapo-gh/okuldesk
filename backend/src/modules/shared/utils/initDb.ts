@@ -70,5 +70,10 @@ export async function initializeDatabase(): Promise<void> {
     }
   }
 
+  // Tüm kullanıcıların şifre zorunluluğunu kaldır (kullanıcı isterse kendisi değiştirebilir)
+  try {
+    await prisma.$executeRawUnsafe('UPDATE "User" SET mustChangePassword = 0 WHERE mustChangePassword = 1');
+  } catch {}
+
   console.log('✅ SQLite PRAGMA ayarları uygulandı (WAL, FK=ON)');
 }

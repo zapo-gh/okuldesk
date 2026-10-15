@@ -209,16 +209,6 @@ export default function SettingsPage() {
 
       {confirmModal}
 
-      {user?.mustChangePassword && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 shadow-sm">
-          <ShieldAlert className="text-amber-600 shrink-0 mt-0.5" size={20} />
-          <div>
-            <h4 className="font-bold text-amber-900 mb-1">Şifre Değişikliği Gerekli</h4>
-            <p className="text-sm text-amber-800">Güvenliğiniz için ilk girişte şifrenizi değiştirmeniz gerekmektedir. Lütfen aşağıdaki "Şifre Değiştir" bölümünü doldurun.</p>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Ağ ve Çoklu Bilgisayar (Ortak Veritabanı) Kartı */}
         <NetworkSettingsCard />
