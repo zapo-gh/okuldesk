@@ -15,26 +15,25 @@ import {
   Pause,
   Square,
   RefreshCw,
-  ChevronDown,
-  ChevronUp,
-  Info,
   Calendar,
-  Filter,
   CheckSquare,
-  SquareCheck,
   MessageSquare,
   Phone,
   AlertTriangle,
   History,
-  Check,
   Eye,
   Sliders,
+  Info,
   X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../hooks/useConfirm';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { ActionModal } from '../../components/ui/ActionModal';
+import { Button } from '../../components/ui/Button';
 
 interface StudentParent {
   id: string;
@@ -54,7 +53,6 @@ interface StudentItem {
   status: string;
   parents: StudentParent[];
   selectedParentId?: string;
-  alreadySentTime?: string;
 }
 
 interface NotificationHistoryItem {
@@ -76,9 +74,9 @@ interface NotificationHistoryItem {
 type SessionType = 'MORNING' | 'AFTERNOON' | 'FULL_DAY';
 
 const SESSION_MAP: Record<SessionType, { label: string; text: string; icon: string }> = {
-  MORNING: { label: 'Sabah (1. Oturum)', text: 'Sabah 1. Oturum', icon: '☀️' },
-  AFTERNOON: { label: 'Öğleden Sonra (2. Oturum)', text: 'Öğleden Sonra 2. Oturum', icon: '🌤️' },
-  FULL_DAY: { label: 'Tam Gün', text: 'Tam Gün', icon: '📅' },
+  MORNING: { label: 'Sabah İlk Ders', text: 'sabah ilk derste', icon: '☀️' },
+  AFTERNOON: { label: 'Öğleden Sonra İlk Ders', text: 'öğleden sonra ilk derste', icon: '🌤️' },
+  FULL_DAY: { label: 'Tam Gün', text: 'tam gün', icon: '📅' },
 };
 
 const DEFAULT_TEMPLATE = `Sayın Velimiz,
@@ -99,6 +97,7 @@ function normalizeTr(text: string): string {
 
 export default function DailyAbsenteeismPage() {
   const { settings } = useSettings();
+  const { confirm, confirmModal } = useConfirm();
 
   // ── Global Parametreler ──
   const [targetDate, setTargetDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -125,23 +124,23 @@ export default function DailyAbsenteeismPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Aktif Sekme (Öğrenci Seçim Yöntemi) ──
+  // ── Aktif Sekme ──
   const [activeTab, setActiveTab] = useState<'express' | 'class'>('express');
 
-  // ── Yöntem 1: Hızlı Numara Girişi State ──
+  // ── Yöntem 1: Hızlı Numara Girişi ──
   const [expressInput, setExpressInput] = useState<string>('');
   const [lookupLoading, setLookupLoading] = useState<boolean>(false);
 
-  // ── Yöntem 2: Sınıf Seçimi State ──
+  // ── Yöntem 2: Sınıf Seçimi ──
   const [classes, setClasses] = useState<Array<{ name: string; count: number }>>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [classStudents, setClassStudents] = useState<StudentItem[]>([]);
   const [classStudentsLoading, setClassStudentsLoading] = useState<boolean>(false);
   const [classSearchFilter, setClassSearchFilter] = useState<string>('');
 
-  // ── Gönderim Kuyruğu (Seçilen Öğrenciler) ──
+  // ── Gönderim Kuyruğu ──
   const [queuedStudents, setQueuedStudents] = useState<StudentItem[]>([]);
-  const [duplicateMap, setDuplicateMap] = useState<Record<string, string>>({}); // studentId -> sentAt
+  const [duplicateMap, setDuplicateMap] = useState<Record<string, string>>({});
 
   // ── Şablon & Ayarlar ──
   const [templateText, setTemplateText] = useState<string>(DEFAULT_TEMPLATE);
@@ -157,7 +156,7 @@ export default function DailyAbsenteeismPage() {
   const [historySessionFilter, setHistorySessionFilter] = useState<string>('ALL');
   const [viewHistoryModalItem, setViewHistoryModalItem] = useState<NotificationHistoryItem | null>(null);
 
-  // ── Canlı Gönderim Motoru (Modal) State ──
+  // ── Canlı Gönderim Motoru State ──
   interface DispatchItem {
     student: StudentItem;
     parent: StudentParent;
@@ -174,7 +173,6 @@ export default function DailyAbsenteeismPage() {
   const [dispatchTicker, setDispatchTicker] = useState<string>('');
   const [countdownSeconds, setCountdownSeconds] = useState<number | null>(null);
 
-  // Gönderim motoru ref'leri (durdurma ve duraklatma için)
   const isPausedRef = useRef(false);
   const isCancelledRef = useRef(false);
 
@@ -182,10 +180,12 @@ export default function DailyAbsenteeismPage() {
   useEffect(() => {
     api.get('/students/classes')
       .then(res => {
-        setClasses(res.data || []);
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setClasses(Array.isArray(list) ? list : []);
       })
       .catch(err => {
         console.error('Sınıflar yüklenemedi:', err);
+        setClasses([]);
       });
   }, []);
 
@@ -229,7 +229,7 @@ export default function DailyAbsenteeismPage() {
     fetchHistory();
   }, [targetDate]);
 
-  // ── Tekrar Gönderim (Duplicate) Kontrolü ──
+  // ── Mükerrer Gönderim Kontrolü ──
   const checkDuplicates = async (students: StudentItem[]) => {
     if (students.length === 0) return;
     try {
@@ -256,7 +256,7 @@ export default function DailyAbsenteeismPage() {
     }
   }, [targetDate, sessionType, queuedStudents.length]);
 
-  // ── Yöntem 1: Numaraları Sorgula ve Kuyruğa Ekle ──
+  // ── Yöntem 1: Hızlı Numara Sorgulama ──
   const handleLookupExpressNumbers = async () => {
     const raw = expressInput.trim();
     if (!raw) {
@@ -282,7 +282,6 @@ export default function DailyAbsenteeismPage() {
         selectedParentId: s.primaryParentId || s.parents?.[0]?.id,
       }));
 
-      // Zaten kuyrukta olanları tekrar ekleme
       const existingIds = new Set(queuedStudents.map(s => s.id));
       const toAdd = newItems.filter(s => !existingIds.has(s.id));
 
@@ -342,23 +341,30 @@ export default function DailyAbsenteeismPage() {
     setQueuedStudents(prev => prev.filter(s => s.id !== studentId));
   };
 
-  // ── Kuyruktaki Öğrencinin Hedef Velisini Değiştir ──
+  // ── Kuyruktaki Tümünü Temizle ──
+  const handleClearAllQueue = async () => {
+    if (queuedStudents.length === 0) return;
+    const ok = await confirm('Gönderim kuyruğundaki tüm öğrencileri listeden kaldırmak istediğinize emin misiniz?');
+    if (!ok) return;
+    setQueuedStudents([]);
+  };
+
+  // ── Hedef Veli Değiştir ──
   const handleParentChange = (studentId: string, parentId: string) => {
     setQueuedStudents(prev =>
       prev.map(s => (s.id === studentId ? { ...s, selectedParentId: parentId } : s))
     );
   };
 
-  // ── Mesaj Hazırlama Fonksiyonu (Dinamik Etiketler + Anti-Spam Değişkenleri) ──
+  // ── Mesaj Hazırlama Fonksiyonu ──
   const renderMessageForStudent = (student: StudentItem, parent: StudentParent, itemIndex = 0): string => {
     const schoolName = (settings?.schoolName || 'Okulumuz').trim();
     const schoolPhone = settings?.schoolPhone || '';
     const dateFormatted = targetDate.split('-').reverse().join('.');
-    const sessionText = SESSION_MAP[sessionType]?.text || 'Ders Yoklaması';
+    const sessionText = SESSION_MAP[sessionType]?.text || 'sabah ilk derste';
 
     let text = templateText;
 
-    // Temel etiket değişimi
     text = text.replace(/{okul_adi}/g, schoolName);
     text = text.replace(/{ogrenci_adi}/g, student.fullName);
     text = text.replace(/{numara}/g, student.schoolNumber);
@@ -368,9 +374,7 @@ export default function DailyAbsenteeismPage() {
     text = text.replace(/{oturum}/g, sessionText);
     text = text.replace(/{okul_telefonu}/g, schoolPhone || 'Okul İdaresi');
 
-    // Anti-Spam Koruması: Metin içi mikro-farklılıklar ve zaman etiketi
     if (antiSpamEnabled) {
-      // 1. Hitap çeşitliliği (eğer şablonda Sayın Velimiz ile başlıyorsa)
       const greetings = [
         'Sayın Velimiz,',
         'Değerli Velimiz,',
@@ -382,7 +386,6 @@ export default function DailyAbsenteeismPage() {
         text = text.replace('Sayın Velimiz,', greetingChoice);
       }
 
-      // 2. Mesaj sonuna benzersiz zaman etiketi ekle (WhatsApp hash çakışmasını ve bot filtresini %100 engeller)
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
       text += `\n\n🕒 [Gönderim Kaydı: ${timeStr}]`;
@@ -401,7 +404,7 @@ export default function DailyAbsenteeismPage() {
     );
   }, [classStudents, classSearchFilter]);
 
-  // ── Gönderim Kuyruğu Başlatma Öncesi Kontrol ──
+  // ── Gönderim Kuyruğu Başlatma Kontrolü ──
   const handleStartDispatch = () => {
     if (queuedStudents.length === 0) {
       toast.error('Gönderim kuyruğunda hiç öğrenci yok.');
@@ -411,9 +414,9 @@ export default function DailyAbsenteeismPage() {
     if (waStatus !== 'connected') {
       toast((t) => (
         <div className="flex flex-col gap-2">
-          <span className="font-semibold text-rose-300">WhatsApp Bağlantısı Bulunamadı!</span>
-          <span className="text-xs text-slate-300">
-            Mesaj gönderebilmek için WhatsApp oturumunun açık olması gerekir.
+          <span className="font-semibold text-rose-700">WhatsApp Bağlantısı Bulunamadı!</span>
+          <span className="text-xs text-slate-600">
+            Mesaj gönderebilmek için sol menüden WhatsApp oturumunun açık olması gerekir.
           </span>
           <div className="flex gap-2 mt-1">
             <Link
@@ -425,7 +428,7 @@ export default function DailyAbsenteeismPage() {
             </Link>
             <button
               onClick={() => toast.dismiss(t.id)}
-              className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs"
+              className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs"
             >
               Vazgeç
             </button>
@@ -435,7 +438,6 @@ export default function DailyAbsenteeismPage() {
       return;
     }
 
-    // Gönderim listesini hazırla
     const items: DispatchItem[] = queuedStudents.map((s, idx) => {
       const parent = s.parents.find(p => p.id === s.selectedParentId) || s.parents[0] || {
         id: '',
@@ -470,14 +472,12 @@ export default function DailyAbsenteeismPage() {
     isCancelledRef.current = false;
 
     for (let i = dispatchIndex; i < dispatchItems.length; i++) {
-      // İptal kontrolü
       if (isCancelledRef.current) {
-        setDispatchTicker('Gönderim kullanıcı tarafından durduruldu.');
+        setDispatchTicker('Gönderim durduruldu.');
         setIsDispatching(false);
         break;
       }
 
-      // Duraklatma kontrolü
       while (isPausedRef.current) {
         setDispatchTicker('⏸️ Gönderim duraklatıldı. Devam etmek için [Devam Et] butonuna tıklayın.');
         await new Promise(r => setTimeout(r, 500));
@@ -488,7 +488,6 @@ export default function DailyAbsenteeismPage() {
       const item = dispatchItems[i];
       setDispatchIndex(i);
 
-      // Telefon kontrolü
       if (!item.parent.phone) {
         setDispatchItems(prev => {
           const cp = [...prev];
@@ -498,7 +497,6 @@ export default function DailyAbsenteeismPage() {
         continue;
       }
 
-      // Veli WhatsApp ret durumu
       if (item.parent.waConsentStatus === 'DECLINED') {
         setDispatchItems(prev => {
           const cp = [...prev];
@@ -508,7 +506,6 @@ export default function DailyAbsenteeismPage() {
         continue;
       }
 
-      // Gönderiliyor durumuna al
       setDispatchItems(prev => {
         const cp = [...prev];
         cp[i] = { ...cp[i], status: 'SENDING' };
@@ -554,7 +551,6 @@ export default function DailyAbsenteeismPage() {
         });
       }
 
-      // Son eleman değilse ve anti-spam devredeyse insansı bekleme süresi uygula
       if (i < dispatchItems.length - 1 && !isCancelledRef.current) {
         const delayMs = antiSpamEnabled
           ? Math.floor(Math.random() * ((antiSpamMaxDelay - antiSpamMinDelay) * 1000 + 1)) + antiSpamMinDelay * 1000
@@ -564,9 +560,7 @@ export default function DailyAbsenteeismPage() {
         setCountdownSeconds(remaining);
 
         while (remaining > 0 && !isCancelledRef.current) {
-          if (isPausedRef.current) {
-            break;
-          }
+          if (isPausedRef.current) break;
           setDispatchTicker(`⏳ Spam koruması: Sonraki veli için ${remaining} sn bekleniyor...`);
           await new Promise(r => setTimeout(r, 1000));
           remaining -= 1;
@@ -577,7 +571,7 @@ export default function DailyAbsenteeismPage() {
     }
 
     setIsDispatching(false);
-    setDispatchTicker('✅ Tüm kuyruk tamamlandı!');
+    setDispatchTicker('✅ İşlem tamamlandı!');
     fetchHistory();
   };
 
@@ -602,9 +596,11 @@ export default function DailyAbsenteeismPage() {
     setDispatchTicker('Gönderim durduruldu.');
   };
 
-  // ── Geçmiş Kayıt Silme ──
+  // ── Geçmiş Kayıt Silme (useConfirm İle) ──
   const handleDeleteHistory = async (id: string) => {
-    if (!window.confirm('Bu bildirim kaydını geçmişten silmek istediğinize emin misiniz?')) return;
+    const ok = await confirm('Bu bildirim kaydını geçmişten silmek istediğinize emin misiniz?');
+    if (!ok) return;
+
     try {
       await api.delete(`/daily-absenteeism/history/${id}`);
       toast.success('Kayıt silindi.');
@@ -636,97 +632,78 @@ export default function DailyAbsenteeismPage() {
     switch (status) {
       case 'ACCEPTED':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full" title="Veli WhatsApp ile bilgilendirmeyi açıkça onaylamıştır.">
-            <CheckCircle2 size={12} /> Onaylı
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="WhatsApp Açık Rıza Onaylı">
+            ✅ Onaylı
           </span>
         );
       case 'DECLINED':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full" title="Veli WhatsApp bildirimini reddetmiştir. Mesaj gönderilmeyecektir.">
-            <XCircle size={12} /> Reddedildi
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title="WhatsApp Bildirimi Reddedildi!">
+            ❌ Reddedildi
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full" title="Veli henüz onay vermemiştir.">
-            <Clock size={12} /> Onaysız
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title="WhatsApp Onayı Bekliyor / Henüz Alınmadı">
+            ⏳ Onaysız
           </span>
         );
     }
   };
 
-  // ── Canlı Gönderim İlerleme Yüzdesi ──
   const completedCount = dispatchItems.filter(
     it => it.status === 'SENT' || it.status === 'FAILED' || it.status === 'SKIPPED'
   ).length;
   const dispatchProgress = dispatchItems.length > 0 ? Math.round((completedCount / dispatchItems.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 pb-20 space-y-6">
-      {/* ── Üst Başlık & Durum Çubuğu ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 p-5 rounded-2xl border border-white/10 shadow-xl backdrop-blur-md">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/25">
-            <BellRing size={24} className="text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-                Anlık / Günlük Devamsızlık Bildirimi
-              </h1>
-              <span className="text-xs bg-indigo-500/20 text-indigo-300 font-semibold px-2.5 py-0.5 rounded-full border border-indigo-500/30">
-                WhatsApp
-              </span>
-            </div>
-            <p className="text-xs md:text-sm text-slate-400 mt-0.5">
-              Sabah ve öğleden sonra yoklamalarında gelmeyen öğrencileri velilerine anında ve güvenle bildirin.
-            </p>
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* ── Standart OkulDesk Başlığı (PageHeader) ── */}
+      <PageHeader
+        title="Anlık Devamsızlık Bildirimi (WhatsApp)"
+        description="Ders yoklaması sonrası okula gelmeyen öğrencileri velilerine anında ve güvenle bildirin."
+        icon={<BellRing size={26} className="text-white" />}
+        actions={
+          <div className="flex items-center gap-2.5">
+            {waStatus === 'connected' ? (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 text-emerald-100 border border-emerald-400/30 rounded-lg text-xs font-semibold backdrop-blur-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>WhatsApp Bağlı</span>
+              </div>
+            ) : (
+              <Link
+                to="/admin/whatsapp"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 border border-rose-400/30 rounded-lg text-xs font-semibold no-underline transition backdrop-blur-sm"
+              >
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span>WhatsApp Bağlı Değil</span>
+              </Link>
+            )}
 
-        {/* WhatsApp Durum Rozeti */}
-        <div className="flex items-center gap-3 self-start lg:self-center">
-          {waStatus === 'connected' ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-medium shadow-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>WhatsApp Bağlı (Hazır)</span>
-            </div>
-          ) : (
-            <Link
-              to="/admin/whatsapp"
-              className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/15 border border-rose-500/30 rounded-xl text-rose-300 hover:text-white hover:bg-rose-500/25 transition-all text-xs font-medium no-underline shadow-sm"
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowTemplateSettings(!showTemplateSettings)}
+              leftIcon={<Sliders size={15} />}
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs py-1.5 px-3"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-              <span>WhatsApp Bağlı Değil (Bağlan)</span>
-            </Link>
-          )}
+              {showTemplateSettings ? 'Ayarları Gizle' : 'Şablon & Spam Ayarları'}
+            </Button>
+          </div>
+        }
+      />
 
-          <button
-            onClick={() => setShowTemplateSettings(!showTemplateSettings)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-              showTemplateSettings
-                ? 'bg-indigo-600 text-white border-indigo-500'
-                : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-            }`}
-          >
-            <Sliders size={14} />
-            <span>Şablon & Spam Ayarları</span>
-            {showTemplateSettings ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Şablon & Anti-Spam Ayarları Çekmecesi (Açılır/Kapanır) ── */}
+      {/* ── Şablon & Anti-Spam Ayarları Kartı ── */}
       {showTemplateSettings && (
-        <div className="bg-slate-900/90 border border-indigo-500/30 p-5 rounded-2xl shadow-2xl backdrop-blur-md space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <Sparkles size={18} className="text-indigo-400" />
-              <h3 className="text-base font-semibold text-white">Bildirim Mesajı Şablonu ve Akıllı Spam Koruması</h3>
+              <Sparkles size={18} className="text-indigo-600" />
+              <h3 className="text-sm font-bold text-slate-800">Bildirim Mesajı Şablonu ve Akıllı Spam Koruması</h3>
             </div>
             <button
               onClick={() => setTemplateText(DEFAULT_TEMPLATE)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline"
+              className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline font-medium cursor-pointer"
             >
               Varsayılan Şablona Sıfırla
             </button>
@@ -735,51 +712,37 @@ export default function DailyAbsenteeismPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Şablon Editörü */}
             <div className="lg:col-span-2 space-y-2">
-              <label className="text-xs font-medium text-slate-300 block">
-                Mesaj Şablonu (Kullanılabilir etiketler aşağıdadır):
+              <label className="text-xs font-semibold text-slate-700 block">
+                Mesaj Şablonu:
               </label>
               <textarea
                 value={templateText}
                 onChange={e => setTemplateText(e.target.value)}
-                rows={7}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 transition-colors"
+                rows={6}
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
                 placeholder="Mesaj metnini giriniz..."
               />
-              <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-400">
-                <span className="font-semibold text-slate-300">Etiketler:</span>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {ogrenci_adi}')}>
-                  {'{ogrenci_adi}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {numara}')}>
-                  {'{numara}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {sinif}')}>
-                  {'{sinif}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {veli_adi}')}>
-                  {'{veli_adi}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {tarih}')}>
-                  {'{tarih}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {oturum}')}>
-                  {'{oturum}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {okul_adi}')}>
-                  {'{okul_adi}'}
-                </code>
-                <code className="bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded cursor-pointer" onClick={() => setTemplateText(p => p + ' {okul_telefonu}')}>
-                  {'{okul_telefonu}'}
-                </code>
+              <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-500">
+                <span className="font-semibold text-slate-700">Etiketler:</span>
+                {['{ogrenci_adi}', '{numara}', '{sinif}', '{veli_adi}', '{tarih}', '{oturum}', '{okul_adi}', '{okul_telefonu}'].map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setTemplateText(p => p + ' ' + tag)}
+                    className="bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded cursor-pointer font-mono text-[10px]"
+                  >
+                    {tag}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Anti-Spam Yapılandırması */}
-            <div className="bg-slate-950/80 p-4 rounded-xl border border-white/10 space-y-3.5">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-emerald-400" />
-                  <span className="text-sm font-semibold text-white">Akıllı Anti-Spam</span>
+                  <ShieldCheck size={18} className="text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-800">Akıllı Anti-Spam Koruması</span>
                 </div>
                 <input
                   type="checkbox"
@@ -788,12 +751,12 @@ export default function DailyAbsenteeismPage() {
                   className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
                 />
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                WhatsApp hesabınızın toplu gönderimlerde spam engeline takılmasını önlemek için dinamik hitap varyasyonu, benzersiz zaman damgası ve insansı gecikme uygular.
+              <p className="text-xs text-slate-600 leading-relaxed">
+                WhatsApp hesabınızın ardışık bildirimlerde bot/spam filtresine takılmasını önlemek için dinamik hitap varyasyonu, benzersiz zaman damgası ve insansı gecikme uygular.
               </p>
 
-              <div className="pt-2 border-t border-white/10 space-y-2">
-                <span className="text-xs font-medium text-slate-300 block">Mesajlar Arası Bekleme Süresi:</span>
+              <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                <span className="text-xs font-semibold text-slate-700 block">Mesajlar Arası Bekleme Süresi:</span>
                 <div className="flex items-center gap-2 text-xs">
                   <input
                     type="number"
@@ -801,18 +764,18 @@ export default function DailyAbsenteeismPage() {
                     max={15}
                     value={antiSpamMinDelay}
                     onChange={e => setAntiSpamMinDelay(Math.max(2, parseInt(e.target.value) || 2))}
-                    className="w-14 bg-slate-900 border border-white/10 rounded px-2 py-1 text-center text-white"
+                    className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-center text-slate-800 font-semibold"
                   />
-                  <span className="text-slate-400">ile</span>
+                  <span className="text-slate-500">ile</span>
                   <input
                     type="number"
                     min={4}
                     max={25}
                     value={antiSpamMaxDelay}
                     onChange={e => setAntiSpamMaxDelay(Math.max(antiSpamMinDelay + 1, parseInt(e.target.value) || 7))}
-                    className="w-14 bg-slate-900 border border-white/10 rounded px-2 py-1 text-center text-white"
+                    className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-center text-slate-800 font-semibold"
                   />
-                  <span className="text-slate-400">saniye arası (Rastgele)</span>
+                  <span className="text-slate-500">saniye arası (Rastgele)</span>
                 </div>
               </div>
             </div>
@@ -820,28 +783,28 @@ export default function DailyAbsenteeismPage() {
         </div>
       )}
 
-      {/* ── Tarih & Oturum Seçim Barı ── */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-white/10 items-center">
+      {/* ── Tarih & Devamsızlık Zamanı Barı ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
         {/* Tarih */}
-        <div className="md:col-span-4 flex items-center gap-2.5">
-          <Calendar size={18} className="text-indigo-400 shrink-0" />
+        <div className="md:col-span-4 flex items-center gap-3">
+          <Calendar size={20} className="text-indigo-600 shrink-0" />
           <div className="flex-1">
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Yoklama Tarihi</label>
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">Yoklama Tarihi</label>
             <input
               type="date"
               value={targetDate}
               onChange={e => setTargetDate(e.target.value)}
-              className="w-full bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-white focus:outline-none focus:border-indigo-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
           </div>
         </div>
 
-        {/* Oturum Seçimi */}
-        <div className="md:col-span-8 flex flex-col sm:flex-row sm:items-center justify-end gap-2">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider self-start sm:self-center mr-1">
-            Devamsızlık Oturumu:
+        {/* Oturum / Ders Seçimi */}
+        <div className="md:col-span-8 flex flex-col sm:flex-row sm:items-center justify-end gap-2.5">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider self-start sm:self-center mr-1">
+            Devamsızlık Zamanı:
           </span>
-          <div className="inline-flex bg-slate-950 p-1 rounded-xl border border-white/10 gap-1">
+          <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
             {(Object.keys(SESSION_MAP) as SessionType[]).map(key => {
               const opt = SESSION_MAP[key];
               const isActive = sessionType === key;
@@ -850,10 +813,10 @@ export default function DailyAbsenteeismPage() {
                   key={key}
                   type="button"
                   onClick={() => setSessionType(key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
                   }`}
                 >
                   <span>{opt.icon}</span>
@@ -865,32 +828,32 @@ export default function DailyAbsenteeismPage() {
         </div>
       </div>
 
-      {/* ── Ana İçerik: 2 Kolonlu Panel (Sol: Seçim Yöntemleri, Sağ: Kuyruk) ── */}
+      {/* ── Ana İçerik: 2 Kolonlu Panel ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ── SOL SÜTUN: Öğrenci Seçimi (Hızlı Numara vs Sınıf Listesi) ── */}
-        <div className="lg:col-span-7 bg-slate-900/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
+        {/* ── SOL SÜTUN: Öğrenci Seçimi ── */}
+        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
           {/* Sekme Butonları */}
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <button
               onClick={() => setActiveTab('express')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'express'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <Send size={16} />
+              <Send size={15} />
               <span>Hızlı Numara Girişi</span>
             </button>
             <button
               onClick={() => setActiveTab('class')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${
                 activeTab === 'class'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
-              <Users size={16} />
+              <Users size={15} />
               <span>Sınıf Listesinden Seçim</span>
             </button>
           </div>
@@ -898,12 +861,12 @@ export default function DailyAbsenteeismPage() {
           {/* ── TAB 1: HIZLI NUMARA GİRİŞİ ── */}
           {activeTab === 'express' && (
             <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-white/10 space-y-3">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                    <span>Okul Numaralarını Yapıştırın veya Yazın:</span>
+                  <label className="text-xs font-bold text-slate-700">
+                    Gelmeyen Öğrenci Numaralarını Giriniz:
                   </label>
-                  <span className="text-[11px] text-slate-400">Virgül, boşluk veya alt alta</span>
+                  <span className="text-[11px] text-slate-500 font-medium">Virgül, boşluk veya alt alta</span>
                 </div>
                 <textarea
                   value={expressInput}
@@ -914,40 +877,32 @@ export default function DailyAbsenteeismPage() {
                     }
                   }}
                   rows={4}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors font-mono"
                   placeholder="Örnek: 102, 345, 876 veya Excel'den kopyalanan liste..."
                 />
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">
-                    İpucu: <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">Ctrl + Enter</kbd> ile hızlı ekleyebilirsiniz.
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-[11px] text-slate-500">
+                    İpucu: <kbd className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-mono">Ctrl + Enter</kbd> ile hızlı ekleyebilirsiniz.
                   </span>
-                  <button
+                  <Button
                     type="button"
                     onClick={handleLookupExpressNumbers}
                     disabled={lookupLoading || !expressInput.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+                    variant="primary"
+                    leftIcon={lookupLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
+                    className="text-xs py-2 px-4 shrink-0"
                   >
-                    {lookupLoading ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        <span>Sorgulanıyor...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Search size={14} />
-                        <span>Sorgula ve Listeye Ekle</span>
-                      </>
-                    )}
-                  </button>
+                    {lookupLoading ? 'Sorgulanıyor...' : 'Sorgula ve Listeye Ekle'}
+                  </Button>
                 </div>
               </div>
 
               {/* Bilgi Kutusu */}
-              <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3">
-                <Info size={18} className="text-blue-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-blue-200 leading-relaxed">
-                  <strong className="text-blue-100 block mb-0.5">Toplu Hızlı Giriş Kolaylığı:</strong>
-                  Nöbetçi öğretmen veya idareci tarafından kağıda yazılmış gelmeyen öğrenci numaralarını doğrudan buraya yazıp ekleyebilirsiniz. Sistem öğrenciyi, sınıfını ve birinci öncelikli velisini otomatik olarak eşleştirecektir.
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+                <Info size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-900 leading-relaxed">
+                  <strong className="text-blue-950 block mb-0.5">Toplu Hızlı Giriş Kolaylığı:</strong>
+                  Yoklama fişinden veya nöbetçi idareci listesinden numaraları doğrudan buraya yapıştırıp listeye ekleyebilirsiniz. Sistem öğrencileri sınıfları ve 1. öncelikli velileriyle anında eşleştirecektir.
                 </div>
               </div>
             </div>
@@ -962,7 +917,7 @@ export default function DailyAbsenteeismPage() {
                   <select
                     value={selectedClass}
                     onChange={e => setSelectedClass(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   >
                     <option value="">-- Sınıf Seçiniz --</option>
                     {classes.map(c => (
@@ -976,13 +931,13 @@ export default function DailyAbsenteeismPage() {
                 {/* Sınıf İçi Arama */}
                 {selectedClass && (
                   <div className="relative flex-1">
-                    <Search size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Sınıf içinde ara (İsim veya No)..."
                       value={classSearchFilter}
                       onChange={e => setClassSearchFilter(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     />
                   </div>
                 )}
@@ -990,50 +945,50 @@ export default function DailyAbsenteeismPage() {
 
               {/* Sınıf Seçili Değilse */}
               {!selectedClass && (
-                <div className="text-center py-12 text-slate-400 bg-slate-950/40 rounded-xl border border-dashed border-white/10">
-                  <Users size={36} className="mx-auto text-slate-500 mb-2 opacity-50" />
-                  <p className="text-sm">Öğrenci listesini görüntülemek için lütfen yukarıdan bir sınıf seçin.</p>
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <Users size={32} className="mx-auto text-slate-400 mb-2 opacity-60" />
+                  <p className="text-sm font-medium text-slate-700">Lütfen yukarıdan bir sınıf seçin</p>
+                  <p className="text-xs text-slate-500 mt-1">Sınıfı seçtikten sonra gelmeyen öğrencileri tıklayarak işaretleyebilirsiniz.</p>
                 </div>
               )}
 
               {/* Sınıf Seçiliyken Liste */}
               {selectedClass && (
-                <div className="space-y-3">
-                  {/* Toplu İşlem Butonları */}
-                  <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-slate-600 px-1">
                     <span>
-                      Toplam: <strong className="text-white">{filteredClassStudents.length}</strong> öğrenci
+                      Sınıf Mevcudu: <strong className="text-slate-800">{filteredClassStudents.length}</strong> öğrenci
                     </span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleSelectAllInClass}
-                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium hover:underline flex items-center gap-1"
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <CheckSquare size={13} /> Sınıftaki Tümünü Ekle
+                        <CheckSquare size={13} /> Sınıftaki Tümünü Seç
                       </button>
-                      <span className="text-slate-600">|</span>
+                      <span className="text-slate-300">|</span>
                       <button
                         type="button"
                         onClick={handleClearAllInClass}
-                        className="text-xs text-slate-400 hover:text-rose-400 font-medium hover:underline"
+                        className="text-xs text-slate-500 hover:text-rose-600 font-medium hover:underline cursor-pointer"
                       >
-                        Sınıfı Kuyruktan Çıkar
+                        Seçimi Temizle
                       </button>
                     </div>
                   </div>
 
                   {classStudentsLoading ? (
-                    <div className="flex items-center justify-center py-12 text-slate-400">
-                      <RefreshCw size={24} className="animate-spin text-indigo-400 mr-2" />
-                      <span>Öğrenciler yükleniyor...</span>
+                    <div className="flex items-center justify-center py-12 text-slate-500">
+                      <RefreshCw size={20} className="animate-spin text-indigo-600 mr-2" />
+                      <span className="text-xs">Öğrenciler yükleniyor...</span>
                     </div>
                   ) : filteredClassStudents.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 bg-slate-950/40 rounded-xl border border-white/10 text-xs">
+                    <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                       Aramaya uygun öğrenci bulunamadı.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[420px] overflow-y-auto pr-1">
                       {filteredClassStudents.map(student => {
                         const isQueued = queuedStudents.some(s => s.id === student.id);
                         const primaryParent = student.parents?.[0];
@@ -1041,44 +996,42 @@ export default function DailyAbsenteeismPage() {
                           <div
                             key={student.id}
                             onClick={() => toggleStudentFromClass(student)}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between gap-2 select-none ${
+                            className={`p-2.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between gap-1.5 select-none ${
                               isQueued
-                                ? 'bg-rose-500/10 border-rose-500/40 shadow-sm shadow-rose-500/10'
-                                : 'bg-slate-950/70 border-white/10 hover:border-white/20 hover:bg-slate-950'
+                                ? 'bg-rose-50/90 border-rose-300 shadow-sm'
+                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
                                     {student.schoolNumber}
                                   </span>
-                                  <span className="text-xs font-semibold text-white">
+                                  <span className="text-xs font-bold text-slate-800 truncate">
                                     {student.fullName}
                                   </span>
                                 </div>
-                                <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                                  <span>Veli: {primaryParent?.fullName || 'Belirtilmemiş'}</span>
-                                  <span>•</span>
-                                  <span>{primaryParent?.phone || 'Tel yok'}</span>
+                                <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                  {primaryParent?.fullName || 'Veli yok'} • {primaryParent?.phone || 'Tel yok'}
                                 </div>
                               </div>
 
-                              <div>
+                              <div className="shrink-0">
                                 {isQueued ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-300 bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 rounded-lg">
-                                    <X size={12} /> Gelmedi
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded">
+                                    <X size={11} /> Gelmedi
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-normal text-slate-400 bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg">
-                                    İşaretle
+                                  <span className="inline-flex items-center text-[10px] font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded">
+                                    Seç
                                   </span>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-white/5">
-                              <span className="text-slate-400">{student.className}</span>
+                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                              <span className="text-slate-500 font-medium text-[10px]">{student.className}</span>
                               {renderConsentBadge(primaryParent?.waConsentStatus)}
                             </div>
                           </div>
@@ -1092,20 +1045,20 @@ export default function DailyAbsenteeismPage() {
           )}
         </div>
 
-        {/* ── SAĞ SÜTUN: Gönderim Kuyruğu (Seçilen Öğrenciler) ── */}
-        <div className="lg:col-span-5 bg-slate-900/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        {/* ── SAĞ SÜTUN: Gönderilecek Öğrenciler (Kompakt Liste) ── */}
+        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3.5 flex flex-col">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-indigo-600/30 text-indigo-300 rounded-lg flex items-center justify-center font-bold text-xs">
+              <span className="w-6 h-6 bg-indigo-100 text-indigo-700 font-bold text-xs rounded-full flex items-center justify-center">
                 {queuedStudents.length}
-              </div>
-              <h2 className="text-base font-bold text-white">Gönderilecek Öğrenciler</h2>
+              </span>
+              <h2 className="text-sm font-bold text-slate-800">Gönderilecek Öğrenciler</h2>
             </div>
             {queuedStudents.length > 0 && (
               <button
                 type="button"
-                onClick={() => setQueuedStudents([])}
-                className="text-xs text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1"
+                onClick={handleClearAllQueue}
+                className="text-xs text-rose-600 hover:text-rose-700 font-medium hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 size={13} /> Tümünü Temizle
               </button>
@@ -1114,408 +1067,413 @@ export default function DailyAbsenteeismPage() {
 
           {/* Kuyruk Boşsa */}
           {queuedStudents.length === 0 ? (
-            <div className="text-center py-16 text-slate-400 bg-slate-950/40 rounded-xl border border-dashed border-white/10 space-y-2">
-              <BellRing size={36} className="mx-auto text-slate-500 opacity-40" />
-              <p className="text-sm font-medium text-slate-300">Henüz öğrenci seçilmedi</p>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto">
+            <div className="text-center py-16 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2">
+              <BellRing size={32} className="mx-auto text-slate-400 opacity-60" />
+              <p className="text-xs font-bold text-slate-700">Henüz öğrenci seçilmedi</p>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
                 Soldaki panelden öğrenci numaralarını yapıştırarak veya sınıf listesinden tıklayarak listeye ekleyin.
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-              {queuedStudents.map(student => {
-                const targetParent =
-                  student.parents.find(p => p.id === student.selectedParentId) ||
-                  student.parents[0] || {
-                    id: '',
-                    fullName: 'Kayıtlı Veli Yok',
-                    relation: 'Veli',
-                    phone: '',
-                    waConsentStatus: 'PENDING',
-                  };
+            <div className="space-y-2">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[380px] overflow-y-auto divide-y divide-slate-100 bg-white">
+                {queuedStudents.map(student => {
+                  const targetParent =
+                    student.parents.find(p => p.id === student.selectedParentId) ||
+                    student.parents[0] || {
+                      id: '',
+                      fullName: 'Veli Bilgisi Yok',
+                      relation: 'Veli',
+                      phone: '',
+                      waConsentStatus: 'PENDING',
+                    };
 
-                const duplicateTime = duplicateMap[student.id];
+                  const duplicateTime = duplicateMap[student.id];
 
-                return (
-                  <div
-                    key={student.id}
-                    className="p-3 bg-slate-950/80 rounded-xl border border-white/10 space-y-2 relative group hover:border-indigo-500/30 transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                  return (
+                    <div
+                      key={student.id}
+                      className="p-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 text-xs"
+                    >
+                      {/* Sol: No & İsim */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="font-mono font-bold text-indigo-700 text-xs">
                             {student.schoolNumber}
                           </span>
-                          <span className="text-xs font-bold text-white">{student.fullName}</span>
-                          <span className="text-[11px] text-slate-400">({student.className})</span>
+                          <span className="font-bold text-slate-800 truncate">
+                            {student.fullName}
+                          </span>
+                          <span className="text-[10px] text-slate-500 bg-slate-100 border border-slate-200 px-1 rounded shrink-0">
+                            {student.className}
+                          </span>
+                        </div>
+
+                        {/* Veli & Telefon */}
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-600">
+                          {student.parents.length > 1 ? (
+                            <select
+                              value={targetParent.id}
+                              onChange={e => handleParentChange(student.id, e.target.value)}
+                              className="bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-700 font-medium"
+                            >
+                              {student.parents.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.fullName} ({p.relation})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="truncate font-medium text-slate-700">
+                              {targetParent.fullName}
+                            </span>
+                          )}
+
+                          <span className="font-mono text-slate-500 text-[10px] shrink-0">
+                            {targetParent.phone || 'Tel yok'}
+                          </span>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => removeStudentFromQueue(student.id)}
-                        className="text-slate-500 hover:text-rose-400 transition-colors p-1"
-                        title="Listeden Çıkar"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                      {/* Sağ: Rozetler & Silme */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex flex-col items-end gap-1">
+                          {renderConsentBadge(targetParent.waConsentStatus)}
+                          {duplicateTime && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded"
+                              title={`Bugün ${SESSION_MAP[sessionType]?.label} için daha önce mesaj gönderilmiş.`}
+                            >
+                              <AlertTriangle size={9} /> Bildirildi
+                            </span>
+                          )}
+                        </div>
 
-                    {/* Veli Seçimi / Bilgisi */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1.5 border-t border-white/5 items-center">
-                      <div>
-                        {student.parents.length > 1 ? (
-                          <select
-                            value={targetParent.id}
-                            onChange={e => handleParentChange(student.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-white/10 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                          >
-                            {student.parents.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.fullName} ({p.relation || 'Veli'})
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-slate-300 font-medium">
-                            {targetParent.fullName} ({targetParent.relation || 'Veli'})
-                          </span>
-                        )}
-                        <span className="text-[11px] text-slate-400 block mt-0.5">
-                          📞 {targetParent.phone || 'Telefon eksik!'}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        {renderConsentBadge(targetParent.waConsentStatus)}
-
-                        {duplicateTime && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded"
-                            title={`Bu öğrenciye ${targetDate} tarihinde (${SESSION_MAP[sessionType]?.label}) mesaj gönderilmiş.`}
-                          >
-                            <AlertTriangle size={10} /> Bugün Bildirildi
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeStudentFromQueue(student.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Listeden Çıkar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
 
-          {/* Gönderim Başlat Butonu */}
-          {queuedStudents.length > 0 && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleStartDispatch}
-                className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-              >
-                <Send size={18} />
-                <span>WhatsApp Bildirimlerini Başlat ({queuedStudents.length} Öğrenci)</span>
-              </button>
+              {/* Alt Gönderim Butonu */}
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleStartDispatch}
+                  leftIcon={<Send size={15} />}
+                  className="w-full py-2.5 justify-center text-xs font-bold"
+                >
+                  WhatsApp Bildirimlerini Başlat ({queuedStudents.length} Öğrenci)
+                </Button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── CANLI GÖNDERİM MODALI (Canlı İlerleme + Anti-Spam Gecikmesi) ── */}
-      {dispatchModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
-            {/* Modal Başlığı */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600/30 text-indigo-400 rounded-xl flex items-center justify-center">
-                  <BellRing size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">WhatsApp Bildirim Gönderim Motoru</h3>
-                  <p className="text-xs text-slate-400">
-                    Oturum: {SESSION_MAP[sessionType]?.label} • {targetDate}
-                  </p>
-                </div>
-              </div>
+      {/* ── CANLI GÖNDERİM MODALI (Standart ActionModal İle) ── */}
+      <ActionModal
+        isOpen={dispatchModalOpen}
+        onClose={() => {
+          if (!isDispatching) {
+            setDispatchModalOpen(false);
+            const sentIds = new Set(
+              dispatchItems.filter(it => it.status === 'SENT').map(it => it.student.id)
+            );
+            setQueuedStudents(prev => prev.filter(s => !sentIds.has(s.id)));
+          }
+        }}
+        title="WhatsApp Devamsızlık Bildirimi Gönderimi"
+        width="xl"
+        hideFooter={true}
+      >
+        <div className="space-y-4 py-1">
+          {/* Oturum & Tarih Bilgisi */}
+          <div className="flex items-center justify-between text-xs text-slate-600 pb-2 border-b border-slate-100">
+            <span>Zaman: <strong className="text-slate-800">{SESSION_MAP[sessionType]?.label}</strong></span>
+            <span>Tarih: <strong className="text-slate-800">{targetDate}</strong></span>
+          </div>
 
-              {!isDispatching && (
-                <button
-                  type="button"
-                  onClick={() => setDispatchModalOpen(false)}
-                  className="text-slate-400 hover:text-white p-1"
-                >
-                  <X size={18} />
-                </button>
-              )}
+          {/* İlerleme Çubuğu */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <span>
+                İlerleme: <strong className="text-slate-800">{completedCount}</strong> / {dispatchItems.length} tamamlandı
+              </span>
+              <span className="font-bold text-indigo-600">%{dispatchProgress}</span>
             </div>
-
-            {/* İlerleme Çubuğu */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-300">
-                <span>
-                  İlerleme: <strong>{completedCount}</strong> / {dispatchItems.length} tamamlandı
-                </span>
-                <span className="font-bold text-indigo-400">%{dispatchProgress}</span>
-              </div>
-              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-white/10">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
-                  style={{ width: `${dispatchProgress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Canlı Ticker / Durum Bildirimi */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-white/10 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2 overflow-hidden">
-                {isDispatching ? (
-                  <RefreshCw size={14} className="animate-spin text-indigo-400 shrink-0" />
-                ) : (
-                  <Info size={14} className="text-slate-400 shrink-0" />
-                )}
-                <span className="truncate text-slate-200 font-mono">
-                  {dispatchTicker || 'Gönderime hazır. Başlat butonuna basınız.'}
-                </span>
-              </div>
-              {countdownSeconds !== null && (
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded font-mono font-bold text-[11px] shrink-0">
-                  {countdownSeconds}s
-                </span>
-              )}
-            </div>
-
-            {/* Kuyruk Listesi */}
-            <div className="max-h-60 overflow-y-auto space-y-2 pr-1 border border-white/5 rounded-xl p-2 bg-slate-950/50">
-              {dispatchItems.map((item, idx) => (
-                <div
-                  key={item.student.id}
-                  className="p-2.5 rounded-lg border border-white/5 bg-slate-900/60 flex items-center justify-between text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded text-[11px]">
-                      {item.student.schoolNumber}
-                    </span>
-                    <span className="font-medium text-white">{item.student.fullName}</span>
-                    <span className="text-[11px] text-slate-400">({item.parent.fullName})</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {item.status === 'PENDING' && (
-                      <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                        <Clock size={12} /> Bekliyor
-                      </span>
-                    )}
-                    {item.status === 'SENDING' && (
-                      <span className="text-[11px] text-indigo-400 flex items-center gap-1">
-                        <RefreshCw size={12} className="animate-spin" /> İletiliyor...
-                      </span>
-                    )}
-                    {item.status === 'SENT' && (
-                      <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
-                        <CheckCircle2 size={12} /> Gönderildi ({item.sentTime})
-                      </span>
-                    )}
-                    {item.status === 'FAILED' && (
-                      <span
-                        className="text-[11px] text-rose-400 flex items-center gap-1 font-medium cursor-help"
-                        title={item.errorMessage}
-                      >
-                        <XCircle size={12} /> Hata: {item.errorMessage}
-                      </span>
-                    )}
-                    {item.status === 'SKIPPED' && (
-                      <span
-                        className="text-[11px] text-amber-400 flex items-center gap-1 font-medium cursor-help"
-                        title={item.errorMessage}
-                      >
-                        <AlertCircle size={12} /> Atlandı
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Kontrol Butonları */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <div className="flex items-center gap-2">
-                {!isDispatching && completedCount < dispatchItems.length && (
-                  <button
-                    type="button"
-                    onClick={runDispatchLoop}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/30 cursor-pointer"
-                  >
-                    <Play size={14} /> Gönderimi Başlat
-                  </button>
-                )}
-
-                {isDispatching && !isPaused && (
-                  <button
-                    type="button"
-                    onClick={handlePauseDispatch}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <Pause size={14} /> Duraklat
-                  </button>
-                )}
-
-                {isPaused && (
-                  <button
-                    type="button"
-                    onClick={handleResumeDispatch}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <Play size={14} /> Devam Et
-                  </button>
-                )}
-
-                {isDispatching && (
-                  <button
-                    type="button"
-                    onClick={handleCancelDispatch}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                  >
-                    <Square size={14} /> İptal Et
-                  </button>
-                )}
-              </div>
-
-              {!isDispatching && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDispatchModalOpen(false);
-                    // Başarılı gönderilenleri kuyruktan temizle
-                    const sentIds = new Set(
-                      dispatchItems.filter(it => it.status === 'SENT').map(it => it.student.id)
-                    );
-                    setQueuedStudents(prev => prev.filter(s => !sentIds.has(s.id)));
-                  }}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-medium transition-colors"
-                >
-                  Kapat ve Kuyruğu Güncelle
-                </button>
-              )}
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+              <div
+                className="h-full bg-indigo-600 transition-all duration-300"
+                style={{ width: `${dispatchProgress}%` }}
+              />
             </div>
           </div>
+
+          {/* Canlı Ticker */}
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 overflow-hidden">
+              {isDispatching ? (
+                <RefreshCw size={14} className="animate-spin text-indigo-600 shrink-0" />
+              ) : (
+                <Info size={14} className="text-slate-400 shrink-0" />
+              )}
+              <span className="truncate text-slate-700 font-mono text-[11px]">
+                {dispatchTicker || 'Gönderime hazır. Başlat butonuna basınız.'}
+              </span>
+            </div>
+            {countdownSeconds !== null && (
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-mono font-bold text-[10px] shrink-0 border border-amber-200">
+                {countdownSeconds}s
+              </span>
+            )}
+          </div>
+
+          {/* Kuyruk Listesi */}
+          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+            {dispatchItems.map(item => (
+              <div
+                key={item.student.id}
+                className="p-2 rounded border border-slate-200/80 bg-white flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-1 py-0.2 rounded text-[10px] font-bold">
+                    {item.student.schoolNumber}
+                  </span>
+                  <span className="font-bold text-slate-800">{item.student.fullName}</span>
+                  <span className="text-[11px] text-slate-500">({item.parent.fullName})</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {item.status === 'PENDING' && (
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <Clock size={11} /> Bekliyor
+                    </span>
+                  )}
+                  {item.status === 'SENDING' && (
+                    <span className="text-[10px] text-indigo-600 flex items-center gap-1 font-semibold">
+                      <RefreshCw size={11} className="animate-spin" /> İletiliyor...
+                    </span>
+                  )}
+                  {item.status === 'SENT' && (
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Gönderildi ({item.sentTime})
+                    </span>
+                  )}
+                  {item.status === 'FAILED' && (
+                    <span
+                      className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-help"
+                      title={item.errorMessage}
+                    >
+                      <XCircle size={11} /> Hata
+                    </span>
+                  )}
+                  {item.status === 'SKIPPED' && (
+                    <span
+                      className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-medium flex items-center gap-1 cursor-help"
+                      title={item.errorMessage}
+                    >
+                      <AlertCircle size={11} /> Atlandı
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Butonlar */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              {!isDispatching && completedCount < dispatchItems.length && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={runDispatchLoop}
+                  leftIcon={<Play size={14} />}
+                  className="text-xs"
+                >
+                  Gönderimi Başlat
+                </Button>
+              )}
+
+              {isDispatching && !isPaused && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePauseDispatch}
+                  leftIcon={<Pause size={14} />}
+                  className="text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                >
+                  Duraklat
+                </Button>
+              )}
+
+              {isPaused && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleResumeDispatch}
+                  leftIcon={<Play size={14} />}
+                  className="text-xs"
+                >
+                  Devam Et
+                </Button>
+              )}
+
+              {isDispatching && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelDispatch}
+                  leftIcon={<Square size={14} />}
+                  className="text-xs text-rose-700 border-rose-300 hover:bg-rose-50"
+                >
+                  Durdur / İptal Et
+                </Button>
+              )}
+            </div>
+
+            {!isDispatching && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDispatchModalOpen(false);
+                  const sentIds = new Set(
+                    dispatchItems.filter(it => it.status === 'SENT').map(it => it.student.id)
+                  );
+                  setQueuedStudents(prev => prev.filter(s => !sentIds.has(s.id)));
+                }}
+                className="text-xs"
+              >
+                Kapat ve Kuyruğu Güncelle
+              </Button>
+            )}
+          </div>
         </div>
-      )}
+      </ActionModal>
 
       {/* ── ALT BÖLÜM: Günlük Bildirim Geçmişi (Tarihçe) ── */}
-      <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
-            <History size={20} className="text-indigo-400" />
+            <History size={18} className="text-indigo-600" />
             <div>
-              <h3 className="text-base font-bold text-white">Günlük WhatsApp Bildirim Geçmişi</h3>
-              <p className="text-xs text-slate-400">
-                Seçilen tarihte ({targetDate}) velilere iletilen tüm anlık devamsızlık bildirimleri
+              <h3 className="text-sm font-bold text-slate-800">Günlük WhatsApp Bildirim Geçmişi</h3>
+              <p className="text-xs text-slate-500">
+                {targetDate} tarihinde velilere iletilen anlık devamsızlık bildirimleri
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Oturum Filtresi */}
             <select
               value={historySessionFilter}
               onChange={e => setHistorySessionFilter(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+              className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
-              <option value="ALL">Tüm Oturumlar</option>
-              <option value="MORNING">Sabah (1. Oturum)</option>
-              <option value="AFTERNOON">Öğleden Sonra (2. Oturum)</option>
+              <option value="ALL">Tüm Zamanlar</option>
+              <option value="MORNING">Sabah İlk Ders</option>
+              <option value="AFTERNOON">Öğleden Sonra İlk Ders</option>
               <option value="FULL_DAY">Tam Gün</option>
             </select>
 
-            {/* Arama */}
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Geçmişte ara..."
                 value={historySearch}
                 onChange={e => setHistorySearch(e.target.value)}
-                className="bg-slate-950 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 w-44"
+                className="bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-40"
               />
             </div>
 
-            <button
+            <Button
+              variant="outline"
               onClick={fetchHistory}
               title="Yenile"
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-300"
+              className="p-1.5"
             >
-              <RefreshCw size={14} className={historyLoading ? 'animate-spin' : ''} />
-            </button>
+              <RefreshCw size={13} className={historyLoading ? 'animate-spin' : ''} />
+            </Button>
           </div>
         </div>
 
         {historyLoading ? (
-          <div className="flex items-center justify-center py-12 text-slate-400">
-            <RefreshCw size={24} className="animate-spin text-indigo-400 mr-2" />
-            <span>Geçmiş yükleniyor...</span>
+          <div className="flex items-center justify-center py-10 text-slate-500">
+            <RefreshCw size={20} className="animate-spin text-indigo-600 mr-2" />
+            <span className="text-xs">Geçmiş yükleniyor...</span>
           </div>
         ) : filteredHistory.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 bg-slate-950/40 rounded-xl border border-dashed border-white/10 text-xs">
+          <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
             {targetDate} tarihinde gönderilmiş herhangi bir bildirim bulunamadı.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-white/10 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                   <th className="py-2.5 px-3">Saat</th>
                   <th className="py-2.5 px-3">Öğrenci No</th>
                   <th className="py-2.5 px-3">Adı Soyadı</th>
                   <th className="py-2.5 px-3">Sınıf</th>
-                  <th className="py-2.5 px-3">Oturum</th>
+                  <th className="py-2.5 px-3">Zaman</th>
                   <th className="py-2.5 px-3">Veli Bilgisi</th>
                   <th className="py-2.5 px-3">Durum</th>
-                  <th className="py-2.5 px-3 text-right">İşlemler</th>
+                  <th className="py-2.5 px-3 text-right">İşlem</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-slate-100">
                 {filteredHistory.map(row => {
                   const sentTimeStr = new Date(row.sentAt).toLocaleTimeString('tr-TR', {
                     hour: '2-digit',
                     minute: '2-digit',
                   });
                   return (
-                    <tr key={row.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-2.5 px-3 font-mono text-slate-400">{sentTimeStr}</td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-indigo-300">{row.schoolNumber || '-'}</td>
-                      <td className="py-2.5 px-3 font-medium text-white">{row.studentName || 'Bilinmiyor'}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{row.className || '-'}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-300 bg-white/5 px-2 py-0.5 rounded">
-                          {SESSION_MAP[row.sessionType]?.icon} {SESSION_MAP[row.sessionType]?.text || row.sessionType}
+                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2 px-3 font-mono text-slate-600">{sentTimeStr}</td>
+                      <td className="py-2 px-3 font-mono font-bold text-indigo-700">{row.schoolNumber || '-'}</td>
+                      <td className="py-2 px-3 font-bold text-slate-800">{row.studentName || 'Bilinmiyor'}</td>
+                      <td className="py-2 px-3 text-slate-600 font-medium">{row.className || '-'}</td>
+                      <td className="py-2 px-3">
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-medium">
+                          {SESSION_MAP[row.sessionType]?.icon} {SESSION_MAP[row.sessionType]?.label || row.sessionType}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3">
-                        <div className="text-slate-200">{row.parentName || '-'}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">{row.parentPhone}</div>
+                      <td className="py-2 px-3">
+                        <div className="text-slate-800 font-semibold">{row.parentName || '-'}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{row.parentPhone}</div>
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2 px-3">
                         {row.status === 'SENT' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                            <CheckCircle2 size={12} /> Başarılı
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 size={11} /> Başarılı
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full cursor-help"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full cursor-help"
                             title={row.errorMessage || 'Hata oluştu'}
                           >
-                            <XCircle size={12} /> Başarısız
+                            <XCircle size={11} /> Başarısız
                           </span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-2 px-3 text-right">
                         <div className="inline-flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setViewHistoryModalItem(row)}
-                            className="p-1 text-slate-400 hover:text-indigo-300 transition-colors"
+                            className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Mesajı İncele"
                           >
                             <Eye size={15} />
@@ -1523,7 +1481,7 @@ export default function DailyAbsenteeismPage() {
                           <button
                             type="button"
                             onClick={() => handleDeleteHistory(row.id)}
-                            className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
+                            className="p-1 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
                             title="Kaydı Sil"
                           >
                             <Trash2 size={15} />
@@ -1539,55 +1497,52 @@ export default function DailyAbsenteeismPage() {
         )}
       </div>
 
-      {/* ── Mesaj Detayı Modal ── */}
-      {viewHistoryModalItem && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={18} className="text-indigo-400" />
-                <h4 className="text-sm font-bold text-white">İletilen WhatsApp Mesajı</h4>
+      {/* ── Mesaj Detayı Modalı (Standart ActionModal İle) ── */}
+      <ActionModal
+        isOpen={Boolean(viewHistoryModalItem)}
+        onClose={() => setViewHistoryModalItem(null)}
+        title="İletilen WhatsApp Mesajı"
+        width="lg"
+        hideFooter={true}
+      >
+        {viewHistoryModalItem && (
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Öğrenci: <strong className="text-slate-800">{viewHistoryModalItem.studentName}</strong></span>
+                <span>Tarih: <strong className="text-slate-800">{viewHistoryModalItem.date}</strong></span>
               </div>
-              <button
-                onClick={() => setViewHistoryModalItem(null)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-slate-400">
-                <span>Öğrenci: <strong className="text-white">{viewHistoryModalItem.studentName}</strong></span>
-                <span>Tarih: <strong className="text-white">{viewHistoryModalItem.date}</strong></span>
-              </div>
-              <div className="flex justify-between text-slate-400">
-                <span>Veli: <strong className="text-white">{viewHistoryModalItem.parentName} ({viewHistoryModalItem.parentPhone})</strong></span>
-                <span>Oturum: <strong className="text-white">{SESSION_MAP[viewHistoryModalItem.sessionType]?.text}</strong></span>
+              <div className="flex justify-between text-slate-600">
+                <span>Veli: <strong className="text-slate-800">{viewHistoryModalItem.parentName} ({viewHistoryModalItem.parentPhone})</strong></span>
+                <span>Zaman: <strong className="text-slate-800">{SESSION_MAP[viewHistoryModalItem.sessionType]?.label}</strong></span>
               </div>
             </div>
 
-            <div className="p-3.5 bg-slate-950 rounded-xl border border-white/10 text-xs text-slate-200 font-mono whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
               {viewHistoryModalItem.message}
             </div>
 
             {viewHistoryModalItem.errorMessage && (
-              <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300">
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
                 <strong>Hata Detayı:</strong> {viewHistoryModalItem.errorMessage}
               </div>
             )}
 
-            <div className="flex justify-end pt-2">
-              <button
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="primary"
                 onClick={() => setViewHistoryModalItem(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-medium"
+                className="text-xs"
               >
                 Kapat
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ActionModal>
+
+      {/* ── Standart OkulDesk Onay Modalı (useConfirm) ── */}
+      {confirmModal}
     </div>
   );
 }
