@@ -27,6 +27,7 @@ export interface ConsentContactData {
   consentToken?: string | null;
   consentIp?: string | null;
   consentUserAgent?: string | null;
+  lastConsentSentAt?: string | null;
   updatedAt?: string;
 }
 

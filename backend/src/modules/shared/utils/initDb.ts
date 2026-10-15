@@ -47,6 +47,7 @@ export async function initializeDatabase(): Promise<void> {
     { table: 'ParentContact', col: 'consentTokenExpiresAt', sql: 'ALTER TABLE "ParentContact" ADD COLUMN "consentTokenExpiresAt" DATETIME' },
     { table: 'ParentContact', col: 'consentIp', sql: 'ALTER TABLE "ParentContact" ADD COLUMN "consentIp" TEXT' },
     { table: 'ParentContact', col: 'consentUserAgent', sql: 'ALTER TABLE "ParentContact" ADD COLUMN "consentUserAgent" TEXT' },
+    { table: 'ParentContact', col: 'lastConsentSentAt', sql: 'ALTER TABLE "ParentContact" ADD COLUMN "lastConsentSentAt" DATETIME' },
     { table: 'Student', col: 'primaryParentId', sql: 'ALTER TABLE "Student" ADD COLUMN "primaryParentId" TEXT' },
     { table: 'User', col: 'fullName', sql: 'ALTER TABLE "User" ADD COLUMN "fullName" TEXT DEFAULT \'\'' },
     { table: 'User', col: 'permissions', sql: 'ALTER TABLE "User" ADD COLUMN "permissions" TEXT DEFAULT \'[]\'' },

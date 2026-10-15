@@ -72,7 +72,17 @@ export class WhatsAppConsentService {
    */
   async getStats(): Promise<ConsentStats> {
     const contacts: any[] = await (prisma.parentContact as any).findMany({
-      where: { parent: { deletedAt: null } },
+      where: {
+        parent: {
+          deletedAt: null,
+          students: {
+            some: {
+              deletedAt: null,
+              status: 'ACTIVE',
+            },
+          },
+        },
+      },
       select: { waConsentStatus: true, photoConsentStatus: true },
     });
 
@@ -109,12 +119,22 @@ export class WhatsAppConsentService {
    */
   async getAllConsentsList() {
     const contacts: any[] = await (prisma.parentContact as any).findMany({
-      where: { parent: { deletedAt: null } },
+      where: {
+        parent: {
+          deletedAt: null,
+          students: {
+            some: {
+              deletedAt: null,
+              status: 'ACTIVE',
+            },
+          },
+        },
+      },
       include: {
         parent: {
           include: {
             students: {
-              where: { deletedAt: null },
+              where: { deletedAt: null, status: 'ACTIVE' },
               select: { id: true, schoolNumber: true, fullName: true, className: true },
             },
           },
@@ -123,7 +143,9 @@ export class WhatsAppConsentService {
       orderBy: [{ parent: { fullName: 'asc' } }],
     });
 
-    return contacts.map((c: any) => {
+    const activeContacts = contacts.filter((c: any) => c.parent?.students && c.parent.students.length > 0);
+
+    return activeContacts.map((c: any) => {
       const student = c.parent?.students?.[0];
       return {
         contactId: c.id,
@@ -140,6 +162,7 @@ export class WhatsAppConsentService {
         consentToken: c.consentToken,
         consentIp: c.consentIp || null,
         consentUserAgent: c.consentUserAgent || null,
+        lastConsentSentAt: c.lastConsentSentAt || null,
         student: student ? {
           id: student.id,
           fullName: student.fullName,
@@ -155,12 +178,22 @@ export class WhatsAppConsentService {
    */
   async exportToExcel(): Promise<Buffer> {
     const contacts = await prisma.parentContact.findMany({
-      where: { parent: { deletedAt: null } },
+      where: {
+        parent: {
+          deletedAt: null,
+          students: {
+            some: {
+              deletedAt: null,
+              status: 'ACTIVE',
+            },
+          },
+        },
+      },
       include: {
         parent: {
           include: {
             students: {
-              where: { deletedAt: null },
+              where: { deletedAt: null, status: 'ACTIVE' },
               select: { schoolNumber: true, fullName: true, className: true },
             },
           },

@@ -154,14 +154,14 @@ export class StudentsService {
   async delete(id: string, userId: string) {
     const student = await prisma.student.findUnique({ where: { id } });
     if (!student) throw new AppError('Öğrenci bulunamadı.', 404);
-    await prisma.student.update({ where: { id }, data: { status: 'INACTIVE' } });
+    await prisma.student.update({ where: { id }, data: { status: 'INACTIVE', deletedAt: new Date() } });
     await AuditService.log(userId, 'SOFT_DELETE_STUDENT', 'Student', id, { schoolNumber: student.schoolNumber, fullName: student.fullName });
     return { message: 'Öğrenci başarıyla pasife alındı.' };
   }
 
   async bulkDelete(ids: string[], userId: string) {
     if (!ids || ids.length === 0) throw new AppError('Pasife alınacak öğrenci seçilmedi.', 400);
-    const result = await prisma.student.updateMany({ where: { id: { in: ids } }, data: { status: 'INACTIVE' } });
+    const result = await prisma.student.updateMany({ where: { id: { in: ids } }, data: { status: 'INACTIVE', deletedAt: new Date() } });
     await AuditService.log(userId, 'BULK_SOFT_DELETE_STUDENT', 'Student', 'Multiple', { ids });
     return { message: `${result.count} öğrenci başarıyla pasife alındı.`, deletedCount: result.count };
   }

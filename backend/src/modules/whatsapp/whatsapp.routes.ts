@@ -54,7 +54,9 @@ router.get('/consents/stats', requirePermission(['whatsapp-consent', 'whatsapp']
 router.get('/consents/list', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.getConsentList);
 router.post('/consents/manual', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.manualUpdateConsent);
 router.get('/consents/pdf/contact/:contactId', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.downloadConsentPdf);
+router.post('/consents/pdf/contact/:contactId/open', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.openConsentPdfInSystem);
 router.get('/consents/pdf/class/:className', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.downloadClassConsentPdf);
+router.post('/consents/pdf/class/:className/open', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.openClassConsentPdfInSystem);
 router.get('/consents/export', requirePermission(['whatsapp-consent', 'whatsapp']), whatsappController.exportConsents);
 router.post(
   '/consents/import',

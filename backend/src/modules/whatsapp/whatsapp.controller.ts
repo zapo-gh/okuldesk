@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { exec } from 'child_process';
 import sharp from 'sharp';
 import { whatsappService } from './whatsapp.service';
 import { absenteeismService } from '../absenteeism/absenteeism.service';
@@ -555,6 +558,15 @@ export const whatsappController = {
         schoolPhone: (settings as any)?.schoolPhone || undefined,
       });
 
+      try {
+        await (prisma.parentContact as any).update({
+          where: { id: primaryContact.id },
+          data: { lastConsentSentAt: new Date() },
+        });
+      } catch (dbErr: any) {
+        console.warn('[WhatsApp Consent] lastConsentSentAt güncelleme uyarısı:', dbErr?.message || dbErr);
+      }
+
       res.json({
         success: true,
         message: 'Onay isteği ve güvenli web formu bağlantısı veliye iletildi.',
@@ -671,7 +683,7 @@ export const whatsappController = {
     try {
       const { className } = req.params;
       const students = await prisma.student.findMany({
-        where: { className, deletedAt: null },
+        where: { className, deletedAt: null, status: 'ACTIVE' },
         include: {
           parents: {
             where: { deletedAt: null },
@@ -686,7 +698,7 @@ export const whatsappController = {
       });
 
       if (students.length === 0) {
-        res.status(404).json({ message: 'Bu sınıfta kayıtlı öğrenci bulunamadı.' });
+        res.status(404).json({ message: 'Bu sınıfta kayıtlı aktif öğrenci bulunamadı.' });
         return;
       }
 
@@ -722,6 +734,138 @@ export const whatsappController = {
         'Content-Length': String(pdfBuffer.length),
       });
       res.send(pdfBuffer);
+    } catch (err) { next(err); }
+  },
+
+  openConsentPdfInSystem: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { contactId } = req.params;
+      const contact = await prisma.parentContact.findUnique({
+        where: { id: contactId },
+        include: {
+          parent: {
+            include: {
+              students: {
+                where: { deletedAt: null, status: 'ACTIVE' },
+                select: { fullName: true, className: true, schoolNumber: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!contact || !contact.parent) {
+        res.status(404).json({ success: false, message: 'Veli kaydı bulunamadı.' });
+        return;
+      }
+
+      const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+      const student = contact.parent.students[0] || {
+        fullName: '',
+        className: '',
+        schoolNumber: '',
+      };
+
+      const pdfBuffer = await generateConsentFormPdf({
+        schoolName: settings?.schoolName || 'OKUL',
+        schoolAddress: settings?.schoolAddress || '',
+        schoolDistrictCity: settings?.schoolDistrictCity || '',
+        schoolEmail: settings?.schoolEmail || '',
+        schoolPhone: settings?.schoolPhone || '',
+        studentName: student.fullName,
+        className: student.className,
+        schoolNumber: student.schoolNumber,
+        parentName: contact.parent.fullName || contact.name,
+        parentPhone: contact.phone,
+        relation: contact.name,
+        waConsentStatus: contact.waConsentStatus,
+        waConsentDate: contact.waConsentDate,
+        consentSource: contact.consentSource,
+        consentIp: (contact as any).consentIp,
+        consentToken: contact.consentToken,
+      });
+
+      const tempDir = path.join(os.tmpdir(), 'okuldesk');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const filename = `KVKK_Onay_Formu_${student.schoolNumber || 'Veli'}_${(student.fullName || 'Form').replace(/[\\/:*?"<>|\s]/g, '_')}.pdf`;
+      const tempPath = path.join(tempDir, filename);
+      fs.writeFileSync(tempPath, pdfBuffer);
+
+      if (process.platform === 'win32') {
+        exec(`start "" "${tempPath}"`);
+      } else if (process.platform === 'darwin') {
+        exec(`open "${tempPath}"`);
+      } else {
+        exec(`xdg-open "${tempPath}"`);
+      }
+
+      res.json({ success: true, message: 'Onay formu varsayılan sistem PDF okuyucusunda açıldı.', data: { filePath: tempPath } });
+    } catch (err) { next(err); }
+  },
+
+  openClassConsentPdfInSystem: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { className } = req.params;
+      const students = await prisma.student.findMany({
+        where: { className, deletedAt: null, status: 'ACTIVE' },
+        include: {
+          parents: {
+            where: { deletedAt: null },
+            include: {
+              contacts: {
+                where: { isPrimary: true },
+              },
+            },
+          },
+        },
+        orderBy: { schoolNumber: 'asc' },
+      });
+
+      if (students.length === 0) {
+        res.status(404).json({ success: false, message: 'Bu sınıfta kayıtlı aktif öğrenci bulunamadı.' });
+        return;
+      }
+
+      const settings = await prisma.schoolSettings.findUnique({ where: { id: 'singleton' } });
+      const list = students.map((s) => {
+        const parent = s.parents[0];
+        const contact = parent?.contacts[0];
+        return {
+          schoolName: settings?.schoolName || 'OKUL',
+          schoolAddress: settings?.schoolAddress || '',
+          schoolDistrictCity: settings?.schoolDistrictCity || '',
+          schoolEmail: settings?.schoolEmail || '',
+          schoolPhone: settings?.schoolPhone || '',
+          studentName: s.fullName,
+          className: s.className,
+          schoolNumber: s.schoolNumber,
+          parentName: parent?.fullName || '....................',
+          parentPhone: contact?.phone || '....................',
+          relation: contact?.name || 'Veli',
+          waConsentStatus: contact?.waConsentStatus || 'PENDING',
+          waConsentDate: contact?.waConsentDate,
+          consentSource: contact?.consentSource,
+          consentIp: (contact as any)?.consentIp,
+          consentToken: contact?.consentToken,
+        };
+      });
+
+      const pdfBuffer = await generateMultipleConsentFormsPdf(list);
+      const tempDir = path.join(os.tmpdir(), 'okuldesk');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const filename = `KVKK_Onay_Formlari_Sinif_${className.replace(/[\\/:*?"<>|\s]/g, '_')}.pdf`;
+      const tempPath = path.join(tempDir, filename);
+      fs.writeFileSync(tempPath, pdfBuffer);
+
+      if (process.platform === 'win32') {
+        exec(`start "" "${tempPath}"`);
+      } else if (process.platform === 'darwin') {
+        exec(`open "${tempPath}"`);
+      } else {
+        exec(`xdg-open "${tempPath}"`);
+      }
+
+      res.json({ success: true, message: `${className} sınıfı onay formları sistem PDF okuyucusunda açıldı.`, data: { filePath: tempPath } });
     } catch (err) { next(err); }
   },
 

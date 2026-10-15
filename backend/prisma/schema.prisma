@@ -71,6 +71,7 @@ model ParentContact {
   consentTokenExpiresAt DateTime?
   consentIp             String?
   consentUserAgent      String?
+  lastConsentSentAt     DateTime?
 
   parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
 

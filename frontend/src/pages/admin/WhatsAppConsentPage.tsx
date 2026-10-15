@@ -162,6 +162,9 @@ export default function WhatsAppConsentPage() {
         title: `${contact.studentName || 'Öğrenci'} - Veli KVKK ve Onay Formu`,
         subtitle: `${contact.className || ''} • No: ${contact.schoolNumber || ''} • Veli: ${contact.parentName || 'Veli'} (${contact.phone})`,
         fileName: `KVKK_Onay_${(contact.studentName || 'Ogrenci').replace(/\s+/g, '_')}.pdf`,
+        onOpenInSystem: async () => {
+          await api.post(`/whatsapp/consents/pdf/contact/${contact.contactId}/open`);
+        },
       });
       toast.success('Yazdırma ve önizleme ekranı açıldı.', { id: toastId });
     } catch {
@@ -184,6 +187,9 @@ export default function WhatsAppConsentPage() {
         title: `${selectedClass} Sınıfı - Tüm Veli Onay Formları`,
         subtitle: `${selectedClass} sınıfında kayıtlı tüm öğrencilerin resmi MEB onay formları birleştirildi.`,
         fileName: `${selectedClass}_Sinifi_Veli_Onay_Formlari.pdf`,
+        onOpenInSystem: async () => {
+          await api.post(`/whatsapp/consents/pdf/class/${encodeURIComponent(selectedClass)}/open`);
+        },
       });
       toast.success(`${selectedClass} sınıfının tüm formları yazdırma ve önizleme ekranına aktarıldı.`);
     } catch (err: any) {
@@ -197,6 +203,20 @@ export default function WhatsAppConsentPage() {
     if (!contact.parentId) {
       toast.error('Veli sistem kaydı bulunamadı.');
       return;
+    }
+
+    const isAlreadySent = Boolean(contact.lastConsentSentAt || contact.consentToken);
+    if (isAlreadySent) {
+      const ok = await confirm(
+        `Bu veliye (${contact.parentName}) daha önce WhatsApp onay bağlantısı gönderildi.\n\nTekrar onay isteği göndermek istiyor musunuz?`
+      );
+      if (!ok) return;
+    } else {
+      const studentLabel = contact.student?.fullName ? `${contact.student.fullName} isimli öğrencinin velisi ` : '';
+      const ok = await confirm(
+        `${studentLabel}${contact.parentName} (${contact.phone}) kişisine WhatsApp onay isteği gönderilecektir.\n\nDevam etmek istiyor musunuz?`
+      );
+      if (!ok) return;
     }
 
     try {
@@ -820,18 +840,29 @@ export default function WhatsAppConsentPage() {
                                   <span>Yazdır</span>
                                 </button>
 
-                                {/* WhatsApp'tan Onay İste (Web linkli) */}
-                                {contact.waConsentStatus !== 'ACCEPTED' && contact.parentId && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSendConsentFromTable(contact)}
-                                    className="px-2 py-1 text-xs font-semibold rounded transition flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-                                    title="WhatsApp ve Web Onay Linki Gönder (alizmtal-wp-onay.web.app)"
-                                  >
-                                    <Send size={13} />
-                                    <span>Onay İste</span>
-                                  </button>
-                                )}
+                                {/* WhatsApp'tan Onay İste (Web linkli) / Gönderildi Durumu */}
+                                {contact.waConsentStatus !== 'ACCEPTED' && contact.parentId && (() => {
+                                  const isAlreadySent = Boolean(contact.lastConsentSentAt || contact.consentToken);
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSendConsentFromTable(contact)}
+                                      className={`px-2 py-1 text-xs font-semibold rounded transition flex items-center gap-1 cursor-pointer ${
+                                        isAlreadySent
+                                          ? 'bg-sky-50 text-sky-700 border border-sky-300 hover:bg-sky-100'
+                                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                      }`}
+                                      title={
+                                        isAlreadySent
+                                          ? 'Daha önce WhatsApp onay bağlantısı gönderildi. Tekrar göndermek için tıklayınız.'
+                                          : 'WhatsApp ve Web Onay Linki Gönder'
+                                      }
+                                    >
+                                      {isAlreadySent ? <CheckCircle2 size={13} className="text-sky-600" /> : <Send size={13} />}
+                                      <span>{isAlreadySent ? 'Gönderildi' : 'Onay İste'}</span>
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </td>
                           </tr>
@@ -862,6 +893,8 @@ export default function WhatsAppConsentPage() {
         onPrintPdf={handlePrintSinglePdf}
       />
 
+      {/* Onay Diyalog Modalı */}
+      {confirmModal}
 
     </div>
   );
