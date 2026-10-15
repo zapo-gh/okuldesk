@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import AdminLayout from './components/AdminLayout';
@@ -182,7 +183,7 @@ function App() {
     );
   }
 
-  return <AuthProvider><SettingsProvider><Suspense fallback={<PageLoader />}><Routes>
+  return <AuthProvider><SettingsProvider><Toaster position="top-right" /><Suspense fallback={<PageLoader />}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
       <Route index element={<DashboardPage />} />

@@ -125,6 +125,62 @@ function formatSchoolClosing(schoolName: string): string {
   return isUpper ? `${clean} MÜDÜRLÜĞÜ` : `${clean} Müdürlüğü`;
 }
 
+const DEFAULT_WRITTEN_WARNING_TEMPLATE = `📩 *ÖĞRENCİ YAZILI UYARI BİLGİLENDİRMESİ*
+_({{uyariNo}}. Yazılı Uyarı / Tutanak)_
+
+Sayın {{veliAdi}},
+
+Okulumuz *{{okulAdi}}* bünyesinde öğrenim gören öğrencimiz *{{ogrenciAdi}}* ({{sinif}} sınıfı, No: {{numara}}) hakkında okul içi kurallar doğrultusunda *{{uyariNo}}. yazılı uyarı tutanağı* düzenlenmiştir.
+
+▫️ *İlgili Davranış:* {{davranis}}
+{{aciklama}}
+Öğrencimizin okul kurallarına uyumu ve olumlu davranış gelişiminin desteklenmesi adına konunun takibini rica ederiz.
+
+Saygılarımızla,
+*{{okulAdi}}*`;
+
+function buildWarningNoticeMessage(opts: {
+  template: string;
+  studentName: string;
+  className: string;
+  schoolNumber: string;
+  warningNumber: number;
+  behaviorText: string;
+  description?: string | null;
+  parentName?: string;
+  schoolName: string;
+}): string {
+  const {
+    template,
+    studentName,
+    className,
+    schoolNumber,
+    warningNumber,
+    behaviorText,
+    description,
+    parentName,
+    schoolName,
+  } = opts;
+  const closingName = formatSchoolClosing(schoolName);
+  const aciklamaText = description && description.trim() ? `▫️ *Açıklama / Detay:* ${description.trim()}\n` : '';
+  const veli = parentName && parentName.trim() ? parentName.trim() : 'Veli';
+
+  return template
+    .replace(/\{\{?ogrenciAdi\}?\}/gi, () => studentName)
+    .replace(/\{\{?ogrenci_adi\}?\}/gi, () => studentName)
+    .replace(/\{\{?sinif\}?\}/gi, () => className || '')
+    .replace(/\{\{?numara\}?\}/gi, () => schoolNumber || '')
+    .replace(/\{\{?uyariNo\}?\}/gi, () => String(warningNumber))
+    .replace(/\{\{?davranis\}?\}/gi, () => behaviorText || '')
+    .replace(/\{\{?aciklama\}?\}/gi, () => aciklamaText)
+    .replace(/\{\{?veliAdi\}?\}/gi, () => veli)
+    .replace(/\{\{?veli_adi\}?\}/gi, () => veli)
+    .replace(/\{\{?okulAdi\}?\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => closingName)
+    .replace(/\{\{?okulAdi\}?\}/gi, () => schoolName)
+    .replace(/\{\{?okul_adi\}?\}/gi, () => schoolName)
+    .trim();
+}
+
 function buildAbsenteeismMessage(opts: {
   template: string;
   studentName: string;
@@ -139,13 +195,13 @@ function buildAbsenteeismMessage(opts: {
 
   // Fonksiyonlu replace: değerlerdeki '$&' gibi dizilerin özel anlam kazanmasını önler
   return template
-    .replace(/\{\{ogrenciAdi\}\}/g, () => studentName)
-    .replace(/\{\{ozurluGun\}\}/g, () => formatDay(excusedDays))
-    .replace(/\{\{ozursuzGun\}\}/g, () => formatDay(unexcusedDays))
-    .replace(/\{\{toplamGun\}\}/g, () => formatDay(total))
-    .replace(/\{\{okulAdi\}\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => closingName)
-    .replace(/\{\{okulAdi\}\}/g, () => schoolName)
-    .replace(/\{\{uyariNo\}\}/g, () => String(warningNumber))
+    .replace(/\{\{?ogrenciAdi\}?\}/gi, () => studentName)
+    .replace(/\{\{?ozurluGun\}?\}/gi, () => formatDay(excusedDays))
+    .replace(/\{\{?ozursuzGun\}?\}/gi, () => formatDay(unexcusedDays))
+    .replace(/\{\{?toplamGun\}?\}/gi, () => formatDay(total))
+    .replace(/\{\{?okulAdi\}?\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => closingName)
+    .replace(/\{\{?okulAdi\}?\}/gi, () => schoolName)
+    .replace(/\{\{?uyariNo\}?\}/gi, () => String(warningNumber))
     .trim();
 }
 
@@ -220,7 +276,7 @@ export const whatsappController = {
       const isBep = !!(record as any).isBep;
       const templateKey = `waTemplate${Math.min(warningNo, 3)}` as 'waTemplate1' | 'waTemplate2' | 'waTemplate3';
       const templateText = isBep
-        ? BEP_WA_TEMPLATE
+        ? ((settings as any).waTemplateBep && (settings as any).waTemplateBep.trim() ? (settings as any).waTemplateBep : BEP_WA_TEMPLATE)
         : (settings[templateKey] && (settings[templateKey] as string).trim())
           ? settings[templateKey] as string
           : DEFAULT_WA_TEMPLATES[Math.min(warningNo, 3)] ?? DEFAULT_WA_TEMPLATES[2];
@@ -311,7 +367,7 @@ export const whatsappController = {
       const isBep = !!(record as any).isBep;
       const templateKey = `waTemplate${Math.min(warningNo, 3)}` as 'waTemplate1' | 'waTemplate2' | 'waTemplate3';
       const templateText = isBep
-        ? BEP_WA_TEMPLATE
+        ? ((settings as any).waTemplateBep && (settings as any).waTemplateBep.trim() ? (settings as any).waTemplateBep : BEP_WA_TEMPLATE)
         : (settings[templateKey] && (settings[templateKey] as string).trim())
           ? settings[templateKey] as string
           : DEFAULT_WA_TEMPLATES[Math.min(warningNo, 3)] ?? DEFAULT_WA_TEMPLATES[2];
@@ -400,18 +456,21 @@ export const whatsappController = {
 
       const sendAsPdf = req.body.sendAsPdf !== false;
       const results: { parent: string; phone: string; ok: boolean; error?: string }[] = [];
+      const rawNoticeTpl = (settings as any).waTemplateWarningNotice;
+      const noticeTemplate = (rawNoticeTpl && rawNoticeTpl.trim()) ? rawNoticeTpl : DEFAULT_WRITTEN_WARNING_TEMPLATE;
 
       for (const parent of filteredParents) {
-        const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
-        const msg =
-          `📩 *ÖĞRENCİ YAZILI UYARI BİLGİLENDİRMESİ*\n` +
-          `_(${record.warningNumber}. Yazılı Uyarı / Tutanak)_\n\n` +
-          `${greeting}\n\n` +
-          `Okulumuz *${schoolName}* bünyesinde öğrenim gören öğrencimiz *${record.student.fullName}* (${record.student.className} sınıfı, No: ${record.student.schoolNumber}) hakkında okul içi kurallar doğrultusunda *${record.warningNumber}. yazılı uyarı tutanağı* düzenlenmiştir.\n\n` +
-          `▫️ *İlgili Davranış:* ${record.behaviorText}\n` +
-          (record.description ? `▫️ *Açıklama / Detay:* ${record.description}\n` : '') +
-          `\nÖğrencimizin okul kurallarına uyumu ve olumlu davranış gelişiminin desteklenmesi adına konunun takibini rica ederiz.\n\n` +
-          `Saygılarımızla,\n*${schoolName}*`;
+        const msg = buildWarningNoticeMessage({
+          template: noticeTemplate,
+          studentName: record.student.fullName,
+          className: record.student.className,
+          schoolNumber: record.student.schoolNumber,
+          warningNumber: record.warningNumber,
+          behaviorText: record.behaviorText,
+          description: record.description,
+          parentName: parent.fullName,
+          schoolName,
+        });
 
         try {
           if (sendAsPdf && pdfPath) {
@@ -459,19 +518,23 @@ export const whatsappController = {
       const settings = await settingsService.get();
       const schoolName = settings.schoolName || 'Okul Yönetimi';
 
+      const rawNoticeTpl = (settings as any).waTemplateWarningNotice;
+      const noticeTemplate = (rawNoticeTpl && rawNoticeTpl.trim()) ? rawNoticeTpl : DEFAULT_WRITTEN_WARNING_TEMPLATE;
+
       const messages = parents
         .filter((p: any) => p.phone && p.phone.trim().length > 0)
         .map((parent: any) => {
-          const greeting = parent.fullName ? `Sayın ${parent.fullName},` : 'Sayın Veli,';
-          const msg =
-            `📩 *ÖĞRENCİ YAZILI UYARI BİLGİLENDİRMESİ*\n` +
-            `_(${record.warningNumber}. Yazılı Uyarı / Tutanak)_\n\n` +
-            `${greeting}\n\n` +
-            `Okulumuz *${schoolName}* bünyesinde öğrenim gören öğrencimiz *${record.student.fullName}* (${record.student.className} sınıfı, No: ${record.student.schoolNumber}) hakkında okul içi kurallar doğrultusunda *${record.warningNumber}. yazılı uyarı tutanağı* düzenlenmiştir.\n\n` +
-            `▫️ *İlgili Davranış:* ${record.behaviorText}\n` +
-            (record.description ? `▫️ *Açıklama / Detay:* ${record.description}\n` : '') +
-            `\nÖğrencimizin okul kurallarına uyumu ve olumlu davranış gelişiminin desteklenmesi adına konunun takibini rica ederiz.\n\n` +
-            `Saygılarımızla,\n*${schoolName}*`;
+          const msg = buildWarningNoticeMessage({
+            template: noticeTemplate,
+            studentName: record.student.fullName,
+            className: record.student.className,
+            schoolNumber: record.student.schoolNumber,
+            warningNumber: record.warningNumber,
+            behaviorText: record.behaviorText,
+            description: record.description,
+            parentName: parent.fullName,
+            schoolName,
+          });
 
           return {
             parent: parent.fullName,
@@ -556,6 +619,7 @@ export const whatsappController = {
       await whatsappService.sendConsentRequest(primaryPhone, webConsentLink, {
         schoolName: settings?.schoolName || undefined,
         schoolPhone: (settings as any)?.schoolPhone || undefined,
+        template: (settings as any)?.waTemplateConsentRequest || undefined,
       });
 
       try {

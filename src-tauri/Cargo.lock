@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "okuldesk"
-version = "1.0.29"
+version = "1.0.30"
 dependencies = [
  "log",
  "serde",

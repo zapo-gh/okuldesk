@@ -25,6 +25,7 @@ interface DashboardData {
   totalStudents: number;
   totalStaff: number;
   absenteeism: { total: number; sentCount: number; notSentCount: number };
+  dailyAbsenteeismTodaySent?: number;
   warnings: { total: number; studentsWithWarnings: number };
   violations: { totalUploads: number; totalViolations: number; confirmedViolations: number };
   whatsapp: { consentedParents: number };
@@ -46,6 +47,7 @@ const emptyData: DashboardData = {
   totalStudents: 0,
   totalStaff: 0,
   absenteeism: { total: 0, sentCount: 0, notSentCount: 0 },
+  dailyAbsenteeismTodaySent: 0,
   warnings: { total: 0, studentsWithWarnings: 0 },
   violations: { totalUploads: 0, totalViolations: 0, confirmedViolations: 0 },
   whatsapp: { consentedParents: 0 },
@@ -61,23 +63,37 @@ export default function DashboardPage() {
   const { settings } = useSettings();
   const [data, setData] = useState<DashboardData>(emptyData);
   const [loading, setLoading] = useState(true);
-  
+  const [reloading, setReloading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const load = async () => {
-    setLoading(true);
-    void 0;
+  const load = async (isManual = false) => {
+    if (isManual) setReloading(true);
     try {
-      const response = await api.get('/dashboard/summary');
+      const response = await api.get('/dashboard/summary', {
+        params: { _t: Date.now() },
+      });
       setData(response.data?.data ?? emptyData);
+      setLastUpdated(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      if (isManual) {
+        toast.success('Gösterge paneli güncellendi.');
+      }
     } catch (err: any) {
       console.error('Dashboard load error:', err);
-      toast.error('Gösterge paneli verileri yüklenemedi.');
+      if (isManual) {
+        toast.error('Gösterge paneli verileri yüklenemedi.');
+      }
     } finally {
       setLoading(false);
+      if (isManual) setReloading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load(false);
+    const handleFocus = () => load(false);
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   if (loading) {
     return <div className="flex h-full min-h-[360px] items-center justify-center"><RefreshCw className="animate-spin text-slate-500" size={28} /></div>;
@@ -99,7 +115,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Gösterge Paneli"
-        description={`${data.schoolName || 'OkulDesk Yönetim Paneli'}${data.principalName ? ` · Müdür: ${data.principalName}` : ''}`}
+        description={`${data.schoolName || 'OkulDesk Yönetim Paneli'}${data.principalName ? ` · Müdür: ${data.principalName}` : ''}${lastUpdated ? ` · Son güncelleme: ${lastUpdated}` : ''}`}
         icon={<LayoutDashboard size={28} />}
         actions={
           <div className="flex items-center gap-2">
@@ -109,8 +125,15 @@ export default function DashboardPage() {
             >
               <Settings size={15} /> Ayarlar
             </Link>
-            <Button variant="outline" size="sm" onClick={load} className="flex items-center gap-1.5 px-3.5 py-2 text-sm">
-              <RefreshCw size={15} /> Yenile
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => load(true)}
+              disabled={reloading}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-sm cursor-pointer"
+            >
+              <RefreshCw size={15} className={reloading ? 'animate-spin text-indigo-600' : ''} />
+              {reloading ? 'Güncelleniyor...' : 'Yenile'}
             </Button>
           </div>
         }
@@ -153,10 +176,11 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DetailCard title="Devamsızlık Durumu" icon={FileText} to="/admin/absenteeism">
-          <MiniStat value={data.absenteeism.notSentCount} label="Gönderilmedi" className="text-red-600" />
-          <MiniStat value={data.absenteeism.sentCount} label="Gönderildi" className="text-green-600" />
-          <MiniStat value={data.absenteeism.total} label="Toplam" className="text-indigo-600" />
+        <DetailCard title="Devamsızlık Durumu" icon={FileText} to="/admin/absenteeism" cols={4}>
+          <MiniStat value={data.absenteeism.notSentCount} label="Mektup Bekleyen" className="text-red-600" />
+          <MiniStat value={data.absenteeism.sentCount} label="Mektup Gönderildi" className="text-green-600" />
+          <MiniStat value={data.dailyAbsenteeismTodaySent || 0} label="Bugün Anlık Bildirim" className="text-sky-600" />
+          <MiniStat value={data.absenteeism.total} label="Toplam Mektup" className="text-indigo-600" />
         </DetailCard>
         <DetailCard title="Yazılı Uyarılar" icon={AlertTriangle} to="/admin/warnings" cols={2}>
           <MiniStat value={data.warnings.total} label="Toplam" className="text-amber-600" />
@@ -167,8 +191,9 @@ export default function DashboardPage() {
           <MiniStat value={data.violations.totalViolations} label="Toplam" className="text-orange-600" />
           <MiniStat value={data.violations.confirmedViolations} label="Onaylı" className="text-red-600" />
         </DetailCard>
-        <DetailCard title="WhatsApp" icon={MessageSquare} to="/admin/whatsapp" cols={1}>
+        <DetailCard title="WhatsApp & Veli Onay" icon={MessageSquare} to="/admin/whatsapp-consent" cols={2}>
           <MiniStat value={data.whatsapp.consentedParents} label="Onaylı Veli" className="text-green-600" />
+          <MiniStat value={data.totalStudents} label="Aktif Öğrenci" className="text-indigo-600" />
         </DetailCard>
         <DetailCard title="Fatura Takibi" icon={Receipt} to="/admin/invoice-tracking" cols={4} className="md:col-span-2 xl:col-span-2">
           <MiniStat value={data.invoices.bekleyenOdenekTalebi} label="Ödenek Bekleyen" className="text-red-600" />

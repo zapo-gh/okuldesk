@@ -14,6 +14,13 @@ interface Settings {
   schoolDistrictCity?: string;
   schoolEmail?: string;
   schoolPhone?: string;
+  waTemplate1?: string;
+  waTemplate2?: string;
+  waTemplate3?: string;
+  waTemplateBep?: string;
+  waTemplateDaily?: string;
+  waTemplateWarningNotice?: string;
+  waTemplateConsentRequest?: string;
 }
 
 interface SettingsContextType {

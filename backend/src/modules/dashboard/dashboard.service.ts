@@ -2,6 +2,18 @@ import prisma from '../shared/utils/prisma';
 
 export class DashboardService {
   async getSummary() {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    let todayDailyAbsenteeismSent = 0;
+    try {
+      const dailyRows = await prisma.$queryRawUnsafe<Array<{ count: number | bigint }>>(
+        `SELECT COUNT(id) as count FROM "DailyAbsenteeismNotification" WHERE "date" = ? AND "status" = 'SENT'`,
+        todayStr
+      );
+      if (dailyRows && dailyRows[0]) {
+        todayDailyAbsenteeismSent = Number(dailyRows[0].count);
+      }
+    } catch {}
+
     const [
       totalStudents,
       totalStaff,
@@ -23,22 +35,30 @@ export class DashboardService {
       invoiceOdenekGeldiMysBekliyor,
       invoiceOdendi,
     ] = await Promise.all([
-      prisma.student.count({ where: { status: 'ACTIVE' } }),
+      prisma.student.count({ where: { status: 'ACTIVE', deletedAt: null } }),
       prisma.staff.count({ where: { isActive: true, deletedAt: null } }),
-      prisma.absenteeism.count({ where: { deletedAt: null } }),
-      prisma.absenteeism.count({ where: { waSentAt: { not: null }, deletedAt: null } }),
-      prisma.absenteeism.count({ where: { waSentAt: null, deletedAt: null } }),
-      prisma.writtenWarning.count({ where: { deletedAt: null } }),
-      // groupBy yerine COUNT DISTINCT — tüm satırları çekmek yerine yalnızca sayıyı döndürür
+      prisma.absenteeism.count({ where: { deletedAt: null, student: { status: 'ACTIVE', deletedAt: null } } }),
+      prisma.absenteeism.count({ where: { waSentAt: { not: null }, deletedAt: null, student: { status: 'ACTIVE', deletedAt: null } } }),
+      prisma.absenteeism.count({ where: { waSentAt: null, deletedAt: null, student: { status: 'ACTIVE', deletedAt: null } } }),
+      prisma.writtenWarning.count({ where: { deletedAt: null, student: { status: 'ACTIVE', deletedAt: null } } }),
       prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(DISTINCT studentId) as count
-        FROM WrittenWarning
-        WHERE deletedAt IS NULL
+        SELECT COUNT(DISTINCT w.studentId) as count
+        FROM WrittenWarning w
+        INNER JOIN Student s ON s.id = w.studentId
+        WHERE w.deletedAt IS NULL AND s.status = 'ACTIVE' AND s.deletedAt IS NULL
       `,
       prisma.violationUpload.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { deletedAt: null } }),
       prisma.dailyViolation.count({ where: { isConfirmed: true, deletedAt: null } }),
-      prisma.parent.count({ where: { contacts: { some: { waConsentStatus: 'ACCEPTED' } } } }),
+      prisma.parentContact.count({
+        where: {
+          waConsentStatus: 'ACCEPTED',
+          parent: {
+            deletedAt: null,
+            students: { some: { status: 'ACTIVE', deletedAt: null } },
+          },
+        },
+      }),
       prisma.schoolSettings.findUnique({ where: { id: 'singleton' } }),
       prisma.fieldTrip.count(),
       prisma.commission.count({ where: { status: 'AKTIF' } }),
@@ -98,6 +118,7 @@ export class DashboardService {
         sentCount: absenteeismSent,
         notSentCount: absenteeismNotSent,
       },
+      dailyAbsenteeismTodaySent: todayDailyAbsenteeismSent,
       warnings: {
         total: warningTotal,
         studentsWithWarnings: Number(warningStudents[0]?.count ?? 0),

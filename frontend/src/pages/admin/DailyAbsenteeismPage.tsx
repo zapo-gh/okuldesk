@@ -24,7 +24,11 @@ import {
   Eye,
   Sliders,
   Info,
-  X
+  X,
+  Printer,
+  Loader2,
+  Layers,
+  List
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -34,6 +38,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { ActionModal } from '../../components/ui/ActionModal';
 import { Button } from '../../components/ui/Button';
+import { printPdfBlob } from '../../utils/printPdf';
 
 interface StudentParent {
   id: string;
@@ -149,11 +154,21 @@ export default function DailyAbsenteeismPage() {
   const [antiSpamMinDelay, setAntiSpamMinDelay] = useState<number>(4);
   const [antiSpamMaxDelay, setAntiSpamMaxDelay] = useState<number>(7);
 
+  // Ayarlardaki anlık devamsızlık şablonuyla senkronize et
+  useEffect(() => {
+    if (settings?.waTemplateDaily && settings.waTemplateDaily.trim()) {
+      setTemplateText(settings.waTemplateDaily);
+    }
+  }, [settings?.waTemplateDaily]);
+
   // ── Geçmiş / Tarihçe ──
   const [historyList, setHistoryList] = useState<NotificationHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [historySearch, setHistorySearch] = useState<string>('');
   const [historySessionFilter, setHistorySessionFilter] = useState<string>('ALL');
+  const [historyClassFilter, setHistoryClassFilter] = useState<string>('ALL');
+  const [historyViewMode, setHistoryViewMode] = useState<'grouped' | 'table'>('grouped');
+  const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
   const [viewHistoryModalItem, setViewHistoryModalItem] = useState<NotificationHistoryItem | null>(null);
 
   // ── Canlı Gönderim Motoru State ──
@@ -615,6 +630,8 @@ export default function DailyAbsenteeismPage() {
     return historyList.filter(item => {
       const matchSession = historySessionFilter === 'ALL' || item.sessionType === historySessionFilter;
       if (!matchSession) return false;
+      const matchClass = historyClassFilter === 'ALL' || (item.className || 'Diğer') === historyClassFilter;
+      if (!matchClass) return false;
       if (!historySearch.trim()) return true;
       const q = normalizeTr(historySearch);
       return (
@@ -625,7 +642,70 @@ export default function DailyAbsenteeismPage() {
         normalizeTr(item.parentPhone || '').includes(q)
       );
     });
-  }, [historyList, historySearch, historySessionFilter]);
+  }, [historyList, historySearch, historySessionFilter, historyClassFilter]);
+
+  // ── Geçmişteki Benzersiz Sınıflar ──
+  const historyAvailableClasses = useMemo(() => {
+    const counts: Record<string, number> = {};
+    historyList.forEach(item => {
+      const cls = (item.className || 'Diğer').trim();
+      counts[cls] = (counts[cls] || 0) + 1;
+    });
+    return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b, 'tr-TR', { numeric: true }));
+  }, [historyList]);
+
+  // ── Sınıf Bazlı Gruplama ──
+  const groupedHistory = useMemo(() => {
+    const map: Record<string, NotificationHistoryItem[]> = {};
+    filteredHistory.forEach(item => {
+      const cls = (item.className || 'Diğer').trim();
+      if (!map[cls]) map[cls] = [];
+      map[cls].push(item);
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b, 'tr-TR', { numeric: true }));
+  }, [filteredHistory]);
+
+  // ── Günlük PDF Rapor İndir / Önizle ──
+  const handleDownloadPdfReport = async () => {
+    if (filteredHistory.length === 0) {
+      toast.error('Rapor oluşturmak için seçili filtrede kayıtlı bildirim bulunmuyor.');
+      return;
+    }
+
+    setPdfGenerating(true);
+    const toastId = toast.loading('Günlük anlık devamsızlık raporu hazırlanıyor...');
+    try {
+      const res = await api.get('/daily-absenteeism/report/pdf', {
+        params: {
+          date: targetDate,
+          sessionType: historySessionFilter,
+          className: historyClassFilter,
+        },
+        responseType: 'blob',
+      });
+
+      const formattedDate = targetDate.split('-').reverse().join('.');
+      printPdfBlob(res.data as Blob, {
+        title: `${formattedDate} Günlük Devamsızlık Bildirim Çizelgesi`,
+        subtitle: `${settings?.schoolName || 'Okul Müdürlüğü'} · Toplam ${filteredHistory.length} öğrencinin veli bilgilendirme kayıtları`,
+        fileName: `Gunluk_Devamsizlik_Raporu_${targetDate}.pdf`,
+        onOpenInSystem: async () => {
+          await api.post('/daily-absenteeism/report/pdf/open', null, {
+            params: {
+              date: targetDate,
+              sessionType: historySessionFilter,
+              className: historyClassFilter,
+            },
+          });
+        },
+      });
+      toast.success('Günlük devamsızlık PDF raporu açıldı.', { id: toastId });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'PDF rapor hazırlanırken hata oluştu.', { id: toastId });
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   // ── KVKK Rozet Yardımcısı ──
   const renderConsentBadge = (status: 'ACCEPTED' | 'DECLINED' | 'PENDING' | undefined) => {
@@ -1364,22 +1444,44 @@ export default function DailyAbsenteeismPage() {
 
       {/* ── ALT BÖLÜM: Günlük Bildirim Geçmişi (Tarihçe) ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
-            <History size={18} className="text-indigo-600" />
+            <History size={18} className="text-indigo-600 shrink-0" />
             <div>
-              <h3 className="text-sm font-bold text-slate-800">Günlük WhatsApp Bildirim Geçmişi</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800">Günlük WhatsApp Bildirim Geçmişi</h3>
+                <span className="text-[11px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200">
+                  {filteredHistory.length} Kayıt
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
-                {targetDate} tarihinde velilere iletilen anlık devamsızlık bildirimleri
+                {targetDate.split('-').reverse().join('.')} tarihinde velilere iletilen anlık devamsızlık bildirimleri
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sınıf Filtresi */}
+            <select
+              value={historyClassFilter}
+              onChange={e => setHistoryClassFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              title="Sınıfa göre filtrele"
+            >
+              <option value="ALL">Tüm Sınıflar ({historyList.length})</option>
+              {historyAvailableClasses.map(([cls, count]) => (
+                <option key={cls} value={cls}>
+                  {cls} Sınıfı ({count})
+                </option>
+              ))}
+            </select>
+
+            {/* Oturum Filtresi */}
             <select
               value={historySessionFilter}
               onChange={e => setHistorySessionFilter(e.target.value)}
               className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              title="Oturuma göre filtrele"
             >
               <option value="ALL">Tüm Zamanlar</option>
               <option value="MORNING">Sabah İlk Ders</option>
@@ -1387,24 +1489,72 @@ export default function DailyAbsenteeismPage() {
               <option value="FULL_DAY">Tam Gün</option>
             </select>
 
+            {/* Arama Kutusu */}
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Geçmişte ara..."
+                placeholder="Öğrenci, veli ara..."
                 value={historySearch}
                 onChange={e => setHistorySearch(e.target.value)}
-                className="bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-40"
+                className="bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-36"
               />
             </div>
 
+            {/* Görünüm Modu Değiştirici */}
+            <div className="flex items-center border border-slate-300 rounded-lg bg-slate-50 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setHistoryViewMode('grouped')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
+                  historyViewMode === 'grouped'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Sınıflara göre gruplandırılmış görünüm"
+              >
+                <Layers size={13} />
+                <span>Sınıf Bazlı</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryViewMode('table')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
+                  historyViewMode === 'table'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Düz liste görünümü"
+              >
+                <List size={13} />
+                <span>Düz Liste</span>
+              </button>
+            </div>
+
+            {/* Günlük PDF Rapor İndir Butonu */}
             <Button
+              type="button"
               variant="outline"
+              size="sm"
+              onClick={handleDownloadPdfReport}
+              disabled={pdfGenerating || filteredHistory.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-indigo-700 bg-indigo-50/80 border-indigo-200 hover:bg-indigo-100 cursor-pointer"
+              title="Günlük bildirilen tüm öğrencilerin resmi MEB PDF çizelgesini indir/yazdır"
+            >
+              {pdfGenerating ? <Loader2 size={13} className="animate-spin text-indigo-600" /> : <Printer size={13} />}
+              <span>Günlük PDF Rapor</span>
+            </Button>
+
+            {/* Yenile Butonu */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={fetchHistory}
               title="Yenile"
-              className="p-1.5"
+              className="p-1.5 cursor-pointer"
             >
-              <RefreshCw size={13} className={historyLoading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={historyLoading ? 'animate-spin text-indigo-600' : ''} />
             </Button>
           </div>
         </div>
@@ -1418,7 +1568,117 @@ export default function DailyAbsenteeismPage() {
           <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
             {targetDate} tarihinde gönderilmiş herhangi bir bildirim bulunamadı.
           </div>
+        ) : historyViewMode === 'grouped' ? (
+          /* ── Sınıf Bazlı Gruplu Görünüm ── */
+          <div className="space-y-4">
+            {groupedHistory.map(([clsName, classRows]) => {
+              const classSent = classRows.filter(r => r.status === 'SENT').length;
+              const classFailed = classRows.length - classSent;
+              return (
+                <div key={clsName} className="border border-slate-200 rounded-xl overflow-hidden shadow-xs bg-white">
+                  {/* Sınıf Kart Başlığı */}
+                  <div className="bg-slate-50/95 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-xs bg-indigo-100/70 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-md">
+                        {clsName} Sınıfı
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        ({classRows.length} Öğrenci)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        <CheckCircle2 size={12} /> {classSent} İletildi
+                      </span>
+                      {classFailed > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded-full">
+                          <XCircle size={12} /> {classFailed} Başarısız
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sınıf Öğrenci Tablosu */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/40 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+                          <th className="py-2 px-3 w-16">Saat</th>
+                          <th className="py-2 px-3 w-20">Okul No</th>
+                          <th className="py-2 px-3">Öğrenci Adı Soyadı</th>
+                          <th className="py-2 px-3">Oturum</th>
+                          <th className="py-2 px-3">Veli ve Telefon</th>
+                          <th className="py-2 px-3 w-24">Durum</th>
+                          <th className="py-2 px-3 text-right w-16">İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {classRows.map(row => {
+                          const sentTimeStr = new Date(row.sentAt).toLocaleTimeString('tr-TR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          });
+                          return (
+                            <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2 px-3 font-mono text-slate-600">{sentTimeStr}</td>
+                              <td className="py-2 px-3 font-mono font-bold text-indigo-700">{row.schoolNumber || '-'}</td>
+                              <td className="py-2 px-3 font-bold text-slate-800">{row.studentName || 'Bilinmiyor'}</td>
+                              <td className="py-2 px-3">
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-medium">
+                                  {SESSION_MAP[row.sessionType]?.icon} {SESSION_MAP[row.sessionType]?.label || row.sessionType}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="text-slate-800 font-semibold">{row.parentName || '-'}</span>
+                                <span className="text-[10px] text-slate-500 font-mono ml-1.5">({row.parentPhone})</span>
+                              </td>
+                              <td className="py-2 px-3">
+                                {row.status === 'SENT' ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                    <CheckCircle2 size={11} /> Başarılı
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full cursor-help"
+                                    title={row.errorMessage || 'Hata oluştu'}
+                                  >
+                                    <XCircle size={11} /> Başarısız
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                <div className="inline-flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewHistoryModalItem(row)}
+                                    className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                                    title="Mesajı İncele"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteHistory(row.id)}
+                                    className="p-1 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                                    title="Kaydı Sil"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* ── Düz Liste Görünümü ── */
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead>

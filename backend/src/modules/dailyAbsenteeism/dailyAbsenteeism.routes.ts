@@ -12,5 +12,7 @@ router.post('/check-duplicates', (req, res, next) => dailyAbsenteeismController.
 router.get('/history', (req, res, next) => dailyAbsenteeismController.getHistory(req, res, next));
 router.post('/send-single', (req, res, next) => dailyAbsenteeismController.sendSingle(req, res, next));
 router.delete('/history/:id', (req, res, next) => dailyAbsenteeismController.deleteHistoryItem(req, res, next));
+router.get('/report/pdf', (req, res, next) => dailyAbsenteeismController.downloadReportPdf(req, res, next));
+router.post('/report/pdf/open', (req, res, next) => dailyAbsenteeismController.openReportPdfInSystem(req, res, next));
 
 export default router;

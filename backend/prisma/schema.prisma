@@ -183,9 +183,13 @@ model SchoolSettings {
   schoolName        String    @default("")
   principalName     String    @default("")
   academicYear      String    @default("2025-2026")
-  waTemplate1       String?   @default("")
-  waTemplate2       String?   @default("")
-  waTemplate3       String?   @default("")
+  waTemplate1                String?   @default("")
+  waTemplate2                String?   @default("")
+  waTemplate3                String?   @default("")
+  waTemplateBep              String?   @default("")
+  waTemplateDaily            String?   @default("")
+  waTemplateWarningNotice    String?   @default("")
+  waTemplateConsentRequest   String?   @default("")
   dutyRotationFreq  String    @default("weekly") // none, weekly, biweekly, monthly, custom
   dutyRotationDates String?   @default("[]") // JSON string array of dates for custom rotation
   dutyStartDate     String? // "YYYY-MM-DD" — nöbet başlangıç tarihi (null = kısıtsız)

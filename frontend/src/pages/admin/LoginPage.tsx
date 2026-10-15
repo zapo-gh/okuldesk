@@ -2,7 +2,7 @@ import toast from 'react-hot-toast';
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { GraduationCap, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Network } from 'lucide-react';
+import { GraduationCap, Lock, User, ArrowRight, ShieldCheck, Eye, EyeOff, Network, AlertCircle, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { getEffectiveServerUrl, isClientMode } from '../../services/api';
 import { NetworkSetupModal } from '../../components/NetworkSetupModal';
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === '1');
   const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const serverUrl = getEffectiveServerUrl();
   const isClient = isClientMode();
@@ -39,7 +40,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    void 0;
+    setErrorMessage(null);
     setSlowWarning(false);
     setLoading(true);
 
@@ -56,7 +57,11 @@ export default function LoginPage() {
       }
       navigate('/admin');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Giriş başarısız. Lütfen tekrar deneyin.');
+      const msg = err.response?.data?.message || 'Kullanıcı adı veya şifre hatalı! Lütfen bilgilerinizi kontrol edip tekrar deneyiniz.';
+      setErrorMessage(msg);
+      toast.error(msg, { duration: 4000 });
+      passwordRef.current?.focus();
+      passwordRef.current?.select();
     } finally {
       setLoading(false);
       setSlowWarning(false);
@@ -88,6 +93,24 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {errorMessage && (
+          <div className="flex items-start gap-2.5 p-3.5 mb-4 rounded-xl bg-red-50/95 border border-red-200 text-red-800 text-xs font-medium shadow-sm animate-in fade-in zoom-in-95">
+            <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-bold text-red-900 mb-0.5">Giriş Başarısız!</div>
+              <div>{errorMessage}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-red-400 hover:text-red-700 p-0.5 transition cursor-pointer"
+              title="Kapat"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {slowWarning && (
           <div className="text-xs px-3.5 py-2.5 rounded-lg mb-4 bg-yellow-50 text-yellow-700 border border-yellow-200">
             ⏳ Sunucu hazırlanıyor, lütfen bekleyin...
@@ -106,11 +129,18 @@ export default function LoginPage() {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="Kullanıcı adınızı giriniz"
                 required
                 ref={usernameRef}
-                className="w-full py-2.5 pr-3.5 pl-10 rounded-xl border border-slate-300 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+                className={`w-full py-2.5 pr-3.5 pl-10 rounded-xl border text-sm outline-none transition-all placeholder:text-slate-400 ${
+                  errorMessage
+                    ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                    : 'border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                }`}
               />
             </div>
           </div>
@@ -126,11 +156,18 @@ export default function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="Şifrenizi giriniz"
                 required
                 ref={passwordRef}
-                className="w-full py-2.5 pr-11 pl-10 rounded-xl border border-slate-300 text-sm outline-none transition-all focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+                className={`w-full py-2.5 pr-11 pl-10 rounded-xl border text-sm outline-none transition-all placeholder:text-slate-400 ${
+                  errorMessage
+                    ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-100'
+                    : 'border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+                }`}
               />
               <button
                 type="button"

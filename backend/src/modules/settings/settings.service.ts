@@ -21,6 +21,10 @@ class SettingsService {
       waTemplate1: settings.waTemplate1 ?? '',
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',
+      waTemplateBep: (settings as any).waTemplateBep ?? '',
+      waTemplateDaily: (settings as any).waTemplateDaily ?? '',
+      waTemplateWarningNotice: (settings as any).waTemplateWarningNotice ?? '',
+      waTemplateConsentRequest: (settings as any).waTemplateConsentRequest ?? '',
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
       dutyRotationDates: settings.dutyRotationDates ?? '[]',
       dutyStartDate: settings.dutyStartDate ?? null,
@@ -42,6 +46,10 @@ class SettingsService {
     waTemplate1?: string;
     waTemplate2?: string;
     waTemplate3?: string;
+    waTemplateBep?: string;
+    waTemplateDaily?: string;
+    waTemplateWarningNotice?: string;
+    waTemplateConsentRequest?: string;
     dutyRotationFreq?: string;
     dutyRotationDates?: string;
     dutyStartDate?: string | null;
@@ -64,6 +72,10 @@ class SettingsService {
         waTemplate1: data.waTemplate1 ?? '',
         waTemplate2: data.waTemplate2 ?? '',
         waTemplate3: data.waTemplate3 ?? '',
+        waTemplateBep: data.waTemplateBep ?? '',
+        waTemplateDaily: data.waTemplateDaily ?? '',
+        waTemplateWarningNotice: data.waTemplateWarningNotice ?? '',
+        waTemplateConsentRequest: data.waTemplateConsentRequest ?? '',
         dutyRotationFreq: data.dutyRotationFreq ?? 'weekly',
         dutyRotationDates: data.dutyRotationDates ?? '[]',
         dutyStartDate: data.dutyStartDate ?? null,
@@ -82,6 +94,10 @@ class SettingsService {
         ...(data.waTemplate1 !== undefined && { waTemplate1: data.waTemplate1 }),
         ...(data.waTemplate2 !== undefined && { waTemplate2: data.waTemplate2 }),
         ...(data.waTemplate3 !== undefined && { waTemplate3: data.waTemplate3 }),
+        ...(data.waTemplateBep !== undefined && { waTemplateBep: data.waTemplateBep }),
+        ...(data.waTemplateDaily !== undefined && { waTemplateDaily: data.waTemplateDaily }),
+        ...(data.waTemplateWarningNotice !== undefined && { waTemplateWarningNotice: data.waTemplateWarningNotice }),
+        ...(data.waTemplateConsentRequest !== undefined && { waTemplateConsentRequest: data.waTemplateConsentRequest }),
         ...(data.dutyRotationFreq !== undefined && { dutyRotationFreq: data.dutyRotationFreq }),
         ...(data.dutyRotationDates !== undefined && { dutyRotationDates: data.dutyRotationDates }),
         ...(data.dutyStartDate !== undefined && { dutyStartDate: data.dutyStartDate }),
@@ -105,6 +121,10 @@ class SettingsService {
       waTemplate1: settings.waTemplate1 ?? '',
       waTemplate2: settings.waTemplate2 ?? '',
       waTemplate3: settings.waTemplate3 ?? '',
+      waTemplateBep: (settings as any).waTemplateBep ?? '',
+      waTemplateDaily: (settings as any).waTemplateDaily ?? '',
+      waTemplateWarningNotice: (settings as any).waTemplateWarningNotice ?? '',
+      waTemplateConsentRequest: (settings as any).waTemplateConsentRequest ?? '',
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
       dutyRotationDates: settings.dutyRotationDates ?? '[]',
       dutyStartDate: settings.dutyStartDate ?? null,

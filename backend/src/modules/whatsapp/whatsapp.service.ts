@@ -378,6 +378,7 @@ export interface ConsentMessageDetails {
   parentName?: string;
   schoolName?: string;
   schoolPhone?: string;
+  template?: string;
 }
 
 export async function sendConsentRequest(
@@ -409,15 +410,31 @@ export async function sendConsentRequest(
     ? `📞 *Tereddüt halinde teyit için okul tel:* ${details.schoolPhone}\n\n`
     : '';
 
-  const text =
-    schoolTitle +
-    greeting +
-    `Okulumuz, öğrencimizin eğitim-öğretim sürecine ilişkin *devamsızlık bildirimleri, yazılı uyarılar ve resmi okul duyurularını* WhatsApp iletişim hattı üzerinden sizlere doğrudan ve hızlı şekilde iletmek istemektedir.\n\n` +
-    `6698 sayılı KVKK kapsamındaki Aydınlatma Metnini incelemek ve WhatsApp iletişim onay tercihinizi belirlemek için lütfen aşağıdaki güvenli bağlantıyı açınız:\n\n` +
-    linkPart +
-    `Tercihinizi ayrıca dilediğiniz takdirde okul idaremizden temin edebileceğiniz 2 sayfalık matbu formu elden imzalayarak da iletebilirsiniz.\n\n` +
-    phonePart +
-    `Saygılarımızla,\n*${schoolUpper} MÜDÜRLÜĞÜ*`;
+  let text = '';
+  if (details?.template && details.template.trim()) {
+    text = details.template
+      .replace(/\{\{?okulAdi\}?\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => `${schoolUpper} MÜDÜRLÜĞÜ`)
+      .replace(/\{\{?okul_adi\}?\}\s*(?:Müdürlüğü|MÜDÜRLÜĞÜ|müdürlüğü)/gi, () => `${schoolUpper} MÜDÜRLÜĞÜ`)
+      .replace(/\{\{?okulAdi\}?\}/gi, () => schoolClean)
+      .replace(/\{\{?okul_adi\}?\}/gi, () => schoolClean)
+      .replace(/\{\{?onayLinki\}?\}/gi, () => consentLink || '')
+      .replace(/\{\{?onay_linki\}?\}/gi, () => consentLink || '')
+      .replace(/\{\{?link\}?\}/gi, () => consentLink || '')
+      .replace(/\{\{?okulTelefon\}?\}/gi, () => details.schoolPhone || '')
+      .replace(/\{\{?okul_telefonu\}?\}/gi, () => details.schoolPhone || '')
+      .replace(/\{\{?telefon\}?\}/gi, () => details.schoolPhone || '')
+      .trim();
+  } else {
+    text =
+      schoolTitle +
+      greeting +
+      `Okulumuz, öğrencimizin eğitim-öğretim sürecine ilişkin *devamsızlık bildirimleri, yazılı uyarılar ve resmi okul duyurularını* WhatsApp iletişim hattı üzerinden sizlere doğrudan ve hızlı şekilde iletmek istemektedir.\n\n` +
+      `6698 sayılı KVKK kapsamındaki Aydınlatma Metnini incelemek ve WhatsApp iletişim onay tercihinizi belirlemek için lütfen aşağıdaki güvenli bağlantıyı açınız:\n\n` +
+      linkPart +
+      `Tercihinizi ayrıca dilediğiniz takdirde okul idaremizden temin edebileceğiniz 2 sayfalık matbu formu elden imzalayarak da iletebilirsiniz.\n\n` +
+      phonePart +
+      `Saygılarımızla,\n*${schoolUpper} MÜDÜRLÜĞÜ*`;
+  }
 
   await enqueueSend(async () => {
     ensureConnected();
