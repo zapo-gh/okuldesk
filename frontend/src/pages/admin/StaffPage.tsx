@@ -5,9 +5,10 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable, Column } from '../../components/ui/DataTable';
 import { ActionModal } from '../../components/ui/ActionModal';
-import { Users, Plus, Edit, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2, Search, X, Filter } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Compass, BookOpen, Upload, AlertCircle, Building2, Search, X, Filter, Smartphone } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
+import { formatPhoneNumber } from '../../utils/formatters';
 
 export type StaffRole = 'KURUM_PERSONELI' | 'MUDUR_YARDIMCISI' | 'REHBER_OGRETMEN' | 'SINIF_REHBER_OGRETMEN';
 
@@ -16,7 +17,9 @@ interface StaffMember {
   name: string;
   title: StaffRole;
   className?: string | null;
+  phone?: string | null;
   clubName?: string | null;
+  clubs?: string[] | null;
   tcKimlikNo?: string | null;
   brans?: string | null;
   kurumSicilNo?: string | null;
@@ -25,6 +28,7 @@ interface StaffMember {
   gorev?: string | null;
   isActive: boolean;
   createdAt: string;
+  extraData?: string | null;
 }
 
 const ROLE_LABELS: Record<StaffRole, string> = {
@@ -43,7 +47,7 @@ const ROLE_ICONS: Record<StaffRole, React.ReactNode> = {
 
 const emptyForm = { 
   name: '', title: 'KURUM_PERSONELI' as StaffRole, className: '',
-  tcKimlikNo: '', brans: '', kurumSicilNo: '', emekliSicilNo: '', unvan: '', gorev: ''
+  phone: '', tcKimlikNo: '', brans: '', kurumSicilNo: '', emekliSicilNo: '', unvan: '', gorev: ''
 };
 
 export default function StaffPage() {
@@ -99,11 +103,27 @@ export default function StaffPage() {
   };
 
   const openEdit = (s: StaffMember) => {
+    let initialPhone = s.phone || '';
+    if (!initialPhone && s.extraData) {
+      try {
+        const extra = typeof s.extraData === 'string' ? JSON.parse(s.extraData) : s.extraData;
+        initialPhone =
+          extra['Cep Telefonu'] ||
+          extra['Telefon'] ||
+          extra['GSM'] ||
+          extra['Telefon No'] ||
+          extra['Cep No'] ||
+          extra['phone'] ||
+          '';
+      } catch {}
+    }
+
     setEditTarget(s);
     setForm({ 
       name: s.name, 
       title: s.title, 
       className: s.className || '',
+      phone: initialPhone || '',
       tcKimlikNo: s.tcKimlikNo || '',
       brans: s.brans || '',
       kurumSicilNo: s.kurumSicilNo || '',
@@ -126,6 +146,7 @@ export default function StaffPage() {
         name: form.name.trim(),
         title: form.title,
         className: form.className?.trim() || undefined,
+        phone: form.phone?.trim() || undefined,
         tcKimlikNo: form.tcKimlikNo || undefined,
         brans: form.brans || undefined,
         kurumSicilNo: form.kurumSicilNo || undefined,
@@ -248,7 +269,7 @@ export default function StaffPage() {
           aria-label="Tümünü seç"
         />
       ),
-      className: 'w-12 text-center',
+      className: 'w-10 px-2 text-center',
       render: (s) => (
         <input 
           type="checkbox" 
@@ -261,19 +282,36 @@ export default function StaffPage() {
     },
     {
       header: 'Ad Soyad',
-      render: (s) => (
-        <div>
-          <span className="font-semibold text-gray-900">{s.name}</span>
-          <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-            {s.tcKimlikNo && <span>TC: {s.tcKimlikNo}</span>}
-            {s.kurumSicilNo && <span>• Sicil: {s.kurumSicilNo}</span>}
+      className: 'px-3',
+      render: (s) => {
+        let phoneDisplay = s.phone;
+        if (!phoneDisplay && s.extraData) {
+          try {
+            const extra = typeof s.extraData === 'string' ? JSON.parse(s.extraData) : s.extraData;
+            phoneDisplay = extra['Cep Telefonu'] || extra['Telefon'] || extra['GSM'] || extra['Telefon No'] || extra['phone'];
+          } catch {}
+        }
+
+        return (
+          <div>
+            <span className="font-semibold text-gray-900">{s.name}</span>
+            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5 flex-wrap">
+              {phoneDisplay && (
+                <span className="text-emerald-700 font-mono font-medium flex items-center gap-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  <Smartphone size={11} className="text-emerald-600" />
+                  {formatPhoneNumber(phoneDisplay)}
+                </span>
+              )}
+              {s.tcKimlikNo && <span>TC: {s.tcKimlikNo}</span>}
+              {s.kurumSicilNo && <span>• Sicil: {s.kurumSicilNo}</span>}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Unvan & Görev',
-      className: 'hidden md:table-cell',
+      className: 'hidden md:table-cell px-3',
       render: (s) => (
         <div>
           <div className="font-medium text-gray-800">{s.unvan || ROLE_LABELS[s.title] || '-'}</div>
@@ -283,36 +321,45 @@ export default function StaffPage() {
     },
     {
       header: 'Branş',
-      className: 'hidden lg:table-cell',
+      className: 'hidden lg:table-cell px-3',
       render: (s) => (
         <span className="text-gray-700 font-medium">{s.brans || '-'}</span>
       ),
     },
     {
       header: 'Sınıf / Kulüp',
-      render: (s) => (
-        <div className="flex flex-col gap-1 items-start">
-          {s.className && (
-            <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200">
-              Sınıf: {s.className}
-            </span>
-          )}
-          {s.clubName && (
-            <span className="inline-flex items-center px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-xs font-semibold border border-emerald-200">
-              Kulüp: {s.clubName}
-            </span>
-          )}
-          {!s.className && !s.clubName && (
-            <span className="text-gray-400 text-xs italic">- Yok -</span>
-          )}
-        </div>
-      ),
+      className: 'px-3 whitespace-nowrap',
+      render: (s) => {
+        const clubs = s.clubs?.length ? s.clubs : (s.clubName ? [s.clubName] : []);
+
+        return (
+          <div className="flex flex-col gap-1 items-start whitespace-nowrap">
+            {s.className && (
+              <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded-md text-xs font-semibold border border-amber-200">
+                Sınıf: {s.className}
+              </span>
+            )}
+            {clubs.map((club, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-xs font-semibold border border-emerald-200 whitespace-nowrap"
+              >
+                Kulüp: {club}
+              </span>
+            ))}
+            {!s.className && clubs.length === 0 && (
+              <span className="text-gray-400 text-xs italic">- Yok -</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'İşlemler',
       align: 'right',
+      className: 'w-20 px-2 text-right',
       render: (s) => (
-        <div className="flex justify-end gap-1.5">
+        <div className="flex justify-end gap-1">
           {viewMode === 'active' ? (
             <>
               <button 
@@ -437,10 +484,12 @@ export default function StaffPage() {
         for (const row of jsonData) {
           const tc = row['T.C. Kimlik No'] || row['TC Kimlik No'] || row['TC'] || row['tcKimlikNo'] || row['TC KİMLİK NO'];
           const name = row['Adı Soyadı'] || row['Ad Soyad'] || row['ADI SOYADI'] || row['name'];
+          const phone = row['Cep Telefonu'] || row['Telefon'] || row['GSM'] || row['Telefon No'] || row['Cep No'] || row['TEL'] || row['phone'] || '';
           
           if (name) {
             parsedStaff.push({
                name: String(name).trim(),
+               phone: phone ? String(phone).trim() : '',
                tcKimlikNo: tc ? String(tc).trim() : '',
                unvan: row['Unvan'] || row['Unvanı'] || row['UNVAN'] || '',
                gorev: row['Görev'] || row['Görevi'] || row['GÖREV'] || '',
@@ -468,6 +517,7 @@ export default function StaffPage() {
       const payload = importData.map(s => ({
         name: s.name,
         role: 'KURUM_PERSONELI',
+        phone: s.phone || undefined,
         tcKimlikNo: s.tcKimlikNo,
         brans: s.brans,
         kurumSicilNo: s.kurumSicilNo,
@@ -622,8 +672,6 @@ export default function StaffPage() {
           data={filteredStaff}
           columns={columns}
           loading={loading}
-          exportable={true}
-          exportFilename="Personel_Listesi"
           emptyMessage={searchTerm || selectedBranch || selectedRole ? "Arama veya filtre kriterlerine uygun personel bulunamadı." : "Henüz personel kaydı bulunmuyor."}
           rowClassName={(s) => selectedIds.has(s.id) ? 'bg-indigo-50/40' : ''}
         />
@@ -670,7 +718,7 @@ export default function StaffPage() {
                 <option value="SINIF_REHBER_OGRETMEN">Sınıf Rehber Öğretmeni</option>
               </select>
             </div>
-            {form.title === 'SINIF_REHBER_OGRETMEN' && (
+            {form.title === 'SINIF_REHBER_OGRETMEN' ? (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Olduğu Sınıf</label>
                 <input
@@ -681,8 +729,38 @@ export default function StaffPage() {
                   placeholder="Örn: 9-A"
                 />
               </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Smartphone size={15} className="text-emerald-600" />
+                  <span>Cep Telefonu (WhatsApp)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                  placeholder="05xx xxx xx xx"
+                />
+              </div>
             )}
           </div>
+
+          {form.title === 'SINIF_REHBER_OGRETMEN' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                <Smartphone size={15} className="text-emerald-600" />
+                <span>Cep Telefonu (WhatsApp)</span>
+              </label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                placeholder="05xx xxx xx xx"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
             <div>

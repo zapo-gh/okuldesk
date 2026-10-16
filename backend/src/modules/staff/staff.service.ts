@@ -45,7 +45,8 @@ class StaffService {
 
       return {
         ...staff,
-        clubName: myClubs.length > 0 ? myClubs.map(c => c.name).join(', ') : null
+        clubName: myClubs.length > 0 ? myClubs.map(c => c.name).join(', ') : null,
+        clubs: myClubs.map(c => c.name)
       };
     });
   }
@@ -76,6 +77,7 @@ class StaffService {
     name: string; 
     title: StaffRole; 
     className?: string;
+    phone?: string;
     tcKimlikNo?: string;
     brans?: string;
     kurumSicilNo?: string;
@@ -95,6 +97,7 @@ class StaffService {
         name: data.name.trim(),
         title: data.title,
         className: data.title === 'SINIF_REHBER_OGRETMEN' ? data.className!.trim() : null,
+        phone: data.phone?.trim() || null,
         tcKimlikNo: data.tcKimlikNo,
         brans: data.brans,
         kurumSicilNo: data.kurumSicilNo,
@@ -113,6 +116,7 @@ class StaffService {
       name: (s.name || '').trim(),
       title: s.title || 'KURUM_PERSONELI',
       className: s.className || null,
+      phone: s.phone || null,
       tcKimlikNo: s.tcKimlikNo || null,
       brans: s.brans || null,
       kurumSicilNo: s.kurumSicilNo || null,
@@ -134,6 +138,7 @@ class StaffService {
     name?: string; 
     title?: StaffRole;
     className?: string; 
+    phone?: string;
     isActive?: boolean;
     tcKimlikNo?: string;
     brans?: string;
@@ -152,6 +157,7 @@ class StaffService {
         ...(data.name !== undefined && { name: data.name.trim() }),
         ...(data.title !== undefined && { title: data.title }),
         ...(data.className !== undefined && { className: data.className?.trim() || null }),
+        ...(data.phone !== undefined && { phone: data.phone?.trim() || null }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
         ...(data.tcKimlikNo !== undefined && { tcKimlikNo: data.tcKimlikNo }),
         ...(data.brans !== undefined && { brans: data.brans }),

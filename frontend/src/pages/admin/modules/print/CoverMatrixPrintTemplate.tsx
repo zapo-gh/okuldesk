@@ -9,13 +9,16 @@ export interface CoverMatrixPrintTemplateProps {
   staffList?: any[];
   schoolName?: string;
   onlyAssigned?: boolean;
+  showMerged?: boolean;
   classDisplayMap?: Record<string, string>;
+  printNotes?: string;
+  printNotesEnabled?: boolean;
 }
 
 export const CoverMatrixPrintTemplate = React.forwardRef<
   HTMLDivElement,
   CoverMatrixPrintTemplateProps
->(({ date, covers, absences, dailyDutyStaff, staffList = [], schoolName, onlyAssigned = true, classDisplayMap = {} }, ref) => {
+>(({ date, covers, absences, dailyDutyStaff, staffList = [], schoolName, onlyAssigned = true, showMerged = true, classDisplayMap = {}, printNotes, printNotesEnabled }, ref) => {
   const dateObj = new Date(date);
   const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' });
   const dayNameCap = dayName.charAt(0).toUpperCase() + dayName.slice(1);
@@ -42,13 +45,23 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
     return id ? String(id) : null;
   };
 
+  // Grup birleştirme filtresi uygulanmış geçerli görevlendirmeler
+  const effectiveCovers = covers.filter(c => {
+    if (c.isCancelled) return false;
+    const isMerged = Boolean(
+      c.isMerged ||
+      c.isCombined ||
+      (c.notes && c.notes.toLowerCase().includes('birleştir'))
+    );
+    if (!showMerged && isMerged) return false;
+    return true;
+  });
+
   // O gün fiilen en az 1 boş derse görevlendirilmiş öğretmenlerin ID kümesi
   const assignedTeacherIds = new Set<string>();
-  covers.forEach(c => {
-    if (!c.isCancelled) {
-      const subId = getAssignedStaffId(c);
-      if (subId) assignedTeacherIds.add(subId);
-    }
+  effectiveCovers.forEach(c => {
+    const subId = getAssignedStaffId(c);
+    if (subId) assignedTeacherIds.add(subId);
   });
 
   // Nöbetçi listesi: onlyAssigned=true ise SADECE görevi olan nöbetçiler ve görevlendirilmiş öğretmenler
@@ -77,8 +90,7 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
   });
 
   // 2. Nöbetçi olmayıp görevlendirilmiş diğer öğretmenler (örn. ders birleştirme için)
-  covers.forEach(c => {
-    if (c.isCancelled) return;
+  effectiveCovers.forEach(c => {
     const subId = getAssignedStaffId(c);
     if (!subId || addedStaffIds.has(subId)) return;
 
@@ -95,8 +107,8 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
   });
 
   // Görevlendirme Metni Satırları (Saate göre sıralı)
-  const validCovers = covers
-    .filter(c => !c.isCancelled && getAssignedStaffId(c))
+  const validCovers = effectiveCovers
+    .filter(c => getAssignedStaffId(c))
     .sort((a, b) => a.period - b.period);
 
   const assignmentTextItems = validCovers.map(c => {
@@ -112,13 +124,15 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
     const absentName = c.absentStaff?.name || '—';
     const reason = getAbsenceReason(c.absentStaffId || c.absentStaff?.id);
 
-    const isMerged = Boolean(c.isMerged || (c.notes && c.notes.toLowerCase().includes('birleştir')));
+    const isMerged = Boolean(c.isMerged || c.isCombined || (c.notes && c.notes.toLowerCase().includes('birleştir')));
     const displayClassName = parseAndStandardizeClass(c.className || '', classDisplayMap).displayName;
+    const mergedTeacher = c.mergedWithStaff?.name || c.presentCoTeachers?.[0]?.name || subName || 'Öğretmen';
+    const displayAbsentName = [c.absentStaff, ...(c.coAbsentStaffs || [])].filter(Boolean).map((s: any) => s.name).join(' & ') || absentName;
 
     if (isMerged) {
       return {
         period: c.period,
-        text: `${c.period}. saat — ${displayClassName} (${absentName} - ${reason}): Ders Birleştirilecek - ${subName}`
+        text: `${c.period}. saat — ${displayClassName} (${displayAbsentName} - ${reason}): Grup Birleştirilecek - ${mergedTeacher}`
       };
     }
 
@@ -137,10 +151,6 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
     >
       <style type="text/css" media="print">
         {`
-          @page {
-            size: landscape;
-            margin: 8mm;
-          }
           body {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -206,9 +216,8 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
 
                   {/* 1 - 11 Saatler */}
                   {periods.map(period => {
-                    const matchCover = covers.find(
+                    const matchCover = effectiveCovers.find(
                       c =>
-                        !c.isCancelled &&
                         c.period === period &&
                         getAssignedStaffId(c) === teacher.staffId
                     );
@@ -230,9 +239,11 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
                     );
                     const isMerged = Boolean(
                       matchCover.isMerged ||
+                        matchCover.isCombined ||
                         (matchCover.notes &&
                           matchCover.notes.toLowerCase().includes('birleştir'))
                     );
+                    const mergedTeacherName = matchCover.mergedWithStaff?.name || matchCover.presentCoTeachers?.[0]?.name;
 
                     return (
                       <td
@@ -243,8 +254,8 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
                           {parseAndStandardizeClass(matchCover.className || '', classDisplayMap).displayName}
                         </div>
                         {isMerged && (
-                          <div className="text-[8px] font-bold text-indigo-700 print:text-black">
-                            Ders Birleştirilecek
+                          <div className="text-[8px] font-bold text-purple-800 print:text-black">
+                            Grup Birleştirildi {mergedTeacherName ? `(${mergedTeacherName})` : ''}
                           </div>
                         )}
                         <div className="text-[9px] text-slate-600 print:text-slate-800 mt-0.5 leading-tight">
@@ -278,6 +289,18 @@ export const CoverMatrixPrintTemplate = React.forwardRef<
                 {item.text}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Resmi Açıklamalar / Notlar */}
+      {printNotesEnabled && printNotes && printNotes.trim() && (
+        <div className="mt-4 pt-2 border-t border-slate-300 text-[10px] text-slate-800 print:text-black">
+          <h4 className="font-bold uppercase text-[10px] text-slate-900 print:text-black mb-1">
+            Açıklamalar:
+          </h4>
+          <div className="whitespace-pre-line leading-relaxed text-[9.5px] pl-0.5">
+            {printNotes.trim()}
           </div>
         </div>
       )}

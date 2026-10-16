@@ -15,6 +15,30 @@ class TimetableService {
   }
 
   /**
+   * Aktif programa ait tüm ders atamalarını ve öğretmen bilgilerini döner.
+   * Günlük sınıf matrisi, öğretmen kartları ve toplu analizler için kullanılır.
+   */
+  async getAllActiveEntries(academicYear: string) {
+    const activeTable = await prisma.timetable.findFirst({
+      where: { academicYear, isActive: true },
+      select: { id: true, name: true, academicYear: true, createdAt: true }
+    });
+    if (!activeTable) return { timetable: null, entries: [] };
+
+    const entries = await prisma.timetableEntry.findMany({
+      where: { timetableId: activeTable.id },
+      include: {
+        staff: {
+          select: { id: true, name: true, brans: true, gorev: true }
+        }
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { period: 'asc' }]
+    });
+
+    return { timetable: activeTable, entries };
+  }
+
+  /**
    * Aktif programdaki benzersiz sınıf isimlerini döner (Frontend listesi için).
    */
   async getActiveClassList(academicYear: string): Promise<string[]> {
@@ -73,9 +97,24 @@ class TimetableService {
       dutyInfo = `${days[staff.dutyConfigs[0].fixedDayOfWeek]} (Sabit)`;
     }
 
+    const allClubs = await prisma.studentClub.findMany({
+      where: { academicYear, isActive: true, deletedAt: null },
+      select: { name: true, assignedStaffId: true, extraData: true }
+    });
+    const myClubs = allClubs.filter(c => {
+      if (c.assignedStaffId === staffId) return true;
+      if (c.extraData) {
+        try {
+          const ex = JSON.parse(c.extraData);
+          if (Array.isArray(ex.staffIds)) return ex.staffIds.includes(staffId);
+        } catch (e) {}
+      }
+      return false;
+    });
+
     const details = {
       homeroomClass: staff?.className || null,
-      clubs: staff?.studentClubs?.map(c => c.name).join(', ') || null,
+      clubs: myClubs.length > 0 ? myClubs.map(c => c.name).join(', ') : null,
       duty: dutyInfo
     };
 

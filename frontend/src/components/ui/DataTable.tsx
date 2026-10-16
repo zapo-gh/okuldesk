@@ -75,16 +75,20 @@ export function DataTable<T extends { id?: string | number }>({
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50/50">
             <tr>
-              {columns.map((col, i) => (
-                <th
-                  key={i}
-                  className={`px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider ${
-                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                  } ${col.className || ''}`}
-                >
-                  {col.header}
-                </th>
-              ))}
+              {columns.map((col, i) => {
+                const padX = col.className?.includes('px-') ? '' : 'px-4 sm:px-5';
+                const padY = col.className?.includes('py-') ? '' : 'py-3.5';
+                return (
+                  <th
+                    key={i}
+                    className={`${padX} ${padY} text-xs font-semibold text-gray-500 uppercase tracking-wider ${
+                      col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                    } ${col.className || ''}`}
+                  >
+                    {col.header}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 bg-white">
@@ -97,16 +101,21 @@ export function DataTable<T extends { id?: string | number }>({
             ) : (
               data.map((item, rowIndex) => (
                 <tr key={item.id || rowIndex} className={`hover:bg-gray-50/50 transition-colors ${rowClassName ? rowClassName(item) : ''}`}>
-                  {columns.map((col, colIndex) => (
-                    <td
-                      key={colIndex}
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-700 ${
-                        col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
-                      } ${col.className || ''}`}
-                    >
-                      {col.render ? col.render(item) : col.accessor ? String(item[col.accessor] || '-') : null}
-                    </td>
-                  ))}
+                  {columns.map((col, colIndex) => {
+                    const wrapClass = col.className?.includes('whitespace-') ? '' : 'whitespace-nowrap';
+                    const padX = col.className?.includes('px-') ? '' : 'px-4 sm:px-5';
+                    const padY = col.className?.includes('py-') ? '' : 'py-3.5';
+                    return (
+                      <td
+                        key={colIndex}
+                        className={`${padX} ${padY} ${wrapClass} text-sm text-gray-700 ${
+                          col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                        } ${col.className || ''}`}
+                      >
+                        {col.render ? col.render(item) : col.accessor ? String(item[col.accessor] || '-') : null}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

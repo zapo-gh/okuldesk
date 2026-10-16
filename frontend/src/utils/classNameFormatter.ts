@@ -15,12 +15,17 @@ export interface ClassMeta {
   branch?: string;
 }
 
-export function normalizeBranchName(br: string): string {
+export function normalizeBranchName(br: string, program?: string): string {
   if (!br) return '';
   const clean = br.toUpperCase().replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
 
   if (clean === 'BİLİŞİM' || clean === 'BİL') return 'Bilişim';
-  if (clean === 'OTOM' || clean === 'OTO') return 'Otomotiv';
+  if (clean === 'OTOMASYON' || clean === 'OTOM') return 'Otomasyon';
+  if (clean === 'OTO' || clean === 'OTOMOTİV') {
+    // ATP programında OTO veya OTOM -> Otomasyon (Endüstriyel Otomasyon Teknolojileri)
+    if (program === 'ATP') return 'Otomasyon';
+    return 'Otomotiv';
+  }
   if (clean === 'MOTOR' || clean === 'MOT') return 'Motor';
   if (clean === 'MOT EA' || clean === 'MOT E A') return 'Motor (E.A)';
   if (clean === 'MOT EM' || clean === 'MOT E M') return 'Motor (E.M)';
@@ -95,7 +100,7 @@ export function parseAndStandardizeClass(
   // Birleşik şube aralığı mı? (örn. 'A-E', 'B-E', 'G-I', 'F-G-I')
   const groupMatch = rest.match(/^([A-ZÇĞİÖŞÜ](?:-[A-ZÇĞİÖŞÜ])+)\s*(.*)$/i);
   // Alan kısaltması mı yoksa şube harfi mi?
-  const isBranchPrefix = /^(MOT|MUH|GID|OTO|PAZ|BİL)/i.test(rest);
+  const isBranchPrefix = /^(MOT|MUH|GID|OTOM|OTO|PAZ|BİL)/i.test(rest);
   const subeMatch = rest.match(/^([A-ZÇĞİÖŞÜ])\b\s*(.*)$/i);
 
   let sube = '';
@@ -114,7 +119,7 @@ export function parseAndStandardizeClass(
   let formatted = `${program} ${gradeStr}`;
   if (sube) formatted += `-${sube}`;
   if (branch) {
-    const cleanBr = normalizeBranchName(branch);
+    const cleanBr = normalizeBranchName(branch, program);
     formatted += ` ${cleanBr}`;
   }
 

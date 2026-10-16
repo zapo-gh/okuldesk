@@ -82,6 +82,28 @@ export function isOutdoorStation(stationName?: string | null): boolean {
   );
 }
 
+export function isAdminStation(stationName?: string | null): boolean {
+  if (!stationName) return false;
+  const name = stationName.toLocaleLowerCase('tr-TR').trim();
+  return (
+    name.includes('idare') ||
+    name.includes('müdür') ||
+    name.includes('mudur') ||
+    name.includes('yönetim')
+  );
+}
+
+export function isVicePrincipal(title?: string | null): boolean {
+  if (!title) return false;
+  const norm = title.toLocaleLowerCase('tr-TR').replace(/[\s.]/g, '');
+  return (
+    norm.includes('müdüryardımcısı') ||
+    norm.includes('müdüryrd') ||
+    norm.includes('myrd') ||
+    norm.includes('müdüryardımcı')
+  );
+}
+
 export class CoverAssignmentService {
   // ── Absences ──
 
@@ -165,8 +187,9 @@ export class CoverAssignmentService {
         });
         const timetableFilter = activeTimetable ? { timetableId: activeTimetable.id } : {};
 
-        const allAbsentTimetable = await prisma.timetableEntry.findMany({
-          where: { staffId: { in: absentStaffIds }, dayOfWeek, ...timetableFilter }
+        const allTimetableToday = await prisma.timetableEntry.findMany({
+          where: { dayOfWeek, ...timetableFilter },
+          include: { staff: { select: { id: true, name: true, gorev: true, title: true } } }
         });
 
         const isStaffAbsentForPeriod = (staffId: string, period: number) => {
@@ -180,27 +203,36 @@ export class CoverAssignmentService {
         };
 
         return covers.map(cover => {
-           if (!cover.className) return cover;
-           
-           const entry = allAbsentTimetable.find(e => e.staffId === cover.absentStaffId && e.period === cover.period);
-           
-           const coTeachers = allAbsentTimetable.filter(
-             e => e.className === cover.className && 
-                  e.period === cover.period && 
-                  e.staffId !== cover.absentStaffId &&
-                  e.staffId !== null &&
-                  isStaffAbsentForPeriod(e.staffId, e.period)
-           );
-           
-           const currentCoTeachers = coTeachers.map(c => 
-             absences.find(a => a.staffId === c.staffId)?.staff
-           ).filter(Boolean);
-           
-           return {
-             ...cover,
-             coAbsentStaffs: currentCoTeachers,
-             room: entry?.room || null
-           };
+          if (!cover.className) return cover;
+
+          const entry = allTimetableToday.find(e => e.staffId === cover.absentStaffId && e.period === cover.period);
+
+          const coTeachers = allTimetableToday.filter(
+            e => e.className === cover.className &&
+                 e.period === cover.period &&
+                 e.staffId !== cover.absentStaffId &&
+                 e.staffId !== null
+          );
+
+          const presentCoTeachers = coTeachers.filter(c => c.staffId && !isStaffAbsentForPeriod(c.staffId, cover.period));
+          const absentCoTeachers = coTeachers.filter(c => c.staffId && isStaffAbsentForPeriod(c.staffId, cover.period));
+
+          const isMergedWithCoTeacher = presentCoTeachers.some(c => c.staffId === cover.substituteStaffId);
+          const mergedWithStaff = isMergedWithCoTeacher
+            ? presentCoTeachers.find(c => c.staffId === cover.substituteStaffId)?.staff
+            : (presentCoTeachers.length > 0 ? presentCoTeachers[0].staff : null);
+
+          return {
+            ...cover,
+            isCoTeaching: coTeachers.length > 0,
+            hasPresentCoTeacher: presentCoTeachers.length > 0,
+            presentCoTeachers: presentCoTeachers.map(c => c.staff).filter(Boolean),
+            coAbsentStaffs: absentCoTeachers.map(c => absences.find(a => a.staffId === c.staffId)?.staff || c.staff).filter(Boolean),
+            isMerged: isMergedWithCoTeacher,
+            isCombined: isMergedWithCoTeacher,
+            mergedWithStaff: isMergedWithCoTeacher ? mergedWithStaff : null,
+            room: entry?.room || cover.room || null
+          };
         });
       }
     } catch (e) {
@@ -283,39 +315,60 @@ export class CoverAssignmentService {
 
     const onDutyStaffIds = dutyAssignments.map(d => d.staffId);
 
-    // A1: academicYear filtresi eklendi — yanlış öğretim yılının programından ders kontrolü yapılmasın
+    // Aktif ders programı
     const activeTimetable = await prisma.timetable.findFirst({
       where: { isActive: true, academicYear },
       select: { id: true }
     });
-
     const timetableFilter = activeTimetable ? { timetableId: activeTimetable.id } : {};
 
-    // 5. Nöbetçilerin ders programı (N+1 safe — tek sorgu)
+    // 5. Nöbetçilerin ders programı (tek sorgu)
     const onDutyTimetable = await prisma.timetableEntry.findMany({
       where: { staffId: { in: onDutyStaffIds }, dayOfWeek, ...timetableFilter }
     });
 
-    // 6. Devamsız öğretmenlerin ders programı (N+1 safe — tek sorgu)
-    const absentStaffIds = absences.map(a => a.staffId);
-    
-    // A2: Eş öğretmen (co-teaching) kontrolü için tüm okulun bugünkü ders programını çek
+    // 6. Bugünkü tüm ders programı
     const allTimetableToday = await prisma.timetableEntry.findMany({
       where: { dayOfWeek, ...timetableFilter },
+      include: { staff: { select: { id: true, name: true, gorev: true, title: true } } },
       orderBy: { period: 'asc' }
     });
-    
-    const allAbsentTimetable = allTimetableToday.filter(e => e.staffId && absentStaffIds.includes(e.staffId));
 
-    // 7. Mevcut covers (bugüne ait tüm covers'ları çekiyoruz, iptal edilenler dahil)
+    // Sınıfların varsayılan derslik haritası (tüm haftalık programdan frekansa göre çıkarılır)
+    const allActiveTimetableEntries = await prisma.timetableEntry.findMany({
+      where: { ...timetableFilter },
+      select: { className: true, room: true }
+    });
+    const classRoomFrequency = new Map<string, Map<string, number>>();
+    for (const e of allActiveTimetableEntries) {
+      if (!e.className || !e.room) continue;
+      if (!classRoomFrequency.has(e.className)) classRoomFrequency.set(e.className, new Map());
+      const rf = classRoomFrequency.get(e.className)!;
+      rf.set(e.room, (rf.get(e.room) || 0) + 1);
+    }
+    const classDefaultRoomMap = new Map<string, string>();
+    for (const [cls, counts] of classRoomFrequency.entries()) {
+      let topRoom = '';
+      let topCount = 0;
+      for (const [rm, cnt] of counts.entries()) {
+        if (cnt > topCount) { topCount = cnt; topRoom = rm; }
+      }
+      classDefaultRoomMap.set(cls, topRoom);
+    }
+
+    // 7. Mevcut covers (bugüne ait tüm covers'lar)
     const existingCovers = await prisma.coverAssignment.findMany({
       where: { date: targetDateUTC },
       select: { id: true, substituteStaffId: true, period: true, absentStaffId: true, isCancelled: true }
     });
 
-    // A4: coverCountMap — gerçek adil dağıtım için tüm dönemin verisini çek
-    const coverCountMap = new Map<string, number>();
-    onDutyStaffIds.forEach(id => coverCountMap.set(id, 0));
+    // Görev sayaçları
+    const coverCountTotalMap = new Map<string, number>();
+    const coverCountTodayMap = new Map<string, number>();
+    onDutyStaffIds.forEach(id => {
+      coverCountTotalMap.set(id, 0);
+      coverCountTodayMap.set(id, 0);
+    });
 
     const historicalCovers = await prisma.coverAssignment.groupBy({
       by: ['substituteStaffId'],
@@ -328,11 +381,11 @@ export class CoverAssignmentService {
 
     historicalCovers.forEach(hc => {
       if (hc.substituteStaffId) {
-        coverCountMap.set(hc.substituteStaffId, hc._count.substituteStaffId);
+        coverCountTotalMap.set(hc.substituteStaffId, hc._count.substituteStaffId);
       }
     });
 
-    // Kayıtlı Derslik - Nöbet Yeri Haritasını ve Nöbet Yerlerini çek
+    // Derslik -> Nöbet Yeri Haritası ve Nöbet Yerleri
     const [schoolSettings, allDutyStations] = await Promise.all([
       prisma.schoolSettings.findUnique({ where: { id: 'singleton' } }),
       prisma.dutyStation.findMany({ where: { isActive: true } })
@@ -354,20 +407,32 @@ export class CoverAssignmentService {
       return false;
     };
 
-    const suggestions: any[] = [];
-    const coveredClasses = new Set<string>(); // className_subject_period
+    // 8. Tüm boş dersleri topla (sınıf ve saat bazında eş-öğretmen birleştirmesi yapılarak)
+    interface EmptySlot {
+      absence: any;
+      entry: any;
+      period: number;
+      className: string | null;
+      subject: string | null;
+      room: string | null;
+      isCoTeaching: boolean;
+      hasPresentCoTeacher: boolean;
+      presentCoTeachers: any[];
+      coAbsentStaffs: any[];
+      isMerged: boolean;
+      mergedWithStaff: any | null;
+    }
+
+    const emptySlots: EmptySlot[] = [];
+    const processedClassPeriods = new Set<string>();
 
     for (const absence of absences) {
-      let absentTimetable = allAbsentTimetable.filter(e => e.staffId === absence.staffId);
-      
-      // Filter based on absenceTime (1-5 Sabah, 6+ Öğleden Sonra)
+      let absentTimetable = allTimetableToday.filter(e => e.staffId === absence.staffId);
       if ((absence as any).absenceTime === 'SABAH') {
         absentTimetable = absentTimetable.filter(e => e.period <= 5);
       } else if ((absence as any).absenceTime === 'OGLEDEN_SONRA') {
         absentTimetable = absentTimetable.filter(e => e.period > 5);
       }
-
-      if (absentTimetable.length === 0) continue;
 
       for (const entry of absentTimetable) {
         const period = entry.period;
@@ -376,312 +441,365 @@ export class CoverAssignmentService {
         const isEntryCancelled = existingCovers.some(
           c => c.absentStaffId === absence.staffId && c.period === period && c.isCancelled
         );
-        if (isEntryCancelled) {
-          // Bu saat iptal edilmiş/öğrenciler eve gönderilmiş, nöbetçi atanmayacak
+        if (isEntryCancelled) continue;
+
+        const classKey = `${entry.className || 'NOCLASS'}_${period}`;
+        if (entry.className && processedClassPeriods.has(classKey)) {
           continue;
         }
 
-        // Zaten nöbetçi atanmış mı kontrolü (kendisi de devamsız olmayan ve iptal edilmemiş bir atama)
-        const isAlreadyCovered = existingCovers.some(
-          c => c.absentStaffId === absence.staffId && c.period === period && !c.isCancelled && c.substituteStaffId
-        );
-        if (isAlreadyCovered) {
-          // Zaten bir nöbetçi atanmış ve DB'ye kaydedilmişse bunu yeni öneri olarak getirme
-        }
+        let isCoTeaching = false;
+        let hasPresentCoTeacher = false;
+        let isMerged = false;
+        let mergedWithStaff: any = null;
+        let presentCoTeachers: any[] = [];
+        let coAbsentStaffs: any[] = [];
 
-        let currentCoTeachers: any[] = [];
-        // Eş öğretmen (Co-teaching) kontrolü
         if (entry.className) {
-          const classKey = `${entry.className}_${entry.subject}_${period}`;
-          
-          if (coveredClasses.has(classKey)) {
-            continue; // Bu sınıfa bu saatte zaten nöbetçi atandı
-          }
-
           const coTeachers = allTimetableToday.filter(
-            e => e.className === entry.className && e.subject === entry.subject && e.period === period
+            e => e.className === entry.className &&
+                 e.period === period &&
+                 e.staffId !== absence.staffId &&
+                 e.staffId !== null
           );
 
-          const presentTeachers = coTeachers.filter(
-            c => c.staffId && !isStaffAbsentForPeriod(c.staffId, period)
-          );
+          if (coTeachers.length > 0) {
+            isCoTeaching = true;
+            const presentEntries = coTeachers.filter(
+              c => c.staffId && !isStaffAbsentForPeriod(c.staffId, period)
+            );
+            const absentEntries = coTeachers.filter(
+              c => c.staffId && isStaffAbsentForPeriod(c.staffId, period)
+            );
 
-          if (presentTeachers.length > 0) {
-            continue; // Derse girebilecek en az bir öğretmen var, nöbetçiye gerek yok
+            presentCoTeachers = presentEntries.map(c => c.staff).filter(Boolean);
+            coAbsentStaffs = absentEntries.map(c => absences.find(a => a.staffId === c.staffId)?.staff || c.staff).filter(Boolean);
+
+            if (presentCoTeachers.length > 0) {
+              hasPresentCoTeacher = true;
+              isMerged = true;
+              mergedWithStaff = presentCoTeachers[0];
+            } else {
+              hasPresentCoTeacher = false;
+              isMerged = false;
+            }
           }
-
-          const absentCoTeachers = coTeachers.filter(
-            c => c.staffId && c.staffId !== absence.staffId && isStaffAbsentForPeriod(c.staffId, period)
-          );
-          currentCoTeachers = absentCoTeachers.map(c => absences.find(a => a.staffId === c.staffId)?.staff).filter(Boolean);
-
-          coveredClasses.add(classKey);
+          processedClassPeriods.add(classKey);
         }
 
-        // Eğer öğretmenin kendi kaydında oda bilgisi yoksa, eş öğretmenlerin kayıtlarına (veya aynı sınıf/saat diğer kayıtlara) bak
+        // Derslik tespiti (kendi kaydından, bugünkü diğer kayıtlardan veya sınıfın varsayılan dersliğinden)
         let finalRoom = entry.room;
         if (!finalRoom && entry.className) {
-          const roomSource = allTimetableToday.find(
+          const todaySource = allTimetableToday.find(
             e => e.className === entry.className && e.period === period && e.room
+          ) || allTimetableToday.find(
+            e => e.className === entry.className && e.room
           );
-          if (roomSource) {
-            finalRoom = roomSource.room;
+          if (todaySource) {
+            finalRoom = todaySource.room;
+          } else if (classDefaultRoomMap.has(entry.className)) {
+            finalRoom = classDefaultRoomMap.get(entry.className) || null;
           }
         }
 
-        // 🎯 Hedef Nöbet Yerini Belirleme (Derslik -> Nöbet Yeri Haritası)
-        let targetStationId: string | null = null;
-        if (finalRoom) {
-          const cleanRoom = finalRoom.trim();
-          const upperRoom = cleanRoom.toUpperCase();
-
-          if (roomStationMap[cleanRoom]) {
-            targetStationId = roomStationMap[cleanRoom];
-          } else if (roomStationMap[upperRoom]) {
-            targetStationId = roomStationMap[upperRoom];
-          } else {
-            // Çoklu oda desteği (örn. "A-02/D-01" ise parçalarına bak)
-            const parts = upperRoom.split(/[\/,]/).map(p => p.trim());
-            for (const part of parts) {
-              if (roomStationMap[part]) {
-                targetStationId = roomStationMap[part];
-                break;
-              }
-            }
-          }
-        }
-
-        const targetStation = targetStationId ? allDutyStations.find(s => s.id === targetStationId) : null;
-        const isTargetOutdoor = isOutdoorStation(targetStation?.name) || (finalRoom ? isOutdoorStation(finalRoom) : false);
-
-        // Hedef kat seviyesi (önce eşleşen nöbet yerinden, yoksa derslik adından örn. "C-02" -> C -> 2)
-        let targetFloor: number | null = getStationFloorLevel(targetStation?.name);
-        if (targetFloor === null && finalRoom && !isTargetOutdoor) {
-          targetFloor = getStationFloorLevel(finalRoom);
-        }
-
-        const candidates = dutyAssignments.map(assignment => {
-          const staffId    = assignment.staffId;
-          const hasClass   = onDutyTimetable.some(t => t.staffId === staffId && t.period === period);
-          const coverCount = coverCountMap.get(staffId) || 0;
-          const station    = assignment.station;
-
-          const candidateFloor = getStationFloorLevel(station?.name);
-          const isCandidateOutdoor = isOutdoorStation(station?.name);
-
-          // 🎯 Kat/Nöbet Yeri Uyumu & Fiziksel Yakınlık Önceliği:
-          // matchTier: 1 = Kat Nöbetçisi (Doğrudan aynı kat / nöbet yeri, mesafe 0) -> KESİN 1. ÖNCELİK!
-          //            2 = En Yakın Kat (Komşu katlar: +1 veya -1 kat mesafe, örn. C Katı için B veya D Katı) -> 2. ÖNCELİK!
-          //            3 = 2 Kat Mesafe (örn. C Katı için A Katı) -> 3. ÖNCELİK!
-          //            4 = 3+ Kat Mesafe
-          //            5 = Diğer Bina İçi Nöbet Yeri
-          //            10 = Bahçe / Dış Alan Nöbetçisi (En son tercih)
-          let matchTier = 5;
-          let floorDistance: number | null = null;
-          let isStationMatch = false;
-          let proximityType: 'EXACT_FLOOR' | 'ADJACENT_FLOOR' | 'DISTANCE_2' | 'DISTANCE_FAR' | 'INDOOR_OTHER' | 'OUTDOOR' = 'INDOOR_OTHER';
-          let proximityLabel = 'Bina İçi';
-
-          if (targetStationId && assignment.stationId === targetStationId) {
-            matchTier = 1;
-            floorDistance = 0;
-            isStationMatch = true;
-            proximityType = 'EXACT_FLOOR';
-            proximityLabel = '🎯 Kat Nöbetçisi';
-          } else if (isTargetOutdoor) {
-            if (isCandidateOutdoor) {
-              matchTier = 1;
-              floorDistance = 0;
-              isStationMatch = true;
-              proximityType = 'EXACT_FLOOR';
-              proximityLabel = '🎯 Bahçe Nöbetçisi';
-            } else {
-              matchTier = 2;
-              floorDistance = 1;
-              proximityType = 'INDOOR_OTHER';
-              proximityLabel = 'Bina İçi';
-            }
-          } else if (targetFloor !== null && candidateFloor !== null) {
-            const diff = Math.abs(targetFloor - candidateFloor);
-            floorDistance = diff;
-            if (diff === 0) {
-              matchTier = 1;
-              isStationMatch = true;
-              proximityType = 'EXACT_FLOOR';
-              proximityLabel = '🎯 Kat Nöbetçisi';
-            } else if (diff === 1) {
-              // 📍 En Yakın Komşu Kat (örn. C katı için B veya D katı!)
-              matchTier = 2;
-              proximityType = 'ADJACENT_FLOOR';
-              proximityLabel = '📍 En Yakın Kat (Komşu)';
-            } else if (diff === 2) {
-              matchTier = 3;
-              proximityType = 'DISTANCE_2';
-              proximityLabel = '2 Kat Mesafe';
-            } else {
-              matchTier = 4;
-              proximityType = 'DISTANCE_FAR';
-              proximityLabel = `${diff} Kat Mesafe`;
-            }
-          } else if (isCandidateOutdoor) {
-            matchTier = 10;
-            floorDistance = 99;
-            proximityType = 'OUTDOOR';
-            proximityLabel = '🌳 Bahçe Nöbetçisi';
-          } else {
-            matchTier = 5;
-            floorDistance = 10;
-            proximityType = 'INDOOR_OTHER';
-            proximityLabel = 'Bina İçi';
-          }
-
-          let proximityBonus = 0;
-          if (matchTier === 1) proximityBonus = 200;
-          else if (matchTier === 2) proximityBonus = 100;
-          else if (matchTier === 3) proximityBonus = 50;
-
-          let isEligible    = true;
-          let conflictReason = '';
-
-          // Nöbetçi öğretmen de devamsız mı? Devamsızlık zamanı ile ders saatini karşılaştır
-          const dutyAbsence = absences.find(a => a.staffId === staffId);
-          if (dutyAbsence) {
-            const absTime = (dutyAbsence as any).absenceTime || 'TAM_GUN';
-            if (absTime === 'TAM_GUN') {
-              isEligible     = false;
-              conflictReason = 'Kendisi de izinli (Tam Gün)';
-            } else if (absTime === 'SABAH' && period <= 5) {
-              isEligible     = false;
-              conflictReason = 'Kendisi de izinli (Sabah)';
-            } else if (absTime === 'OGLEDEN_SONRA' && period > 5) {
-              isEligible     = false;
-              conflictReason = 'Kendisi de izinli (Öğleden Sonra)';
-            }
-          }
-
-          if (rules?.maxCoversPerDay && coverCount >= rules.maxCoversPerDay) {
-            isEligible     = false;
-            conflictReason = 'Günlük max limit';
-          }
-
-          if (rules?.preventConsecutive && isEligible) {
-            const hasCoverPrev = existingCovers.some(c => c.substituteStaffId === staffId && c.period === period - 1)
-              || suggestions.some(s => s.substituteStaffId === staffId && s.period === period - 1);
-            const hasCoverNext = existingCovers.some(c => c.substituteStaffId === staffId && c.period === period + 1)
-              || suggestions.some(s => s.substituteStaffId === staffId && s.period === period + 1);
-            if (hasCoverPrev || hasCoverNext) {
-              isEligible     = false;
-              conflictReason = 'Ardışık görev';
-            }
-          }
-
-          const hasCoverThisPeriod =
-            existingCovers.some(c => c.substituteStaffId === staffId && c.period === period)
-            || suggestions.some(s => s.substituteStaffId === staffId && s.period === period);
-          if (hasCoverThisPeriod) {
-            isEligible     = false;
-            conflictReason = 'Bu saatte dolu';
-          }
-
-          return {
-            staff: assignment.staff,
-            station: assignment.station,
-            isFree: !hasClass,
-            coverCount,
-            matchTier,
-            floorDistance,
-            proximityType,
-            proximityLabel,
-            isStationMatch,
-            effectiveScore: coverCount - proximityBonus,
-            isEligible,
-            conflictReason
-          };
-        });
-
-        const eligibleCandidates = candidates.filter(c => c.isEligible);
-
-        // A3: isVicePrincipal güçlendirildi — kısaltma varyantlarını da yakalar
-        const isVicePrincipal = (title: string | null): boolean => {
-          if (!title) return false;
-          const norm = title.toLocaleLowerCase('tr-TR').replace(/[\s.]/g, '');
-          return norm.includes('müdüryardımcısı')
-            || norm.includes('müdüryrd')
-            || norm.includes('myrd')
-            || norm.includes('müdüryardımcı');
-        };
-
-        const teacherCandidates = eligibleCandidates.filter(c => !isVicePrincipal(c.staff.title));
-        const vpCandidates      = eligibleCandidates.filter(c =>  isVicePrincipal(c.staff.title));
-
-        // 🎯 Kademeli sıralama:
-        // 1. matchTier (1 = Aynı Kat > 2 = En Yakın Komşu Kat [B/D] > 3 = 2 Kat Mesafe [A] > 4 = 3+ Kat > 5 = Bina İçi > 10 = Bahçe)
-        // 2. coverCount (Aynı kademedeki nöbetçiler arasında daha az görev almış olan önce gelir - Adil Dağıtım)
-        // 3. station sortOrder (Eşitlik durumunda stabilite)
-        const sortCandidates = (a: any, b: any) => {
-          if (a.matchTier !== b.matchTier) return a.matchTier - b.matchTier;
-          if (a.coverCount !== b.coverCount) return a.coverCount - b.coverCount;
-          return (a.station?.sortOrder || 0) - (b.station?.sortOrder || 0);
-        };
-
-        const freeTeachers  = teacherCandidates.filter(c =>  c.isFree).sort(sortCandidates);
-        const freeVPs       = vpCandidates.filter(c =>       c.isFree).sort(sortCandidates);
-        const busyTeachers  = teacherCandidates.filter(c => !c.isFree).sort(sortCandidates);
-        const busyVPs       = vpCandidates.filter(c =>      !c.isFree).sort(sortCandidates);
-
-        let selectedSubstitute: typeof candidates[0] | null = null;
-        let isConflict = false;
-
-        if      (freeTeachers.length > 0) { selectedSubstitute = freeTeachers[0]; }
-        else if (freeVPs.length > 0)      { selectedSubstitute = freeVPs[0]; }
-        else if (busyTeachers.length > 0) { selectedSubstitute = busyTeachers[0]; isConflict = true; }
-        else if (busyVPs.length > 0)      { selectedSubstitute = busyVPs[0];      isConflict = true; }
-
-        if (selectedSubstitute) {
-          coverCountMap.set(selectedSubstitute.staff.id, selectedSubstitute.coverCount + 1);
-        }
-
-        suggestions.push({
-          absenceId:        absence.id,
-          absentStaff:      absence.staff,
-          coAbsentStaffs:   currentCoTeachers,
-          period:           entry.period,
-          className:        entry.className,
-          subject:          entry.subject,
-          room:             finalRoom,
-          isStationMatch:   selectedSubstitute?.isStationMatch || false,
-          matchTier:        selectedSubstitute?.matchTier ?? null,
-          floorDistance:    selectedSubstitute?.floorDistance ?? null,
-          proximityType:    selectedSubstitute?.proximityType ?? null,
-          proximityLabel:   selectedSubstitute?.proximityLabel ?? null,
-          substituteStaffId: selectedSubstitute?.staff.id ?? null,
-          availableDutyStaff: candidates.map(c => ({
-            ...c.staff,
-            isFree: c.isFree,
-            coverCount: c.coverCount,
-            isEligible: c.isEligible,
-            conflictReason: c.conflictReason,
-            matchTier: c.matchTier,
-            floorDistance: c.floorDistance,
-            proximityType: c.proximityType,
-            proximityLabel: c.proximityLabel,
-            isStationMatch: c.isStationMatch,
-            station: c.station
-          })),
-          suggestedSubstitute: selectedSubstitute
-            ? {
-                staff: selectedSubstitute.staff,
-                station: selectedSubstitute.station,
-                isConflict,
-                isStationMatch: selectedSubstitute.isStationMatch || false,
-                matchTier: selectedSubstitute.matchTier,
-                floorDistance: selectedSubstitute.floorDistance,
-                proximityType: selectedSubstitute.proximityType,
-                proximityLabel: selectedSubstitute.proximityLabel,
-              }
-            : null
+        emptySlots.push({
+          absence,
+          entry,
+          period,
+          className: entry.className,
+          subject: entry.subject,
+          room: finalRoom,
+          isCoTeaching,
+          hasPresentCoTeacher,
+          presentCoTeachers,
+          coAbsentStaffs,
+          isMerged,
+          mergedWithStaff
         });
       }
+    }
+
+    // Kronolojik saate göre sırala (Ders saatleri sırayla dağıtılsın: 1, 2, 3...)
+    emptySlots.sort((a, b) => a.period - b.period || (a.className || '').localeCompare(b.className || ''));
+
+    // Öğretmenlerin atandığı ders saatlerini takip eden harita (çakışma ve ardışık saat kontrolü için)
+    const assignedSlotsByStaff = new Map<string, Set<number>>();
+    onDutyStaffIds.forEach(id => assignedSlotsByStaff.set(id, new Set()));
+
+    const suggestions: any[] = [];
+
+    // 9. Sırayla her boş ders için nöbetçi görevlendir
+    for (const slot of emptySlots) {
+      if (slot.isMerged && slot.mergedWithStaff) {
+        suggestions.push({
+          absenceId: slot.absence.id,
+          absentStaff: slot.absence.staff,
+          coAbsentStaffs: slot.coAbsentStaffs,
+          presentCoTeachers: slot.presentCoTeachers,
+          isCoTeaching: slot.isCoTeaching,
+          hasPresentCoTeacher: slot.hasPresentCoTeacher,
+          isMerged: true,
+          isCombined: true,
+          mergedWithStaff: slot.mergedWithStaff,
+          period: slot.period,
+          className: slot.className,
+          subject: slot.subject,
+          room: slot.room,
+          isStationMatch: false,
+          matchTier: null,
+          floorDistance: null,
+          proximityType: null,
+          proximityLabel: null,
+          substituteStaffId: slot.mergedWithStaff.id,
+          availableDutyStaff: [],
+          suggestedSubstitute: {
+            staff: slot.mergedWithStaff,
+            station: null,
+            isConflict: false,
+            isCoTeacher: true,
+            isMerged: true
+          }
+        });
+        continue;
+      }
+
+      // 🎯 Hedef Nöbet Yeri ve Kat Seviyesi Tespiti
+      let targetStationId: string | null = null;
+      if (slot.room) {
+        const cleanRoom = slot.room.trim();
+        const upperRoom = cleanRoom.toUpperCase();
+
+        if (roomStationMap[cleanRoom]) {
+          targetStationId = roomStationMap[cleanRoom];
+        } else if (roomStationMap[upperRoom]) {
+          targetStationId = roomStationMap[upperRoom];
+        } else {
+          const parts = upperRoom.split(/[\/,]/).map(p => p.trim());
+          for (const part of parts) {
+            if (roomStationMap[part]) {
+              targetStationId = roomStationMap[part];
+              break;
+            }
+          }
+        }
+      }
+
+      const targetStation = targetStationId ? allDutyStations.find(s => s.id === targetStationId) : null;
+      const isTargetOutdoor = isOutdoorStation(targetStation?.name) || (slot.room ? isOutdoorStation(slot.room) : false);
+
+      let targetFloor: number | null = getStationFloorLevel(targetStation?.name);
+      if (targetFloor === null && slot.room && !isTargetOutdoor) {
+        targetFloor = getStationFloorLevel(slot.room);
+      }
+
+      // Adayları değerlendir
+      const candidates = dutyAssignments.map(assignment => {
+        const staffId = assignment.staffId;
+        const hasClass = onDutyTimetable.some(t => t.staffId === staffId && t.period === slot.period);
+        const isFree = !hasClass;
+        const coverCountTotal = coverCountTotalMap.get(staffId) || 0;
+        const coverCountToday = coverCountTodayMap.get(staffId) || 0;
+        const station = assignment.station;
+
+        const candidateFloor = getStationFloorLevel(station?.name);
+        const isCandidateOutdoor = isOutdoorStation(station?.name);
+        const isCandidateAdmin = isAdminStation(station?.name) || isVicePrincipal(assignment.staff.title);
+
+        // 🎯 Mesafe (distance) hesaplama:
+        // 0: Aynı yer / kat
+        // 1: Komşu (en yakın) kat
+        // 2: 2 kat mesafe
+        // 10: Açık alan / bahçe
+        // 50: İdareci
+        let distance = 999;
+        if (targetStationId && assignment.stationId === targetStationId) {
+          distance = 0;
+        } else if (isTargetOutdoor && isCandidateOutdoor) {
+          distance = 0;
+        } else if (targetFloor !== null && candidateFloor !== null) {
+          distance = Math.abs(targetFloor - candidateFloor);
+        } else if (isCandidateOutdoor || isTargetOutdoor) {
+          distance = 10;
+        } else if (isCandidateAdmin) {
+          distance = 50;
+        } else {
+          distance = 20;
+        }
+
+        // 🎯 Öncelik Kademesi (Tier):
+        // Tier 1: 1. KESİN ÖNCELİK -> Aynı yerdeki/kattaki boş dersi olan nöbetçi (distance === 0, isFree === true)
+        // Tier 2: 2. ÖNCELİK -> En yakın yerdeki/kattaki boş dersi olan nöbetçi (komşu katlar: distance 1, 2, 3...)
+        // Tier 3: 3. ÖNCELİK -> Bahçe/dış alandaki boş dersi olan nöbetçi
+        // Tier 4: Dersi olan nöbetçi öğretmen (çakışma)
+        // Tier 5: İdareci / Nöbetçi İdareci (son çare)
+        let tier = 5;
+        if (!isCandidateAdmin) {
+          if (isFree) {
+            if (distance === 0) tier = 1;
+            else if (distance < 10) tier = 2;
+            else tier = 3;
+          } else {
+            tier = 4;
+          }
+        } else {
+          tier = 5;
+        }
+
+        let proximityType: 'EXACT_FLOOR' | 'ADJACENT_FLOOR' | 'DISTANCE_2' | 'DISTANCE_FAR' | 'INDOOR_OTHER' | 'OUTDOOR' | 'ADMIN' = 'INDOOR_OTHER';
+        let proximityLabel = 'Bina İçi';
+        if (isCandidateAdmin) {
+          proximityType = 'ADMIN';
+          proximityLabel = '🏢 İdareci';
+        } else if (distance === 0) {
+          proximityType = 'EXACT_FLOOR';
+          proximityLabel = isCandidateOutdoor ? '🎯 Bahçe Nöbetçisi' : '🎯 Kat Nöbetçisi (Aynı Kat)';
+        } else if (distance === 1) {
+          proximityType = 'ADJACENT_FLOOR';
+          proximityLabel = '📍 En Yakın Kat (Komşu)';
+        } else if (distance === 2) {
+          proximityType = 'DISTANCE_2';
+          proximityLabel = '2 Kat Mesafe';
+        } else if (distance < 10) {
+          proximityType = 'DISTANCE_FAR';
+          proximityLabel = `${distance} Kat Mesafe`;
+        } else if (isCandidateOutdoor) {
+          proximityType = 'OUTDOOR';
+          proximityLabel = '🌳 Bahçe Nöbetçisi';
+        }
+
+        // Ardışık saat kontrolü & ceza puanı
+        const assignedPeriods = assignedSlotsByStaff.get(staffId) || new Set<number>();
+        const hasConsecutive = assignedPeriods.has(slot.period - 1) || assignedPeriods.has(slot.period + 1);
+        const consecutivePenalty = hasConsecutive ? 50 : 0;
+
+        let isEligible = true;
+        let conflictReason = '';
+
+        if (isStaffAbsentForPeriod(staffId, slot.period)) {
+          isEligible = false;
+          conflictReason = 'Kendisi de izinli';
+        }
+
+        if (assignedPeriods.has(slot.period)) {
+          isEligible = false;
+          conflictReason = 'Bu saatte dolu';
+        }
+
+        if (rules?.maxCoversPerDay && coverCountToday >= rules.maxCoversPerDay && isEligible) {
+          isEligible = false;
+          conflictReason = 'Günlük max limit';
+        }
+
+        if (rules?.preventConsecutive && hasConsecutive && isEligible) {
+          isEligible = false;
+          conflictReason = 'Ardışık görev';
+        }
+
+        return {
+          staff: assignment.staff,
+          station: assignment.station,
+          staffId,
+          isFree,
+          coverCount: coverCountToday,
+          coverCountToday,
+          coverCountTotal,
+          tier,
+          distance,
+          candidateFloor,
+          isCandidateAdmin,
+          isStationMatch: distance === 0,
+          floorDistance: distance < 50 ? distance : null,
+          proximityType,
+          proximityLabel,
+          consecutivePenalty,
+          isEligible,
+          conflictReason
+        };
+      });
+
+      // 🎯 Sıralama Algoritması:
+      // 1. Tier (1: Aynı Kat Boş > 2: En Yakın Kat Boş > 3: Bahçe Boş > 4: Dersi Olan > 5: İdareci)
+      // 2. Mesafe (Tier 2 içinde: 1 kat mesafe > 2 kat mesafe > 3 kat mesafe)
+      // 3. Günlük Görev Sayısı (Bugün daha az görev almış olan)
+      // 4. Dönemlik Görev Sayısı (Eşitlik durumunda dönem boyunca daha az görev almış olan)
+      // 5. Ardışık saat tercihi
+      // 6. Belirleyici stabil sıra (nöbet yeri sırası ve isim)
+      const compareCandidates = (a: any, b: any) => {
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        if (a.distance !== b.distance) return a.distance - b.distance;
+        if (a.coverCountToday !== b.coverCountToday) return a.coverCountToday - b.coverCountToday;
+        if (a.coverCountTotal !== b.coverCountTotal) return a.coverCountTotal - b.coverCountTotal;
+        if (a.consecutivePenalty !== b.consecutivePenalty) return a.consecutivePenalty - b.consecutivePenalty;
+        const orderA = a.station?.sortOrder ?? 99;
+        const orderB = b.station?.sortOrder ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.staff.name.localeCompare(b.staff.name, 'tr-TR');
+      };
+
+      const sortedAllCandidates = [...candidates].sort((a, b) => {
+        if (a.isEligible !== b.isEligible) return a.isEligible ? -1 : 1;
+        return compareCandidates(a, b);
+      });
+
+      const eligibleCandidates = candidates.filter(c => c.isEligible).sort(compareCandidates);
+      const selectedSubstitute = eligibleCandidates[0] || null;
+
+      let isConflict = false;
+      if (selectedSubstitute) {
+        coverCountTodayMap.set(selectedSubstitute.staffId, selectedSubstitute.coverCountToday + 1);
+        coverCountTotalMap.set(selectedSubstitute.staffId, selectedSubstitute.coverCountTotal + 1);
+        assignedSlotsByStaff.get(selectedSubstitute.staffId)!.add(slot.period);
+        isConflict = !selectedSubstitute.isFree || selectedSubstitute.isCandidateAdmin;
+      }
+
+      suggestions.push({
+        absenceId: slot.absence.id,
+        absentStaff: slot.absence.staff,
+        coAbsentStaffs: slot.coAbsentStaffs,
+        presentCoTeachers: slot.presentCoTeachers,
+        isCoTeaching: slot.isCoTeaching,
+        hasPresentCoTeacher: slot.hasPresentCoTeacher,
+        isMerged: false,
+        isCombined: false,
+        mergedWithStaff: null,
+        period: slot.period,
+        className: slot.className,
+        subject: slot.subject,
+        room: slot.room,
+        isStationMatch: selectedSubstitute?.isStationMatch || false,
+        matchTier: selectedSubstitute?.tier ?? null,
+        floorDistance: selectedSubstitute?.floorDistance ?? null,
+        proximityType: selectedSubstitute?.proximityType ?? null,
+        proximityLabel: selectedSubstitute?.proximityLabel ?? null,
+        substituteStaffId: selectedSubstitute?.staff.id ?? null,
+        availableDutyStaff: sortedAllCandidates.map(c => ({
+          ...c.staff,
+          isFree: c.isFree,
+          coverCount: c.coverCountToday,
+          coverCountToday: c.coverCountToday,
+          coverCountTotal: c.coverCountTotal,
+          isEligible: c.isEligible,
+          conflictReason: c.conflictReason,
+          matchTier: c.tier,
+          floorDistance: c.floorDistance,
+          proximityType: c.proximityType,
+          proximityLabel: c.proximityLabel,
+          isStationMatch: c.isStationMatch,
+          station: c.station
+        })),
+        suggestedSubstitute: selectedSubstitute
+          ? {
+              staff: selectedSubstitute.staff,
+              station: selectedSubstitute.station,
+              isConflict,
+              isStationMatch: selectedSubstitute.isStationMatch,
+              matchTier: selectedSubstitute.tier,
+              floorDistance: selectedSubstitute.floorDistance,
+              proximityType: selectedSubstitute.proximityType,
+              proximityLabel: selectedSubstitute.proximityLabel
+            }
+          : null
+      });
     }
 
     return { status: 'success', suggestions };
@@ -721,14 +839,12 @@ export class CoverAssignmentService {
     const toUpdate: { id: string; substituteStaffId: string | null; subject?: string; room?: string; isCancelled?: boolean }[] = [];
 
     for (const cover of data.covers) {
-      if (!cover.substituteStaffId && !cover.isCancelled) continue;
-
       const key = `${cover.absentStaffId}|${cover.period}`;
       const existingId = existingMap.get(key);
 
       if (existingId) {
-        toUpdate.push({ id: existingId, substituteStaffId: cover.substituteStaffId, subject: cover.subject, room: cover.room, isCancelled: cover.isCancelled });
-      } else {
+        toUpdate.push({ id: existingId, substituteStaffId: cover.substituteStaffId || null, subject: cover.subject, room: cover.room, isCancelled: cover.isCancelled });
+      } else if (cover.substituteStaffId || cover.isCancelled) {
         toCreate.push(cover);
       }
     }

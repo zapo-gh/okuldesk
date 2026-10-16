@@ -1040,13 +1040,70 @@ class DutyScheduleService {
       ]
     });
 
+    const onDutyStaffIds = Array.from(new Set(dutyAssignmentsRaw.map(d => d.staffId)));
+
+    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const endOfDay   = new Date(`${dateStr}T23:59:59.999Z`);
+
+    // Nöbetçilerin bugünkü ders programını ve devamsızlıklarını çek
+    let activeTimetable = await prisma.timetable.findFirst({
+      where: { isActive: true, academicYear },
+      select: { id: true }
+    });
+    if (!activeTimetable) {
+      activeTimetable = await prisma.timetable.findFirst({
+        where: { isActive: true },
+        select: { id: true }
+      });
+    }
+    const timetableFilter = activeTimetable ? { timetableId: activeTimetable.id } : {};
+
+    const [dutyTimetableEntries, todayAbsences] = await Promise.all([
+      prisma.timetableEntry.findMany({
+        where: { staffId: { in: onDutyStaffIds }, dayOfWeek, ...timetableFilter },
+        select: { staffId: true, period: true, className: true, subject: true, room: true }
+      }),
+      prisma.staffAbsence.findMany({
+        where: {
+          academicYear,
+          startDate: { lte: endOfDay },
+          endDate:   { gte: startOfDay },
+          staffId: { in: onDutyStaffIds }
+        }
+      })
+    ]);
+
     const map = new Map<string, any>();
     for (const d of dutyAssignmentsRaw) {
       if (!map.has(d.staffId)) {
+        const teacherEntries = dutyTimetableEntries.filter(e => e.staffId === d.staffId);
+        const busyPeriods = new Set(teacherEntries.map(e => e.period));
+
+        // İzinliyse o saatleri de meşgul say
+        const abs = todayAbsences.find(a => a.staffId === d.staffId);
+        if (abs) {
+          const absTime = abs.absenceTime || 'TAM_GUN';
+          for (let p = 1; p <= 11; p++) {
+            if (absTime === 'TAM_GUN') busyPeriods.add(p);
+            else if (absTime === 'SABAH' && p <= 5) busyPeriods.add(p);
+            else if (absTime === 'OGLEDEN_SONRA' && p > 5) busyPeriods.add(p);
+          }
+        }
+
+        const freePeriods: number[] = [];
+        for (let p = 1; p <= 11; p++) {
+          if (!busyPeriods.has(p)) {
+            freePeriods.push(p);
+          }
+        }
+
         map.set(d.staffId, {
           staffId: d.staffId,
           staff: d.staff,
-          station: d.station
+          station: d.station,
+          freePeriods,
+          busyPeriods: Array.from(busyPeriods),
+          lessons: teacherEntries
         });
       }
     }

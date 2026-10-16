@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { useSettings } from '../../context/SettingsContext';
 import { LayoutDashboard, Receipt, FolderArchive } from 'lucide-react';
 
 interface DashboardData {
@@ -60,7 +59,6 @@ const emptyData: DashboardData = {
 };
 
 export default function DashboardPage() {
-  const { settings } = useSettings();
   const [data, setData] = useState<DashboardData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
@@ -138,26 +136,6 @@ export default function DashboardPage() {
           </div>
         }
       />
-
-      {new Date().getDay() === 5 && settings?.dutyRotationFreq && settings.dutyRotationFreq !== 'none' && (
-        <div className="mb-6 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-indigo-800">
-          <AlertTriangle size={20} className="shrink-0 mt-0.5" />
-          <div>
-            <h4 className="font-semibold text-sm">Nöbet Rotasyonu Hatırlatması</h4>
-            <p className="text-xs mt-1">
-              Bugün Cuma. Nöbet yerlerinde {
-                settings.dutyRotationFreq === 'weekly' ? 'haftalık' :
-                settings.dutyRotationFreq === 'biweekly' ? '2 haftalık' :
-                settings.dutyRotationFreq === 'fourweekly' ? '4 haftalık' :
-                settings.dutyRotationFreq === 'custom' ? 'özel tarihlere göre' : 'aylık'
-              } rotasyon uygulanıyor. Gelecek haftanın nöbet yerlerini oluşturmayı unutmayın.
-            </p>
-          </div>
-          <Link to="/admin/duty-schedule" className="ml-auto flex items-center gap-1 bg-white px-3 py-1.5 rounded text-xs font-semibold text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition">
-            <Clock size={14} /> Nöbete Git
-          </Link>
-        </div>
-      )}
 
       <section className="mb-6 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
         {cards.map(({ icon: Icon, value, label, color, bg, path }) => (

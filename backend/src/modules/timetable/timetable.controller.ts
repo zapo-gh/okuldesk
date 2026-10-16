@@ -13,6 +13,16 @@ class TimetableController {
     }
   }
 
+  async getAllActiveEntries(req: Request, res: Response, next: NextFunction) {
+    try {
+      const academicYear = (req.query.academicYear as string) || '2025-2026';
+      const data = await timetableService.getAllActiveEntries(academicYear);
+      res.json({ status: 'success', data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getActiveClassList(req: Request, res: Response, next: NextFunction) {
     try {
       const academicYear = (req.query.academicYear as string) || '2025-2026';

@@ -355,7 +355,7 @@ class StudentClubService {
       };
     });
   }
-  async create(d: { name: string; description?: string; assignedStaffId?: string; meetingDay?: string; meetingTime?: string; maxMembers?: number; academicYear: string; extraData?: string }) {
+  async create(d: { name: string; description?: string | null; assignedStaffId?: string | null; meetingDay?: string | null; meetingTime?: string | null; maxMembers?: number; academicYear: string; extraData?: string | null }) {
     return prisma.studentClub.create({
       data: {
         id: uuid(),

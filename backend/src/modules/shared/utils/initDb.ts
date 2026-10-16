@@ -59,6 +59,7 @@ export async function initializeDatabase(): Promise<void> {
     { table: 'User', col: 'fullName', sql: 'ALTER TABLE "User" ADD COLUMN "fullName" TEXT DEFAULT \'\'' },
     { table: 'User', col: 'permissions', sql: 'ALTER TABLE "User" ADD COLUMN "permissions" TEXT DEFAULT \'[]\'' },
     { table: 'User', col: 'isActive', sql: 'ALTER TABLE "User" ADD COLUMN "isActive" BOOLEAN DEFAULT 1' },
+    { table: 'Staff', col: 'phone', sql: 'ALTER TABLE "Staff" ADD COLUMN "phone" TEXT' },
   ];
 
   // Tabloların mevcut kolonlarını bir kez çek

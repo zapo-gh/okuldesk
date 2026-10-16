@@ -216,7 +216,8 @@ model Staff {
   user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   name          String
   title         String
-  className     String? // Sadece SINIF_REHBER_OGRETMEN iÃ§in (Ã¶rn: "10-A")
+  className     String? // Sadece SINIF_REHBER_OGRETMEN için (örn: "10-A")
+  phone         String? // Cep telefonu / WhatsApp iletişim
   tcKimlikNo    String?
   brans         String?
   kurumSicilNo  String?

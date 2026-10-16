@@ -58,6 +58,7 @@ interface TimetableGridProps {
   entries: any[];
   viewMode: 'teacher' | 'class';
   todayDow?: number;
+  currentPeriod?: number | null;
   getPeriodTime?: (period: number) => string | null;
   onCellClick?: (group: any) => void;
   classDisplayMap?: Record<string, string>;
@@ -67,6 +68,7 @@ export default function TimetableGrid({
   entries,
   viewMode,
   todayDow,
+  currentPeriod,
   getPeriodTime,
   onCellClick,
   classDisplayMap,
@@ -108,12 +110,22 @@ export default function TimetableGrid({
             </th>
             {periods.map(p => {
               const time = getPeriodTime ? getPeriodTime(p) : null;
+              const isLivePeriod = todayDow !== undefined && todayDow >= 1 && todayDow <= 5 && currentPeriod === p;
               return (
                 <th
                   key={p}
-                  className="px-0.5 py-1.5 text-center text-[11px] font-extrabold text-slate-700 uppercase tracking-wider bg-slate-100/90 border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:p-0.5 overflow-hidden"
+                  className={`px-0.5 py-1.5 text-center text-[11px] font-extrabold uppercase tracking-wider border-b border-slate-200 print:bg-gray-100 print:border print:border-black print:text-black print:p-0.5 overflow-hidden transition-colors ${
+                    isLivePeriod
+                      ? 'bg-emerald-100/90 text-emerald-950 font-black'
+                      : 'bg-slate-100/90 text-slate-700'
+                  }`}
                 >
-                  <span className="block leading-tight truncate print:text-[8px] print:leading-none">{p}. Ders</span>
+                  <span className="flex items-center justify-center gap-1 leading-tight truncate print:text-[8px] print:leading-none">
+                    <span>{p}. Ders</span>
+                    {isLivePeriod && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping print:hidden" />
+                    )}
+                  </span>
                   {time && (
                     <span className="block text-[9px] font-normal text-slate-500 normal-case tracking-normal mt-0.5 truncate print:text-black print:text-[6.5px] print:leading-none print:mt-0 print:tracking-tighter">
                       {time}
@@ -159,10 +171,13 @@ export default function TimetableGrid({
                 {periods.map(period => {
                   const cells = getCells(day.val, period);
                   const grouped = groupCells(cells);
+                  const isLiveNow = isToday && currentPeriod === period;
                   return (
                     <td
                       key={period}
-                      className="p-0.5 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-0 print:align-top overflow-hidden"
+                      className={`p-0.5 text-center align-middle border-l border-slate-100 first:border-l-0 print:border print:border-black print:p-0 print:align-top overflow-hidden ${
+                        isLiveNow ? 'bg-emerald-50/40' : ''
+                      }`}
                     >
                       {grouped.length > 0 ? (
                         <div className="flex flex-col gap-0.5 w-full h-full">
@@ -179,7 +194,9 @@ export default function TimetableGrid({
                                 key={idx}
                                 onClick={() => onCellClick?.(group)}
                                 title={tooltip}
-                                className={`flex flex-col items-center justify-center rounded-lg border px-1 py-1 w-full min-h-[38px] shadow-2xs transition-all duration-150 hover:shadow-md hover:scale-[1.01] print:rounded-none print:border-none print:shadow-none print:bg-transparent print:p-0.5 print:min-h-0 print:text-black ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''}`}
+                                className={`flex flex-col items-center justify-center rounded-lg border px-1 py-1 w-full min-h-[38px] shadow-2xs transition-all duration-150 hover:shadow-md hover:scale-[1.01] print:rounded-none print:border-none print:shadow-none print:bg-transparent print:p-0.5 print:min-h-0 print:text-black ${getSubjectColor(group.subject)} ${onCellClick ? 'cursor-pointer' : ''} ${
+                                  isLiveNow ? 'ring-2 ring-emerald-500 shadow-md' : ''
+                                }`}
                               >
                                 {viewMode === 'teacher' ? (
                                   <>

@@ -26,6 +26,7 @@ export default function StudentClubPage() {
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
+    assignedStaffIds: [] as string[],
     assignedStaffId: '',
     assignedStaffName: '',
     meetingDay: '',
@@ -127,29 +128,44 @@ export default function StudentClubPage() {
 
   const handleSave = async () => {
     try {
-      if (!formData.name) {
+      if (!formData.name?.trim()) {
         toast.error('Kulüp adı zorunludur.');
         return;
       }
       
+      const staffIds: string[] = formData.assignedStaffIds || [];
+      const staffNames: string[] = staffIds
+        .map((id: string) => staff.find(s => s.id === id)?.name)
+        .filter(Boolean) as string[];
+
+      const primaryStaffId = staffIds.length > 0 ? staffIds[0] : null;
+      const assignedStaffName = staffNames.join(', ');
+
+      const existingExtra = editingId ? (clubs.find(c => c.id === editingId)?.extra || {}) : {};
+      const extraData = JSON.stringify({
+        ...existingExtra,
+        activities: formData.activities || [],
+        staffIds,
+        staffNames
+      });
+
       const payload = {
-        name: formData.name,
-        description: formData.description,
-        assignedStaffId: formData.assignedStaffId,
-        assignedStaffName: formData.assignedStaffName,
-        meetingDay: formData.meetingDay,
-        meetingTime: formData.meetingTime,
+        name: formData.name.trim(),
+        description: formData.description || null,
+        assignedStaffId: primaryStaffId,
+        meetingDay: formData.meetingDay || null,
+        meetingTime: formData.meetingTime || null,
         maxMembers: parseInt(formData.maxMembers) || 30,
         academicYear,
-        extraData: JSON.stringify({
-          activities: formData.activities
-        })
+        extraData
       };
 
       if (editingId) {
         await api.put(`/student-club/${editingId}`, payload);
+        toast.success('Kulüp başarıyla güncellendi.');
       } else {
         await api.post('/student-club', payload);
+        toast.success('Kulüp başarıyla oluşturuldu.');
       }
 
       setIsModalOpen(false);
@@ -173,8 +189,9 @@ export default function StudentClubPage() {
     setEditingId(null);
     setActiveTab('info');
     setFormData({
-      name: 'Kızılay ve Kan Bağışı Kulübü',
-      description: 'Yardımlaşma ve dayanışma faaliyetleri',
+      name: '',
+      description: '',
+      assignedStaffIds: [],
       assignedStaffId: '',
       assignedStaffName: '',
       meetingDay: 'Cuma',
@@ -192,11 +209,25 @@ export default function StudentClubPage() {
   const openEditModal = async (club: any) => {
     setEditingId(club.id);
     setActiveTab('info');
+
+    let initialStaffIds: string[] = [];
+    if (club.extra?.staffIds && Array.isArray(club.extra.staffIds) && club.extra.staffIds.length > 0) {
+      initialStaffIds = club.extra.staffIds;
+    } else if (club.assignedStaffId) {
+      initialStaffIds = [club.assignedStaffId];
+    }
+
+    const staffNames = initialStaffIds
+      .map((id: string) => staff.find(s => s.id === id)?.name)
+      .filter(Boolean);
+    const assignedStaffName = staffNames.length > 0 ? staffNames.join(', ') : (club.assignedStaffName || '');
+
     setFormData({
       name: club.name || '',
       description: club.description || '',
-      assignedStaffId: club.assignedStaffId || '',
-      assignedStaffName: club.assignedStaffName || '',
+      assignedStaffIds: initialStaffIds,
+      assignedStaffId: initialStaffIds[0] || '',
+      assignedStaffName,
       meetingDay: club.meetingDay || '',
       meetingTime: club.meetingTime || '',
       maxMembers: club.maxMembers?.toString() || '30',
@@ -286,7 +317,26 @@ export default function StudentClubPage() {
 
   const columns: Column<any>[] = [
     { header: 'Kulüp Adı', accessor: 'name', render: (row: any) => <span className="font-semibold">{row.name}</span> },
-    { header: 'Danışman Öğretmen', accessor: 'assignedStaffName', render: (row: any) => row.assignedStaffName || '-' },
+    { 
+      header: 'Danışman Öğretmen', 
+      accessor: 'assignedStaffName', 
+      render: (row: any) => {
+        if (!row.assignedStaffName) return <span className="text-slate-400">-</span>;
+        const names = row.assignedStaffName.split(',').map((n: string) => n.trim()).filter(Boolean);
+        if (names.length <= 1) {
+          return <span className="font-medium text-slate-800">{row.assignedStaffName}</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1.5">
+            {names.map((name: string, i: number) => (
+              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                {name}
+              </span>
+            ))}
+          </div>
+        );
+      }
+    },
     { header: 'Toplantı Günü', accessor: 'meetingDay', render: (row: any) => row.meetingDay || '-' },
     { header: 'Üye Sayısı', accessor: 'memberCount', render: (row: any) => <span className="font-medium text-emerald-700">{row.memberCount || 0} / {row.maxMembers}</span> },
     { 
@@ -389,19 +439,90 @@ export default function StudentClubPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Danışman Öğretmen</label>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-sm font-medium text-slate-700">Danışman Öğretmenler</label>
+                          <span className="text-xs text-slate-500">
+                            {(formData.assignedStaffIds || []).length > 0
+                              ? `${(formData.assignedStaffIds || []).length} öğretmen seçildi`
+                              : '1 veya daha fazla öğretmen seçebilirsiniz'}
+                          </span>
+                        </div>
+
+                        {/* Seçili Danışman Öğretmen Rozetleri */}
+                        {(formData.assignedStaffIds || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            {(formData.assignedStaffIds || []).map((id: string) => {
+                              const s = staff.find(st => st.id === id);
+                              const teacherName = s ? s.name : 'Bilinmeyen Öğretmen';
+                              const teacherBrans = s?.brans;
+                              return (
+                                <span
+                                  key={id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-indigo-200 text-slate-800 rounded-lg text-sm shadow-sm"
+                                >
+                                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                                  <span className="font-medium">{teacherName}</span>
+                                  {teacherBrans && (
+                                    <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium border border-indigo-100">
+                                      {teacherBrans}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newIds = (formData.assignedStaffIds || []).filter((tid: string) => tid !== id);
+                                      const newNames = newIds.map((tid: string) => staff.find(st => st.id === tid)?.name).filter(Boolean);
+                                      setFormData({
+                                        ...formData,
+                                        assignedStaffIds: newIds,
+                                        assignedStaffId: newIds[0] || '',
+                                        assignedStaffName: newNames.join(', ')
+                                      });
+                                    }}
+                                    className="ml-1 p-0.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                    title="Kaldır"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
                         <select 
-                          value={formData.assignedStaffId} 
+                          value="" 
                           onChange={(e) => {
-                            const staffId = e.target.value;
-                            const staffObj = staff.find(s => s.id === staffId);
-                            setFormData({...formData, assignedStaffId: staffId, assignedStaffName: staffObj ? staffObj.name : ''});
+                            const chosenId = e.target.value;
+                            if (!chosenId) return;
+                            const newIds = [...(formData.assignedStaffIds || []), chosenId];
+                            const newNames = newIds.map((id: string) => staff.find(s => s.id === id)?.name).filter(Boolean);
+                            setFormData({
+                              ...formData,
+                              assignedStaffIds: newIds,
+                              assignedStaffId: newIds[0] || '',
+                              assignedStaffName: newNames.join(', ')
+                            });
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white text-sm"
                         >
-                          <option value="">-- Danışman Öğretmen Seçiniz --</option>
-                          {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.title || s.role})</option>)}
+                          <option value="">
+                            {(formData.assignedStaffIds || []).length === 0 
+                              ? '-- Danışman Öğretmen Seçiniz --' 
+                              : '+ Bir Danışman Öğretmen Daha Ekle...'}
+                          </option>
+                          {staff
+                            .filter(s => !(formData.assignedStaffIds || []).includes(s.id))
+                            .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'tr-TR'))
+                            .map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}{s.brans ? ` (${s.brans})` : ''}
+                              </option>
+                            ))}
                         </select>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Kulübe 1'den fazla danışman öğretmen atayabilirsiniz. Listeden seçtiğiniz öğretmenler yukarıya eklenir.
+                        </p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Toplantı Günü</label>

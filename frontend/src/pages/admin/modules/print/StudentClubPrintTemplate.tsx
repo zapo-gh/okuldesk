@@ -34,7 +34,7 @@ export const StudentClubPrintTemplate = forwardRef<HTMLDivElement, StudentClubPr
 
         <table className="w-full mb-6 border-none text-sm">
           <tbody>
-            <tr><td className="w-1/3 py-1 font-bold border-none">Danışman Öğretmen</td><td className="w-2/3 py-1 border-none">: {formData.assignedStaffName}</td></tr>
+            <tr><td className="w-1/3 py-1 font-bold border-none">Danışman Öğretmen{formData.assignedStaffName?.includes(',') ? 'ler' : ''}</td><td className="w-2/3 py-1 border-none">: {formData.assignedStaffName || '-'}</td></tr>
             <tr><td className="py-1 font-bold border-none">Toplantı Gün/Saati</td><td className="py-1 border-none">: {formData.meetingDay} - {formData.meetingTime}</td></tr>
             <tr><td className="py-1 font-bold border-none align-top">Kulübün Amacı</td><td className="py-1 border-none">: {formData.description}</td></tr>
           </tbody>
@@ -99,7 +99,7 @@ export const StudentClubPrintTemplate = forwardRef<HTMLDivElement, StudentClubPr
                 <td className="border-none w-1/2 align-bottom">
                   <div className="h-24"></div>
                   <div className="font-bold">{formData.assignedStaffName || '....................................'}</div>
-                  <div className="mt-1">Danışman Öğretmen</div>
+                  <div className="mt-1">Danışman Öğretmen{formData.assignedStaffName?.includes(',') ? 'ler' : ''}</div>
                 </td>
                 <td className="border-none w-1/2 align-bottom">
                   <div className="mb-4">

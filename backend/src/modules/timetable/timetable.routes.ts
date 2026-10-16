@@ -21,6 +21,7 @@ const upload = multer({
 router.use(authMiddleware);
 
 router.get('/active',             (req, res, next) => timetableController.getActiveTimetable(req, res, next));
+router.get('/all-active-entries', (req, res, next) => timetableController.getAllActiveEntries(req, res, next));
 router.get('/classes',            (req, res, next) => timetableController.getActiveClassList(req, res, next));
 router.get('/history',            (req, res, next) => timetableController.getTimetableHistory(req, res, next));
 router.get('/load-summary',       (req, res, next) => timetableController.getLoadSummary(req, res, next));

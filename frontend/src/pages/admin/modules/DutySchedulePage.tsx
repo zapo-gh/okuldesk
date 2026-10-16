@@ -3,7 +3,7 @@ import api from '../../../services/api';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { useSettings } from '../../../context/SettingsContext';
 import {
-  CalendarRange, Save, Trash2, MapPin, Users, BarChart2,
+  CalendarRange, Save, Trash2, MapPin, Users,
   Settings, Printer, Zap, Plus, Edit, ChevronLeft, ChevronRight, X, Shield, UploadCloud, Copy, Layers
 } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -120,14 +120,13 @@ export default function DutySchedulePage() {
     return activeDay ? activeDay.weekNum : (days.length > 0 ? days[days.length - 1].weekNum : 0);
   });
 
-  const [activeTab, setActiveTab] = useState<'cizelge' | 'istatistik' | 'personel' | 'idareci' | 'yerler' | 'derslikler' | 'ayarlar'>('cizelge');
+  const [activeTab, setActiveTab] = useState<'cizelge' | 'personel' | 'idareci' | 'yerler' | 'derslikler' | 'ayarlar'>('cizelge');
 
   // Data state
   const [stations,    setStations]    = useState<any[]>([]);
   const [staffList,   setStaffList]   = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [staffConfigs, setStaffConfigs] = useState<any[]>([]);
-  const [stats,       setStats]       = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -211,15 +210,9 @@ export default function DutySchedulePage() {
     }
   }, [academicYear]);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await api.get(`/duty-schedule/stats?year=${selectedYear}&month=${selectedMonth}&academicYear=${academicYear}`);
-      setStats(res.data.data || []);
-    } catch {}
-  }, [academicYear, selectedYear, selectedMonth]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => { if (activeTab === 'istatistik') fetchStats(); }, [activeTab, fetchStats]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   // Özel rotasyon tarihlerini settings context'ten yerel state'e senkronize et
   useEffect(() => {
@@ -886,7 +879,7 @@ export default function DutySchedulePage() {
     <div className="space-y-6">
       <PageHeader
         title="Personel Nöbet Çizelgesi"
-        description="Aylık nöbet dağıtımı, personel ayarları ve eşitlik raporu."
+        description="Aylık nöbet dağıtımı ve personel ayarları."
         icon={<CalendarRange size={24} />}
         actions={
           <div className="flex gap-2">
@@ -975,7 +968,6 @@ export default function DutySchedulePage() {
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-max">
           {([
             { key: 'cizelge',    label: 'Çizelge',          icon: <CalendarRange size={15}/> },
-            { key: 'istatistik', label: 'İstatistik',        icon: <BarChart2 size={15}/> },
             { key: 'personel',   label: 'Öğretmen Nöbetleri', icon: <Users size={15}/> },
             { key: 'idareci',    label: 'İdareci Nöbetleri', icon: <Shield size={15}/> },
             { key: 'yerler',     label: 'Nöbet Yerleri',     icon: <MapPin size={15}/> },
@@ -1232,72 +1224,6 @@ export default function DutySchedulePage() {
                       </table>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── İSTATİSTİK ── */}
-          {activeTab === 'istatistik' && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
-                <h3 className="font-bold text-slate-800 text-sm">{monthName} {selectedYear} — Nöbet Eşitlik Raporu</h3>
-                <button onClick={fetchStats} className="text-xs text-indigo-600 hover:underline">Yenile</button>
-              </div>
-              {stats.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-sm">Bu ay henüz nöbet ataması yok.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Personel</th>
-                        <th className="text-left text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Unvan</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Nöbet Sayısı</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200">Dağılım</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {stats.map((s, i) => {
-                        const nonExemptStats = stats.filter((x: any) => !x.isExempt);
-                        const maxCount = nonExemptStats[0]?.count || 1;
-                        const pct = s.isExempt ? 0 : Math.round((s.count / maxCount) * 100);
-                        return (
-                          <tr key={s.staffId} className={`${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} ${s.isExempt ? 'opacity-60' : ''}`}>
-                            <td className="px-5 py-3 font-semibold text-slate-800">
-                              {s.staffName}
-                              {s.isExempt && (
-                                <span className="ml-2 text-xs font-normal text-amber-600 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full">Muaf</span>
-                              )}
-                            </td>
-                            <td className="px-5 py-3 text-slate-500">{s.title || '—'}</td>
-                            <td className="px-5 py-3 text-center">
-                              {s.isExempt ? (
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold bg-slate-100 text-slate-400">—</span>
-                              ) : (
-                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
-                                  s.count >= 5 ? 'bg-red-100 text-red-700' :
-                                  s.count >= 3 ? 'bg-amber-100 text-amber-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>{s.count}</span>
-                              )}
-                            </td>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 bg-slate-100 rounded-full h-2">
-                                  <div
-                                    className={`h-2 rounded-full transition-all ${s.isExempt ? 'bg-slate-300' : 'bg-indigo-500'}`}
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-slate-400 w-8 text-right">{s.isExempt ? '—' : `${pct}%`}</span>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
                 </div>
               )}
             </div>

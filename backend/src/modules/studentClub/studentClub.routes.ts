@@ -8,16 +8,17 @@ import { parseClubListPdf } from './utils/clubListParser';
 import prisma from '../shared/utils/prisma';
 
 const clubSchema = z.object({
-  name: z.string().min(1), description: z.string().optional(),
-  assignedStaffId: z.string().optional(), meetingDay: z.string().optional(),
-  meetingTime: z.string().optional(), maxMembers: z.number().optional(),
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  assignedStaffId: z.string().nullable().optional(),
+  meetingDay: z.string().nullable().optional(),
+  meetingTime: z.string().nullable().optional(),
+  maxMembers: z.number().optional(),
   academicYear: z.string().min(1),
-
-  extraData: z.string().optional(),
+  extraData: z.string().nullable().optional(),
 });
 const memberSchema = z.object({
   clubId: z.string().min(1), studentId: z.string().min(1), role: z.string().optional(),
-
   extraData: z.string().optional(),
 });
 
@@ -38,7 +39,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = clubSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
-    res.status(201).json({ success: true, data: await studentClubService.create(p.data) });
+    const data = {
+      ...p.data,
+      assignedStaffId: p.data.assignedStaffId || null,
+      description: p.data.description || null,
+      meetingDay: p.data.meetingDay || null,
+      meetingTime: p.data.meetingTime || null,
+      extraData: p.data.extraData || null,
+    };
+    res.status(201).json({ success: true, data: await studentClubService.create(data) });
   } catch (e) { next(e); }
 });
 
@@ -46,7 +55,15 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const p = clubSchema.safeParse(req.body);
     if (!p.success) throw new AppError(p.error.errors[0].message, 400);
-    await studentClubService.update(req.params.id, p.data); 
+    const data = {
+      ...p.data,
+      assignedStaffId: p.data.assignedStaffId || null,
+      description: p.data.description || null,
+      meetingDay: p.data.meetingDay || null,
+      meetingTime: p.data.meetingTime || null,
+      extraData: p.data.extraData || null,
+    };
+    await studentClubService.update(req.params.id, data); 
     res.json({ success: true }); 
   }
   catch (e) { next(e); }
