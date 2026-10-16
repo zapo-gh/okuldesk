@@ -177,12 +177,14 @@ export async function importStudents(
       });
 
       if (existing) {
-        // Update name/class if changed
+        // Update name/class if changed, reactivate if previously deleted
         await prisma.student.update({
           where: { schoolNumber: student.schoolNumber },
           data: {
             fullName: student.fullName,
             className: student.className,
+            status: 'ACTIVE',
+            deletedAt: null,
           },
         });
         result.skipped++;

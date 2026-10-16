@@ -94,12 +94,105 @@ export class StudentsService {
   }
 
   async create(data: { schoolNumber: string; fullName: string; className: string; parents?: { fullName: string; phone: string }[] }) {
-    const existing = await prisma.student.findUnique({ where: { schoolNumber: data.schoolNumber } });
-    if (existing) throw new AppError('Bu okul numarası zaten kayıtlı.', 409);
+    const cleanNumber = data.schoolNumber.trim();
+    const cleanName = data.fullName.trim();
+    const cleanClass = data.className.trim();
+
+    const existing = await prisma.student.findUnique({
+      where: { schoolNumber: cleanNumber },
+      include: { parents: true },
+    });
+
+    if (existing) {
+      if (existing.status === 'ACTIVE' && !existing.deletedAt) {
+        throw new AppError(
+          `'${cleanNumber}' okul numarası zaten aktif bir öğrencide (${existing.fullName} - ${existing.className}) kayıtlıdır.`,
+          409
+        );
+      }
+
+      // Öğrenci daha önce silinmiş / pasife alınmış:
+      const normalize = (s: string) => s.trim().toLocaleLowerCase('tr-TR');
+      const isSameStudent = normalize(existing.fullName) === normalize(cleanName);
+
+      return prisma.$transaction(async (tx) => {
+        let targetStudentId = existing.id;
+
+        if (isSameStudent) {
+          // Aynı öğrenci: Mevcut kaydı yeniden aktifleştir ve sınıfını güncelle
+          await tx.student.update({
+            where: { id: existing.id },
+            data: {
+              fullName: cleanName,
+              className: cleanClass,
+              status: 'ACTIVE',
+              deletedAt: null,
+            },
+          });
+        } else {
+          // Farklı öğrenci: Eski silinmiş öğrencinin numarasını serbest bırak, yeni öğrenci kaydı oluştur
+          await tx.student.update({
+            where: { id: existing.id },
+            data: {
+              schoolNumber: `${existing.schoolNumber}__pasif_${Date.now()}`,
+            },
+          });
+          const created = await tx.student.create({
+            data: {
+              schoolNumber: cleanNumber,
+              fullName: cleanName,
+              className: cleanClass,
+              status: 'ACTIVE',
+            },
+          });
+          targetStudentId = created.id;
+        }
+
+        // Veli bağlantılarını kur
+        if (data.parents && data.parents.length > 0) {
+          await tx.student.update({
+            where: { id: targetStudentId },
+            data: { parents: { set: [] }, primaryParentId: null },
+          });
+
+          let firstParentId: string | null = null;
+          for (const input of data.parents) {
+            if (!input.fullName?.trim() || !input.phone?.trim()) continue;
+            const account = await parentAccountService.ensureParent(tx, input);
+            if (!firstParentId) firstParentId = account.parent.id;
+            await tx.student.update({
+              where: { id: targetStudentId },
+              data: { parents: { connect: { id: account.parent.id } } },
+            });
+          }
+          if (firstParentId) {
+            await tx.student.update({
+              where: { id: targetStudentId },
+              data: { primaryParentId: firstParentId } as any,
+            });
+          }
+        }
+
+        const resultStudent = await tx.student.findUnique({
+          where: { id: targetStudentId },
+          include: { parents: { include: { contacts: { where: { isPrimary: true } } } } },
+        });
+        return StudentsService.mapStudentParents(resultStudent);
+      });
+    }
+
     const { parents, ...studentData } = data;
 
     return prisma.$transaction(async (tx) => {
-      const student = await tx.student.create({ data: studentData });
+      const student = await tx.student.create({
+        data: {
+          ...studentData,
+          schoolNumber: cleanNumber,
+          fullName: cleanName,
+          className: cleanClass,
+          status: 'ACTIVE',
+        },
+      });
       let firstParentId: string | null = null;
       for (const input of parents ?? []) {
         if (!input.fullName?.trim() || !input.phone?.trim()) continue;
@@ -124,17 +217,26 @@ export class StudentsService {
     if (!student) throw new AppError('Öğrenci bulunamadı.', 404);
 
     if (data.schoolNumber && data.schoolNumber !== student.schoolNumber) {
-      const existing = await prisma.student.findUnique({ where: { schoolNumber: data.schoolNumber } });
+      const cleanNewNumber = data.schoolNumber.trim();
+      const existing = await prisma.student.findUnique({ where: { schoolNumber: cleanNewNumber } });
       if (existing && existing.id !== id) {
-        throw new AppError(
-          `'${data.schoolNumber}' okul numarası zaten başka bir öğrencide (${existing.fullName} - ${existing.className}) kayıtlıdır.`,
-          409
-        );
+        if (existing.status === 'ACTIVE' && !existing.deletedAt) {
+          throw new AppError(
+            `'${cleanNewNumber}' okul numarası zaten başka bir öğrencide (${existing.fullName} - ${existing.className}) kayıtlıdır.`,
+            409
+          );
+        } else {
+          // Çakışan öğrenci silinmiş/pasif ise, numarasını serbest bırak
+          await prisma.student.update({
+            where: { id: existing.id },
+            data: { schoolNumber: `${existing.schoolNumber}__pasif_${Date.now()}` },
+          });
+        }
       }
       if (userId) {
         await AuditService.log(userId, 'UPDATE_STUDENT_NUMBER', 'Student', id, {
           oldNumber: student.schoolNumber,
-          newNumber: data.schoolNumber,
+          newNumber: cleanNewNumber,
           studentName: student.fullName,
         });
       }

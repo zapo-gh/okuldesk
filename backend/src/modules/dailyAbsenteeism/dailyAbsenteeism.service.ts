@@ -31,9 +31,35 @@ export class DailyAbsenteeismService {
           "status" TEXT NOT NULL DEFAULT 'SENT',
           "errorMessage" TEXT,
           "sentAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "waMessageId" TEXT,
+          "deliveryStatus" TEXT DEFAULT 'PENDING',
+          "deliveredAt" DATETIME,
+          "readAt" DATETIME,
           FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE
         );
       `);
+
+      // Migration: Mevcut tabloda yeni teslim ve okundu kolonları yoksa dinamik ekle
+      try {
+        const tableCols = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+          `PRAGMA table_info("DailyAbsenteeismNotification")`
+        );
+        const colNames = new Set((tableCols || []).map(r => r.name.toLowerCase()));
+        if (!colNames.has('wamessageid')) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "waMessageId" TEXT;`);
+        }
+        if (!colNames.has('deliverystatus')) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "deliveryStatus" TEXT DEFAULT 'PENDING';`);
+        }
+        if (!colNames.has('deliveredat')) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "deliveredAt" DATETIME;`);
+        }
+        if (!colNames.has('readat')) {
+          await prisma.$executeRawUnsafe(`ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "readAt" DATETIME;`);
+        }
+      } catch (colErr) {
+        console.warn('[DailyAbsenteeismService] kolon kontrol hatası:', colErr);
+      }
 
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS "idx_daily_notif_student_date" 
@@ -43,6 +69,11 @@ export class DailyAbsenteeismService {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS "idx_daily_notif_date" 
         ON "DailyAbsenteeismNotification"("date");
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "idx_daily_notif_wamsgid" 
+        ON "DailyAbsenteeismNotification"("waMessageId");
       `);
 
       DailyAbsenteeismService.tableInitialized = true;
@@ -165,6 +196,7 @@ export class DailyAbsenteeismService {
       SELECT 
         d.id, d.studentId, d.date, d.sessionType, d.parentName, d.parentPhone,
         d.message, d.status, d.errorMessage, d.sentAt,
+        d.waMessageId, d.deliveryStatus, d.deliveredAt, d.readAt,
         s.fullName as studentName, s.schoolNumber, s.className
       FROM "DailyAbsenteeismNotification" d
       LEFT JOIN "Student" s ON s.id = d.studentId
@@ -173,6 +205,40 @@ export class DailyAbsenteeismService {
     `, targetDate);
 
     return rows;
+  }
+
+  /**
+   * Baileys socket ACK olayları (SERVER_ACK, DELIVERY_ACK, READ) geldiğinde veritabanındaki bildirim durumunu günceller.
+   */
+  async updateDeliveryStatus(waMessageId: string, deliveryStatus: 'SERVER_ACK' | 'DELIVERED' | 'READ') {
+    if (!waMessageId) return;
+    await this.ensureTable();
+    try {
+      if (deliveryStatus === 'READ') {
+        await prisma.$executeRawUnsafe(`
+          UPDATE "DailyAbsenteeismNotification"
+          SET "deliveryStatus" = 'READ',
+              "readAt" = COALESCE("readAt", CURRENT_TIMESTAMP),
+              "deliveredAt" = COALESCE("deliveredAt", CURRENT_TIMESTAMP)
+          WHERE "waMessageId" = ?
+        `, waMessageId);
+      } else if (deliveryStatus === 'DELIVERED') {
+        await prisma.$executeRawUnsafe(`
+          UPDATE "DailyAbsenteeismNotification"
+          SET "deliveryStatus" = CASE WHEN "deliveryStatus" = 'READ' THEN 'READ' ELSE 'DELIVERED' END,
+              "deliveredAt" = COALESCE("deliveredAt", CURRENT_TIMESTAMP)
+          WHERE "waMessageId" = ?
+        `, waMessageId);
+      } else if (deliveryStatus === 'SERVER_ACK') {
+        await prisma.$executeRawUnsafe(`
+          UPDATE "DailyAbsenteeismNotification"
+          SET "deliveryStatus" = CASE WHEN "deliveryStatus" IN ('DELIVERED', 'READ') THEN "deliveryStatus" ELSE 'SERVER_ACK' END
+          WHERE "waMessageId" = ?
+        `, waMessageId);
+      }
+    } catch (err) {
+      console.warn('[DailyAbsenteeismService] updateDeliveryStatus hatası:', err);
+    }
   }
 
   /**
@@ -190,27 +256,33 @@ export class DailyAbsenteeismService {
     const id = crypto.randomUUID();
     let status = 'SENT';
     let errorMessage: string | null = null;
+    let waMessageId: string | null = null;
+    let deliveryStatus = 'PENDING';
 
     try {
       // WhatsApp servisi üzerinden doğrudan mesajı ilet
-      await whatsappService.sendTextMessage(parentPhone, message);
+      const sendRes = await whatsappService.sendTextMessage(parentPhone, message);
+      waMessageId = sendRes?.messageId || null;
+      deliveryStatus = waMessageId ? 'SERVER_ACK' : 'PENDING';
     } catch (err: any) {
       status = 'FAILED';
+      deliveryStatus = 'FAILED';
       errorMessage = err?.message || 'Bilinmeyen WhatsApp gönderim hatası';
     }
 
     // Sonucu veritabanına kaydet
     await prisma.$executeRawUnsafe(`
       INSERT INTO "DailyAbsenteeismNotification" (
-        "id", "studentId", "date", "sessionType", "parentName", "parentPhone", "message", "status", "errorMessage", "sentAt"
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `, id, studentId, date, sessionType, parentName || '', parentPhone, message, status, errorMessage);
+        "id", "studentId", "date", "sessionType", "parentName", "parentPhone", "message", "status", "errorMessage", "sentAt", "waMessageId", "deliveryStatus"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+    `, id, studentId, date, sessionType, parentName || '', parentPhone, message, status, errorMessage, waMessageId, deliveryStatus);
 
     if (status === 'FAILED') {
       return {
         success: false,
         id,
         status,
+        deliveryStatus,
         error: errorMessage,
       };
     }
@@ -219,6 +291,8 @@ export class DailyAbsenteeismService {
       success: true,
       id,
       status: 'SENT',
+      waMessageId,
+      deliveryStatus,
       sentAt: new Date().toISOString(),
     };
   }

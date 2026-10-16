@@ -188,6 +188,30 @@ export async function initialize(): Promise<void> {
 
     sock.ev.on('creds.update', saveCreds);
 
+    // Mesaj teslim edildi ve okundu bildirimleri (ACKs / Receipts: 2=SERVER_ACK, 3=DELIVERY_ACK, 4=READ, 5=PLAYED)
+    sock.ev.on('messages.update', async (updates: any[]) => {
+      try {
+        if (!Array.isArray(updates)) return;
+        for (const update of updates) {
+          const msgId = update.key?.id;
+          const status = update.update?.status;
+          if (!msgId || status === undefined) continue;
+
+          let deliveryStatus: 'SERVER_ACK' | 'DELIVERED' | 'READ' | null = null;
+          if (status === 2) deliveryStatus = 'SERVER_ACK';
+          else if (status === 3) deliveryStatus = 'DELIVERED';
+          else if (status === 4 || status === 5) deliveryStatus = 'READ';
+
+          if (deliveryStatus) {
+            const { dailyAbsenteeismService } = await import('../dailyAbsenteeism/dailyAbsenteeism.service');
+            await dailyAbsenteeismService.updateDeliveryStatus(msgId, deliveryStatus);
+          }
+        }
+      } catch (err) {
+        console.warn('[WhatsApp] messages.update işleme hatası:', err);
+      }
+    });
+
     if (connectionTimeoutTimer) clearTimeout(connectionTimeoutTimer);
     connectionTimeoutTimer = setTimeout(() => {
       if (socket === sock && (state.status === 'connecting' || state.status === 'reconnecting')) {
@@ -454,13 +478,14 @@ export async function sendConsentRequest(
   console.log('📤 WhatsApp veli bilgilendirme ve onay formu linki gönderildi.');
 }
 
-export async function sendTextMessage(phone: string, text: string): Promise<void> {
+export async function sendTextMessage(phone: string, text: string): Promise<{ messageId?: string }> {
   ensureConnected();
   await checkConsent(phone);
   const jid = toJid(phone);
-  await enqueueSend(async () => {
+  return await enqueueSend(async () => {
     ensureConnected();
-    await socket.sendMessage(jid, { text });
+    const sent = await socket.sendMessage(jid, { text });
+    return { messageId: sent?.key?.id };
   });
 }
 
@@ -469,15 +494,16 @@ export async function sendMessageWithPDF(
   text: string,
   pdfPath: string,
   fileName = 'belge.pdf'
-): Promise<void> {
+): Promise<{ messageId?: string }> {
   ensureConnected();
   if (!fs.existsSync(pdfPath)) throw new Error('PDF dosyası bulunamadı.');
   await checkConsent(phone);
   const jid = toJid(phone);
   const document = fs.readFileSync(pdfPath);
-  await enqueueSend(async () => {
+  return await enqueueSend(async () => {
     ensureConnected();
-    await socket.sendMessage(jid, { document, fileName, mimetype: 'application/pdf', caption: text });
+    const sent = await socket.sendMessage(jid, { document, fileName, mimetype: 'application/pdf', caption: text });
+    return { messageId: sent?.key?.id };
   });
 }
 
@@ -485,15 +511,16 @@ export async function sendMessageWithImage(
   phone: string,
   text: string,
   imagePath: string
-): Promise<void> {
+): Promise<{ messageId?: string }> {
   ensureConnected();
   if (!fs.existsSync(imagePath)) throw new Error('Görsel dosyası bulunamadı.');
   await checkConsent(phone);
   const jid = toJid(phone);
   const image = fs.readFileSync(imagePath);
-  await enqueueSend(async () => {
+  return await enqueueSend(async () => {
     ensureConnected();
-    await socket.sendMessage(jid, { image, caption: text, mimetype: 'image/jpeg' });
+    const sent = await socket.sendMessage(jid, { image, caption: text, mimetype: 'image/jpeg' });
+    return { messageId: sent?.key?.id };
   });
 }
 
@@ -501,13 +528,14 @@ export async function sendMessageWithImageBuffer(
   phone: string,
   text: string,
   imageBuffer: Buffer
-): Promise<void> {
+): Promise<{ messageId?: string }> {
   ensureConnected();
   await checkConsent(phone);
   const jid = toJid(phone);
-  await enqueueSend(async () => {
+  return await enqueueSend(async () => {
     ensureConnected();
-    await socket.sendMessage(jid, { image: imageBuffer, caption: text, mimetype: 'image/jpeg' });
+    const sent = await socket.sendMessage(jid, { image: imageBuffer, caption: text, mimetype: 'image/jpeg' });
+    return { messageId: sent?.key?.id };
   });
 }
 

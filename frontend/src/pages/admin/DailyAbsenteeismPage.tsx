@@ -28,7 +28,9 @@ import {
   Printer,
   Loader2,
   Layers,
-  List
+  List,
+  CheckCheck,
+  Check
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -74,13 +76,17 @@ interface NotificationHistoryItem {
   status: 'SENT' | 'FAILED';
   errorMessage?: string;
   sentAt: string;
+  waMessageId?: string;
+  deliveryStatus?: 'PENDING' | 'SERVER_ACK' | 'DELIVERED' | 'READ' | 'FAILED';
+  deliveredAt?: string;
+  readAt?: string;
 }
 
 type SessionType = 'MORNING' | 'AFTERNOON' | 'FULL_DAY';
 
 const SESSION_MAP: Record<SessionType, { label: string; text: string; icon: string }> = {
-  MORNING: { label: 'Sabah İlk Ders', text: 'sabah ilk derste', icon: '☀️' },
-  AFTERNOON: { label: 'Öğleden Sonra İlk Ders', text: 'öğleden sonra ilk derste', icon: '🌤️' },
+  MORNING: { label: 'Sabah İlk Ders', text: 'sabah ilk ders', icon: '☀️' },
+  AFTERNOON: { label: 'Öğleden Sonra İlk Ders', text: 'öğleden sonra ilk ders', icon: '🌤️' },
   FULL_DAY: { label: 'Tam Gün', text: 'tam gün', icon: '📅' },
 };
 
@@ -367,6 +373,51 @@ export default function DailyAbsenteeismPage() {
   const handleParentChange = (studentId: string, parentId: string) => {
     setQueuedStudents(prev =>
       prev.map(s => (s.id === studentId ? { ...s, selectedParentId: parentId } : s))
+    );
+  };
+
+  // ── WhatsApp İletim ve Okunma Durumu Rozeti ──
+  const renderHistoryDeliveryBadge = (row: NotificationHistoryItem) => {
+    if (row.status === 'FAILED') {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full cursor-help"
+          title={row.errorMessage || 'Gönderim başarısız oldu'}
+        >
+          <XCircle size={11} /> Başarısız
+        </span>
+      );
+    }
+
+    if (row.deliveryStatus === 'READ') {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full shadow-2xs"
+          title="Veli WhatsApp mesajını açtı / okudu (Çift Mavi Tik)"
+        >
+          <CheckCheck size={12} className="text-sky-600" /> Okundu
+        </span>
+      );
+    }
+
+    if (row.deliveryStatus === 'DELIVERED') {
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full shadow-2xs"
+          title="Mesaj velinin telefonuna ulaştı (Çift Gri Tik)"
+        >
+          <CheckCheck size={12} className="text-slate-500" /> İletildi
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs"
+        title="WhatsApp sunucusuna ulaştı (Tek Gri Tik)"
+      >
+        <Check size={12} className="text-emerald-600" /> Gönderildi
+      </span>
     );
   };
 
@@ -792,11 +843,10 @@ export default function DailyAbsenteeismPage() {
                   key={key}
                   type="button"
                   onClick={() => setSessionType(key)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isActive
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                  }`}
+                    }`}
                 >
                   <span>{opt.icon}</span>
                   <span>{opt.label}</span>
@@ -815,22 +865,20 @@ export default function DailyAbsenteeismPage() {
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <button
               onClick={() => setActiveTab('express')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'express'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${activeTab === 'express'
                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Send size={15} />
               <span>Hızlı Numara Girişi</span>
             </button>
             <button
               onClick={() => setActiveTab('class')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'class'
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all cursor-pointer ${activeTab === 'class'
                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Users size={15} />
               <span>Sınıf Listesinden Seçim</span>
@@ -975,11 +1023,10 @@ export default function DailyAbsenteeismPage() {
                           <div
                             key={student.id}
                             onClick={() => toggleStudentFromClass(student)}
-                            className={`p-2.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between gap-1.5 select-none ${
-                              isQueued
+                            className={`p-2.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between gap-1.5 select-none ${isQueued
                                 ? 'bg-rose-50/90 border-rose-300 shadow-sm'
                                 : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -1405,11 +1452,10 @@ export default function DailyAbsenteeismPage() {
               <button
                 type="button"
                 onClick={() => setHistoryViewMode('grouped')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
-                  historyViewMode === 'grouped'
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${historyViewMode === 'grouped'
                     ? 'bg-white text-indigo-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
                 title="Sınıflara göre gruplandırılmış görünüm"
               >
                 <Layers size={13} />
@@ -1418,11 +1464,10 @@ export default function DailyAbsenteeismPage() {
               <button
                 type="button"
                 onClick={() => setHistoryViewMode('table')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
-                  historyViewMode === 'table'
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${historyViewMode === 'table'
                     ? 'bg-white text-indigo-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
                 title="Düz liste görünümü"
               >
                 <List size={13} />
@@ -1533,18 +1578,7 @@ export default function DailyAbsenteeismPage() {
                                 <span className="text-[10px] text-slate-500 font-mono ml-1.5">({row.parentPhone})</span>
                               </td>
                               <td className="py-2 px-3">
-                                {row.status === 'SENT' ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                    <CheckCircle2 size={11} /> Başarılı
-                                  </span>
-                                ) : (
-                                  <span
-                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full cursor-help"
-                                    title={row.errorMessage || 'Hata oluştu'}
-                                  >
-                                    <XCircle size={11} /> Başarısız
-                                  </span>
-                                )}
+                                {renderHistoryDeliveryBadge(row)}
                               </td>
                               <td className="py-2 px-3 text-right">
                                 <div className="inline-flex items-center gap-1">
@@ -1614,18 +1648,7 @@ export default function DailyAbsenteeismPage() {
                         <div className="text-[10px] text-slate-500 font-mono">{row.parentPhone}</div>
                       </td>
                       <td className="py-2 px-3">
-                        {row.status === 'SENT' ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                            <CheckCircle2 size={11} /> Başarılı
-                          </span>
-                        ) : (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full cursor-help"
-                            title={row.errorMessage || 'Hata oluştu'}
-                          >
-                            <XCircle size={11} /> Başarısız
-                          </span>
-                        )}
+                        {renderHistoryDeliveryBadge(row)}
                       </td>
                       <td className="py-2 px-3 text-right">
                         <div className="inline-flex items-center gap-1">
@@ -1674,6 +1697,80 @@ export default function DailyAbsenteeismPage() {
               <div className="flex justify-between text-slate-600">
                 <span>Veli: <strong className="text-slate-800">{viewHistoryModalItem.parentName} ({viewHistoryModalItem.parentPhone})</strong></span>
                 <span>Zaman: <strong className="text-slate-800">{SESSION_MAP[viewHistoryModalItem.sessionType]?.label}</strong></span>
+              </div>
+            </div>
+
+            {/* İletim & Okunma Durumu Rapor Kartı */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2">
+              <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                <span>WhatsApp İletim Raporu</span>
+                {viewHistoryModalItem.status === 'FAILED' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100/70 border border-rose-200 px-2 py-0.5 rounded-full">
+                    <XCircle size={12} className="text-rose-600" /> Başarısız
+                  </span>
+                ) : viewHistoryModalItem.deliveryStatus === 'READ' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-800 bg-sky-100/70 border border-sky-200 px-2 py-0.5 rounded-full">
+                    <CheckCheck size={12} className="text-sky-600" /> Veli Okudu (Mavi Tik)
+                  </span>
+                ) : viewHistoryModalItem.deliveryStatus === 'DELIVERED' ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-200/80 border border-slate-300 px-2 py-0.5 rounded-full">
+                    <CheckCheck size={12} className="text-slate-500" /> Cihaza Teslim Edildi
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    <Check size={12} className="text-emerald-600" /> Sunucuya Ulaştı
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-[11px] pt-1">
+                <div className="bg-white p-2 rounded-lg border border-slate-200">
+                  <div className="text-slate-400 text-[10px]">Gönderim</div>
+                  <div className="font-semibold text-slate-800">
+                    {new Date(viewHistoryModalItem.sentAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 font-medium flex items-center gap-0.5">
+                    <Check size={10} /> Sunucuda
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-slate-200">
+                  <div className="text-slate-400 text-[10px]">Cihaza Teslim</div>
+                  <div className="font-semibold text-slate-800">
+                    {viewHistoryModalItem.deliveredAt
+                      ? new Date(viewHistoryModalItem.deliveredAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                      : viewHistoryModalItem.deliveryStatus === 'DELIVERED' || viewHistoryModalItem.deliveryStatus === 'READ'
+                        ? 'İletildi'
+                        : '-'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium flex items-center gap-0.5">
+                    {viewHistoryModalItem.deliveredAt || viewHistoryModalItem.deliveryStatus === 'DELIVERED' || viewHistoryModalItem.deliveryStatus === 'READ' ? (
+                      <>
+                        <CheckCheck size={10} className="text-slate-500" /> İletildi
+                      </>
+                    ) : (
+                      'Bekleniyor...'
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-slate-200">
+                  <div className="text-slate-400 text-[10px]">Okunma Durumu</div>
+                  <div className="font-semibold text-slate-800">
+                    {viewHistoryModalItem.readAt
+                      ? new Date(viewHistoryModalItem.readAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                      : '-'}
+                  </div>
+                  <div className={`text-[10px] font-medium flex items-center gap-0.5 ${viewHistoryModalItem.deliveryStatus === 'READ' ? 'text-sky-600 font-bold' : 'text-slate-400'}`}>
+                    {viewHistoryModalItem.deliveryStatus === 'READ' ? (
+                      <>
+                        <CheckCheck size={10} className="text-sky-600" /> Okundu (Mavi Tik)
+                      </>
+                    ) : (
+                      'Henüz Açılmadı'
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-400 italic">
+                * Not: Veli kendi WhatsApp ayarlarından "Okundu Bilgisi"ni (Mavi Tik) kapattıysa, mesaj veli tarafından açılsa dahi mavi tik yerine iletildi (çift gri tik) olarak görünür.
               </div>
             </div>
 

@@ -60,6 +60,10 @@ export async function initializeDatabase(): Promise<void> {
     { table: 'User', col: 'permissions', sql: 'ALTER TABLE "User" ADD COLUMN "permissions" TEXT DEFAULT \'[]\'' },
     { table: 'User', col: 'isActive', sql: 'ALTER TABLE "User" ADD COLUMN "isActive" BOOLEAN DEFAULT 1' },
     { table: 'Staff', col: 'phone', sql: 'ALTER TABLE "Staff" ADD COLUMN "phone" TEXT' },
+    { table: 'DailyAbsenteeismNotification', col: 'waMessageId', sql: 'ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "waMessageId" TEXT' },
+    { table: 'DailyAbsenteeismNotification', col: 'deliveryStatus', sql: 'ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "deliveryStatus" TEXT DEFAULT \'PENDING\'' },
+    { table: 'DailyAbsenteeismNotification', col: 'deliveredAt', sql: 'ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "deliveredAt" DATETIME' },
+    { table: 'DailyAbsenteeismNotification', col: 'readAt', sql: 'ALTER TABLE "DailyAbsenteeismNotification" ADD COLUMN "readAt" DATETIME' },
   ];
 
   // Tabloların mevcut kolonlarını bir kez çek
