@@ -25,6 +25,7 @@ import {
   Layers
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { NetworkSettingsCard } from '../../components/NetworkSettingsCard';
 
 type WAStatus = 'disconnected' | 'qr' | 'connecting' | 'reconnecting' | 'connected';
 
@@ -338,6 +339,12 @@ export default function WhatsAppPage() {
   const [schoolPhone, setSchoolPhone] = useState('0212 000 00 00');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── Anti-Spam State'leri ──
+  const [antiSpamEnabled, setAntiSpamEnabled] = useState(true);
+  const [antiSpamMinDelay, setAntiSpamMinDelay] = useState(4);
+  const [antiSpamMaxDelay, setAntiSpamMaxDelay] = useState(7);
+  const [antiSpamSaving, setAntiSpamSaving] = useState(false);
+
   const fetchStatus = async () => {
     try {
       const res = await api.get('/whatsapp/status');
@@ -363,6 +370,9 @@ export default function WhatsAppPage() {
         });
         if (d.schoolName) setSchoolName(d.schoolName);
         if (d.schoolPhone) setSchoolPhone(d.schoolPhone);
+        if (d.waAntiSpamEnabled !== undefined) setAntiSpamEnabled(d.waAntiSpamEnabled);
+        if (d.waAntiSpamMinDelay !== undefined) setAntiSpamMinDelay(d.waAntiSpamMinDelay);
+        if (d.waAntiSpamMaxDelay !== undefined) setAntiSpamMaxDelay(d.waAntiSpamMaxDelay);
       }
     } catch {
       // sessizce geç
@@ -430,6 +440,23 @@ export default function WhatsAppPage() {
       toast.error('Şablonlar kaydedilirken bir hata oluştu.');
     } finally {
       setTemplateSaving(false);
+    }
+  };
+
+  const handleSaveAntiSpam = async () => {
+    setAntiSpamSaving(true);
+    try {
+      await api.put('/settings', {
+        waAntiSpamEnabled: antiSpamEnabled,
+        waAntiSpamMinDelay: antiSpamMinDelay,
+        waAntiSpamMaxDelay: antiSpamMaxDelay,
+      });
+      await refreshSettings();
+      toast.success('Anti-Spam koruması ve gecikme ayarları kaydedildi.');
+    } catch {
+      toast.error('Spam ayarları kaydedilirken hata oluştu.');
+    } finally {
+      setAntiSpamSaving(false);
     }
   };
 
@@ -636,6 +663,88 @@ export default function WhatsAppPage() {
                   {actionLoading ? <><Loader2 size={16} className="animate-spin"/> Bekleyin...</> : <><Unlink size={16}/> Bağlantıyı Kes</>}
                 </Button>
               )}
+            </div>
+          </div>
+
+          {/* Ağ ve Çoklu Bilgisayar (Ortak Veritabanı) Kartı */}
+          <NetworkSettingsCard />
+
+          {/* Akıllı Anti-Spam ve Gönderim Güvenliği Kartı */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    Akıllı Anti-Spam ve Gönderim Güvenliği Koruması
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    WhatsApp kurumsal hattınızın toplu bildirimlerde engel/spam filtresine takılmasını önleyen insansı gecikme sistemi.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={antiSpamSaving}
+                onClick={handleSaveAntiSpam}
+                leftIcon={antiSpamSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                className="text-xs font-bold h-8 px-4 bg-emerald-600 hover:bg-emerald-700 self-start sm:self-auto"
+              >
+                {antiSpamSaving ? 'Kaydediliyor...' : 'Spam Ayarlarını Kaydet'}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+              <div className="md:col-span-7 space-y-2">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={antiSpamEnabled}
+                    onChange={e => setAntiSpamEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    Akıllı İnsansı Gönderim Gecikmesini Etkinleştir (Önerilen)
+                  </span>
+                </label>
+                <p className="text-xs text-slate-600 leading-relaxed pl-6">
+                  Ardı ardına giden veli bildirimleri arasına rastgele insansı zaman farkı ekler. Otomatik bildirimler bot algoritması yerine gerçek insan kullanımı izlenimi vererek hesabınızı güvende tutar.
+                </p>
+              </div>
+
+              <div className="md:col-span-5 bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <span className="text-xs font-bold text-slate-700 block">
+                  Mesajlar Arası Bekleme Süresi (Saniye):
+                </span>
+                <div className="flex items-center gap-2 text-xs">
+                  <input
+                    type="number"
+                    min={2}
+                    max={20}
+                    value={antiSpamMinDelay}
+                    onChange={e => setAntiSpamMinDelay(Math.max(2, parseInt(e.target.value) || 2))}
+                    className="w-16 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-center font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <span className="text-slate-500 font-medium">ile</span>
+                  <input
+                    type="number"
+                    min={4}
+                    max={30}
+                    value={antiSpamMaxDelay}
+                    onChange={e => setAntiSpamMaxDelay(Math.max(antiSpamMinDelay + 1, parseInt(e.target.value) || 7))}
+                    className="w-16 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-center font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                  <span className="text-slate-500">sn arası (Rastgele)</span>
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  * Toplu anlık devamsızlık ve mektup gönderimlerinde her veli öncesinde bu aralıktan rastgele bir süre beklenir.
+                </div>
+              </div>
             </div>
           </div>
 

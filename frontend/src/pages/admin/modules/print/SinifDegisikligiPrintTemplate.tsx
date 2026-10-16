@@ -32,7 +32,7 @@ export default function SinifDegisikligiPrintTemplate({ data, settings }: PrintT
         {schoolName.toLocaleUpperCase('tr-TR')} MÜDÜRLÜĞÜNE
       </div>
       
-      <div className="text-justify leading-relaxed text-[16px] indent-8 mb-8">
+      <div className="text-justify leading-relaxed text-[16px] indent-8">
         Velisi bulunduğum okulunuz <strong>{data.student.className || '......'}</strong> sınıfı,{' '}
         <strong>{data.student.schoolNumber || '............'}</strong> nolu öğrencisi{' '}
         <strong>{data.student.fullName || '...........................................'}</strong>'ın{' '}
@@ -41,7 +41,7 @@ export default function SinifDegisikligiPrintTemplate({ data, settings }: PrintT
         nedeniyle sınıf değişikliği yapılması hususunda;
       </div>
       
-      <div className="text-justify leading-relaxed text-[16px] indent-8 mb-24">
+      <div className="text-justify leading-relaxed text-[16px] indent-8 mt-4 mb-16">
         Gereğini arz ederim.
       </div>
 

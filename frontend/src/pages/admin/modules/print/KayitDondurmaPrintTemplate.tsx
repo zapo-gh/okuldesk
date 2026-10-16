@@ -36,7 +36,7 @@ export default function KayitDondurmaPrintTemplate({ data, settings }: PrintTemp
         {schoolName.toLocaleUpperCase('tr-TR')} MÜDÜRLÜĞÜNE
       </div>
       
-      <div className="text-justify leading-relaxed text-[16px] indent-8 mb-16">
+      <div className="text-justify leading-relaxed text-[16px] indent-8">
         Velisi olduğum okulunuz <strong>{grade || '...'}</strong>. Sınıf öğrencisi 
         <strong> {data.student.schoolNumber || '............'}</strong> okul numaralı 
         <strong> {data.student.fullName || '...........................................'}</strong> 
@@ -45,7 +45,7 @@ export default function KayitDondurmaPrintTemplate({ data, settings }: PrintTemp
         alacağı için <strong>{data.academicYear || '20... - 20...'}</strong> Eğitim Öğretim yılı için kayıt dondurma hakkını kullanmak istiyorum.
       </div>
       
-      <div className="text-justify leading-relaxed text-[16px] indent-8 mb-24">
+      <div className="text-justify leading-relaxed text-[16px] indent-8 mt-4 mb-16">
         Gereğini arz ederim.
       </div>
 

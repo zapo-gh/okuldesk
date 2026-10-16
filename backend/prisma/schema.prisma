@@ -190,6 +190,9 @@ model SchoolSettings {
   waTemplateDaily            String?   @default("")
   waTemplateWarningNotice    String?   @default("")
   waTemplateConsentRequest   String?   @default("")
+  waAntiSpamEnabled          Boolean?  @default(true)
+  waAntiSpamMinDelay         Int?      @default(4)
+  waAntiSpamMaxDelay         Int?      @default(7)
   dutyRotationFreq  String    @default("weekly") // none, weekly, biweekly, monthly, custom
   dutyRotationDates String?   @default("[]") // JSON string array of dates for custom rotation
   dutyStartDate     String? // "YYYY-MM-DD" — nöbet başlangıç tarihi (null = kısıtsız)

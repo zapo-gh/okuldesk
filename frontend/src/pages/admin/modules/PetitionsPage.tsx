@@ -651,7 +651,7 @@ export default function PetitionsPage() {
                 </div>
 
                 {petitionType === 'MESEM_NAKIL' ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5">
                     <p className="text-justify indent-6 leading-relaxed">
                       Velisi olduğum okulunuz öğrencisi{' '}
                       <strong className="text-indigo-900 bg-indigo-50 px-1 rounded">
@@ -663,7 +663,7 @@ export default function PetitionsPage() {
                       </strong>
                       'ne aldırmak istiyorum. Öğrencimin öğrenim durum belgesi ve öğrenim belgesinin tarafıma verilerek e-okul sisteminde Mesleki Eğitim Merkezine "nakil gidebilir" olarak işaretlenmesini talep ediyorum.
                     </p>
-                    <p className="indent-6">Gereğini arz ederim.</p>
+                    <p className="indent-6 text-justify">Gereğini arz ederim.</p>
                   </div>
                 ) : petitionType === 'KAYIT_DONDURMA' ? (
                   <div className="space-y-4">

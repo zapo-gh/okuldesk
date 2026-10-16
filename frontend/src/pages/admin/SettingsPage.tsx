@@ -7,7 +7,6 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Settings, Save, Edit, ShieldAlert, School, KeyRound, AlertTriangle, CheckCircle2, X, Info, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
-import { NetworkSettingsCard } from '../../components/NetworkSettingsCard';
 
 export default function SettingsPage() {
   const { user, clearMustChangePassword } = useAuth();
@@ -210,9 +209,6 @@ export default function SettingsPage() {
       {confirmModal}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Ağ ve Çoklu Bilgisayar (Ortak Veritabanı) Kartı */}
-        <NetworkSettingsCard />
-
         {/* Okul Bilgileri */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-5 border-b border-gray-100 bg-gray-50/50">

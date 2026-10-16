@@ -315,33 +315,33 @@ export default function StaffPage() {
         <div className="flex justify-end gap-1.5">
           {viewMode === 'active' ? (
             <>
-              <Button 
-                variant="ghost" 
+              <button 
+                type="button"
                 onClick={() => openEdit(s)} 
-                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 h-8 w-8 rounded-lg" 
+                className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 border border-indigo-200/80 transition-colors cursor-pointer shadow-2xs" 
                 title="Düzenle"
               >
-                <Edit size={16} />
-              </Button>
-              <Button 
-                variant="ghost" 
+                <Edit size={16} className="text-indigo-600" />
+              </button>
+              <button 
+                type="button"
                 onClick={() => handleDelete(s.id)} 
                 disabled={deleteId === s.id} 
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 h-8 w-8 rounded-lg disabled:opacity-50" 
+                className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 border border-rose-200/80 transition-colors cursor-pointer shadow-2xs disabled:opacity-50" 
                 title="Sil"
               >
-                <Trash2 size={16} />
-              </Button>
+                <Trash2 size={16} className="text-rose-600" />
+              </button>
             </>
           ) : (
-            <Button 
-              variant="outline" 
+            <button 
+              type="button"
               onClick={() => handleRestore(s.id)} 
-              className="text-indigo-600 border-indigo-300 hover:bg-indigo-50 px-2.5 py-1 text-xs" 
+              className="inline-flex items-center justify-center text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 text-xs rounded-lg font-bold transition-colors cursor-pointer" 
               title="Geri Al"
             >
               Geri Al
-            </Button>
+            </button>
           )}
         </div>
       ),

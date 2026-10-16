@@ -52,11 +52,11 @@ export default function AlanDegisikligiPrintTemplate({ data, settings }: PrintTe
           </div>
         )}
         
-        <div className="text-justify leading-relaxed text-[16px] indent-8 mb-16">
+        <div className="text-justify leading-relaxed text-[16px] indent-8">
           Öğrencimin alan değişikliği talebinin Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği hükümleri ve kontenjan durumu doğrultusunda değerlendirilerek e-Okul sisteminde gerekli alan/dal geçiş işlemlerinin yapılması hususunda;
         </div>
 
-        <div className="text-justify leading-relaxed text-[16px] indent-8 mb-16">
+        <div className="text-justify leading-relaxed text-[16px] indent-8 mt-4 mb-16">
           Gereğini arz ederim.
         </div>
       </div>

@@ -21,6 +21,9 @@ interface Settings {
   waTemplateDaily?: string;
   waTemplateWarningNotice?: string;
   waTemplateConsentRequest?: string;
+  waAntiSpamEnabled?: boolean;
+  waAntiSpamMinDelay?: number;
+  waAntiSpamMaxDelay?: number;
 }
 
 interface SettingsContextType {

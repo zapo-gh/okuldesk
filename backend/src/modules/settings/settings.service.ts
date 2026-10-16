@@ -25,6 +25,9 @@ class SettingsService {
       waTemplateDaily: (settings as any).waTemplateDaily ?? '',
       waTemplateWarningNotice: (settings as any).waTemplateWarningNotice ?? '',
       waTemplateConsentRequest: (settings as any).waTemplateConsentRequest ?? '',
+      waAntiSpamEnabled: (settings as any).waAntiSpamEnabled ?? true,
+      waAntiSpamMinDelay: (settings as any).waAntiSpamMinDelay ?? 4,
+      waAntiSpamMaxDelay: (settings as any).waAntiSpamMaxDelay ?? 7,
       dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
       dutyRotationDates: settings.dutyRotationDates ?? '[]',
       dutyStartDate: settings.dutyStartDate ?? null,
@@ -50,6 +53,9 @@ class SettingsService {
     waTemplateDaily?: string;
     waTemplateWarningNotice?: string;
     waTemplateConsentRequest?: string;
+    waAntiSpamEnabled?: boolean;
+    waAntiSpamMinDelay?: number;
+    waAntiSpamMaxDelay?: number;
     dutyRotationFreq?: string;
     dutyRotationDates?: string;
     dutyStartDate?: string | null;
@@ -76,6 +82,9 @@ class SettingsService {
         waTemplateDaily: data.waTemplateDaily ?? '',
         waTemplateWarningNotice: data.waTemplateWarningNotice ?? '',
         waTemplateConsentRequest: data.waTemplateConsentRequest ?? '',
+        waAntiSpamEnabled: data.waAntiSpamEnabled ?? true,
+        waAntiSpamMinDelay: data.waAntiSpamMinDelay ?? 4,
+        waAntiSpamMaxDelay: data.waAntiSpamMaxDelay ?? 7,
         dutyRotationFreq: data.dutyRotationFreq ?? 'weekly',
         dutyRotationDates: data.dutyRotationDates ?? '[]',
         dutyStartDate: data.dutyStartDate ?? null,
@@ -98,6 +107,9 @@ class SettingsService {
         ...(data.waTemplateDaily !== undefined && { waTemplateDaily: data.waTemplateDaily }),
         ...(data.waTemplateWarningNotice !== undefined && { waTemplateWarningNotice: data.waTemplateWarningNotice }),
         ...(data.waTemplateConsentRequest !== undefined && { waTemplateConsentRequest: data.waTemplateConsentRequest }),
+        ...(data.waAntiSpamEnabled !== undefined && { waAntiSpamEnabled: data.waAntiSpamEnabled }),
+        ...(data.waAntiSpamMinDelay !== undefined && { waAntiSpamMinDelay: data.waAntiSpamMinDelay }),
+        ...(data.waAntiSpamMaxDelay !== undefined && { waAntiSpamMaxDelay: data.waAntiSpamMaxDelay }),
         ...(data.dutyRotationFreq !== undefined && { dutyRotationFreq: data.dutyRotationFreq }),
         ...(data.dutyRotationDates !== undefined && { dutyRotationDates: data.dutyRotationDates }),
         ...(data.dutyStartDate !== undefined && { dutyStartDate: data.dutyStartDate }),
@@ -125,14 +137,9 @@ class SettingsService {
       waTemplateDaily: (settings as any).waTemplateDaily ?? '',
       waTemplateWarningNotice: (settings as any).waTemplateWarningNotice ?? '',
       waTemplateConsentRequest: (settings as any).waTemplateConsentRequest ?? '',
-      dutyRotationFreq: settings.dutyRotationFreq ?? 'weekly',
-      dutyRotationDates: settings.dutyRotationDates ?? '[]',
-      dutyStartDate: settings.dutyStartDate ?? null,
-      dutyRoomStationMap: (settings as any).dutyRoomStationMap ?? '{}',
-      classDisplayMap: (settings as any).classDisplayMap ?? '{}',
-      lastRotationDate: settings.lastRotationDate?.toISOString() ?? null,
-      publicBaseUrl: (settings as any).publicBaseUrl ?? '',
-      schoolAddress: (settings as any).schoolAddress ?? '',
+      waAntiSpamEnabled: (settings as any).waAntiSpamEnabled ?? true,
+      waAntiSpamMinDelay: (settings as any).waAntiSpamMinDelay ?? 4,
+      waAntiSpamMaxDelay: (settings as any).waAntiSpamMaxDelay ?? 7,
       schoolDistrictCity: (settings as any).schoolDistrictCity ?? '',
       schoolEmail: (settings as any).schoolEmail ?? '',
       schoolPhone: (settings as any).schoolPhone ?? '',

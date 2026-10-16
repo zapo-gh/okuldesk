@@ -147,12 +147,11 @@ export default function DailyAbsenteeismPage() {
   const [queuedStudents, setQueuedStudents] = useState<StudentItem[]>([]);
   const [duplicateMap, setDuplicateMap] = useState<Record<string, string>>({});
 
-  // ── Şablon & Ayarlar ──
+  // ── Şablon & Anti-Spam (WhatsApp Şablon Merkezi üzerinden yönetilir) ──
   const [templateText, setTemplateText] = useState<string>(DEFAULT_TEMPLATE);
-  const [showTemplateSettings, setShowTemplateSettings] = useState<boolean>(false);
-  const [antiSpamEnabled, setAntiSpamEnabled] = useState<boolean>(true);
-  const [antiSpamMinDelay, setAntiSpamMinDelay] = useState<number>(4);
-  const [antiSpamMaxDelay, setAntiSpamMaxDelay] = useState<number>(7);
+  const antiSpamEnabled = settings?.waAntiSpamEnabled !== false;
+  const antiSpamMinDelay = settings?.waAntiSpamMinDelay ?? 4;
+  const antiSpamMaxDelay = settings?.waAntiSpamMaxDelay ?? 7;
 
   // Ayarlardaki anlık devamsızlık şablonuyla senkronize et
   useEffect(() => {
@@ -759,109 +758,9 @@ export default function DailyAbsenteeismPage() {
                 <span>WhatsApp Bağlı Değil</span>
               </Link>
             )}
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowTemplateSettings(!showTemplateSettings)}
-              leftIcon={<Sliders size={15} />}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs py-1.5 px-3"
-            >
-              {showTemplateSettings ? 'Ayarları Gizle' : 'Şablon & Spam Ayarları'}
-            </Button>
           </div>
         }
       />
-
-      {/* ── Şablon & Anti-Spam Ayarları Kartı ── */}
-      {showTemplateSettings && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4 animate-in fade-in duration-150">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles size={18} className="text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-800">Bildirim Mesajı Şablonu ve Akıllı Spam Koruması</h3>
-            </div>
-            <button
-              onClick={() => setTemplateText(DEFAULT_TEMPLATE)}
-              className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline font-medium cursor-pointer"
-            >
-              Varsayılan Şablona Sıfırla
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Şablon Editörü */}
-            <div className="lg:col-span-2 space-y-2">
-              <label className="text-xs font-semibold text-slate-700 block">
-                Mesaj Şablonu:
-              </label>
-              <textarea
-                value={templateText}
-                onChange={e => setTemplateText(e.target.value)}
-                rows={6}
-                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-                placeholder="Mesaj metnini giriniz..."
-              />
-              <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">Etiketler:</span>
-                {['{ogrenci_adi}', '{numara}', '{sinif}', '{veli_adi}', '{tarih}', '{oturum}', '{okul_adi}', '{okul_telefonu}'].map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => setTemplateText(p => p + ' ' + tag)}
-                    className="bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded cursor-pointer font-mono text-[10px]"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Anti-Spam Yapılandırması */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-800">Akıllı Anti-Spam Koruması</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={antiSpamEnabled}
-                  onChange={e => setAntiSpamEnabled(e.target.checked)}
-                  className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                />
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                WhatsApp hesabınızın ardışık bildirimlerde bot/spam filtresine takılmasını önlemek için dinamik hitap varyasyonu, benzersiz zaman damgası ve insansı gecikme uygular.
-              </p>
-
-              <div className="pt-2 border-t border-slate-200/80 space-y-2">
-                <span className="text-xs font-semibold text-slate-700 block">Mesajlar Arası Bekleme Süresi:</span>
-                <div className="flex items-center gap-2 text-xs">
-                  <input
-                    type="number"
-                    min={2}
-                    max={15}
-                    value={antiSpamMinDelay}
-                    onChange={e => setAntiSpamMinDelay(Math.max(2, parseInt(e.target.value) || 2))}
-                    className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-center text-slate-800 font-semibold"
-                  />
-                  <span className="text-slate-500">ile</span>
-                  <input
-                    type="number"
-                    min={4}
-                    max={25}
-                    value={antiSpamMaxDelay}
-                    onChange={e => setAntiSpamMaxDelay(Math.max(antiSpamMinDelay + 1, parseInt(e.target.value) || 7))}
-                    className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-center text-slate-800 font-semibold"
-                  />
-                  <span className="text-slate-500">saniye arası (Rastgele)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Tarih & Devamsızlık Zamanı Barı ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
